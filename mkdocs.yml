@@ -1,5 +1,5 @@
 site_name: Saffier
-site_description: Highly scalable, performant, easy to learn, easy to code and for every application.
+site_description: The only python ORM you will ever need.
 site_url: https://saffier.dymmond.com
 
 theme:

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-    <em>🚀 Highly scalable, performant, easy to learn, easy to code and for every application. 🚀</em>
+    <em>🚀 The only Python ORM you will ever need. 🚀</em>
 </p>
 
 <p align="center">
