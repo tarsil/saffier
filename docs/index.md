@@ -1,7 +1,7 @@
 # Saffier
 
 <p align="center">
-  <a href="https://saffier.dymmond.com"><img src="https://res.cloudinary.com/dymmond/image/upload/v1673619342/saffier/img/logo-gr_z1ot8o.png" alt='Saffier'></a>
+  <a href="https://saffier.dymmond.com"><img src="https://res.cloudinary.com/dymmond/image/upload/v1675104815/Saffier/logo/logo_dowatx.png" alt='Saffier'></a>
 </p>
 
 <p align="center">
