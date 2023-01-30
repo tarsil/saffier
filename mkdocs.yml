@@ -1,0 +1,79 @@
+site_name: Saffier
+site_description: Highly scalable, performant, easy to learn, easy to code and for every application.
+site_url: https://saffier.dymmond.com
+
+theme:
+  name: "material"
+  custom_dir: docs/overrides
+  language: en
+  palette:
+    - scheme: "default"
+      primary: "green"
+      accent: "orange"
+      media: "(prefers-color-scheme: light)"
+      toggle:
+        icon: "material/lightbulb"
+        name: "Switch to dark mode"
+    - scheme: "slate"
+      media: "(prefers-color-scheme: dark)"
+      primary: "green"
+      accent: "orange"
+      toggle:
+        icon: "material/lightbulb-outline"
+        name: "Switch to light mode"
+  favicon: statics/images/favicon.ico
+  logo: statics/images/logo-white.svg
+  features:
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+
+repo_name: dymmond/saffier
+repo_url: https://github.com/dymmond/saffier
+edit_uri: ""
+plugins:
+  - search
+  - markdownextradata:
+      data: data
+
+nav:
+  - Saffier: "index.md"
+  - Saffier People: "saffier-people.md"
+  - Contributing: "contributing.md"
+  - Sponsorship: "sponsorship.md"
+  - Release Notes: "release-notes.md"
+markdown_extensions:
+  - attr_list
+  - toc:
+      permalink: true
+  - markdown.extensions.codehilite:
+      guess_lang: false
+  - mdx_include:
+      base_path: docs
+  - admonition
+  - codehilite
+  - extra
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format ""
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.tabbed:
+      alternate_style: true
+  - md_in_html
+
+extra:
+  alternate:
+    - link: /
+      name: English
+      lang: en
+    # - link: /pt/
+    #   name: Portuguese (Portugal)
+    #   lang: en
+
+extra_css:
+  - statics/css/extra.css
+  - statics/css/custom.css
