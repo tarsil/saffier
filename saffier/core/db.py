@@ -85,7 +85,8 @@ class Database(EncodeDatabase):
         password = credentials.get("password", None)
         host = credentials["host"]
         database = credentials["database"]
+        port = credentials["port"]
 
         if not "password" in credentials:
-            return f"{scheme}://{user}@{host}/{database}"
-        return f"{scheme}://{user}:{password}@{host}/{database}"
+            return f"{scheme}://{user}@{host}:{port}/{database}"
+        return f"{scheme}://{user}:{password}@{host}:{port}/{database}"

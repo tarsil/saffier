@@ -1,9 +1,22 @@
-from typing import Any
+from optparse import NO_DEFAULT
+from typing import Any, Dict, Union
 
-from pydantic import Field
+from pydantic import BaseConfig, BaseModel
+from pydantic.fields import FieldInfo, Undefined
+from typesystem import Integer
+from typesystem import Schema as ISchema
+
+from saffier.types import DictAny
+
+NO_DEFAULT = object()
 
 
-class SaffierField(Field):
+class SaffierField(FieldInfo):
+    def __init__(self, default: Any = NO_DEFAULT, **kwargs: Any) -> None:
+        if default is not NO_DEFAULT:
+            self.default = default
+        super().__init__(default, **kwargs)
+
     def validate(self, value: Any) -> Any:
         if value is None and self.null:
             return None
@@ -28,10 +41,27 @@ class SaffierField(Field):
         return default
 
 
-class AnyField(Field):
+class AnyField(FieldInfo):
     """
     Always matches.
     """
 
     def validate(self, value: Any) -> Any:
         return value
+
+
+class Schema(FieldInfo):
+    """
+    Schema representation of a Schema for Saffier
+    """
+
+    def __init__(
+        self, default: Any = Undefined, *, fields: Dict[str, SaffierField], **kwargs: DictAny
+    ) -> Any:
+        kwargs.update(fields=fields)
+        super().__init__(default=default, **kwargs)
+        self.fields = fields
+
+    class Config(BaseConfig):
+        extra = "allow"
+        arbitrary_types_allowed = True

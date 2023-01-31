@@ -7,29 +7,13 @@ from typing_extensions import Protocol, runtime_checkable
 DIALECTS = {"postgres": "postgres"}
 
 
-@runtime_checkable
-class FieldProtocol(Protocol):
+class BaseFieldProtocol(sqlalchemy.TypeDecorator):
     """
-    Protocol implementation for a Field coming from SQLAlchemy
+    When implementing a field representation from SQLAlchemy, the protocol will be enforced
     """
 
     impl: Any
     cache_ok: bool
-
-    def load_dialect_impl(self, dialect: Any) -> Any:
-        ...
-
-    def process_bind_param(self, value: Any, dialect: Any) -> str:
-        ...
-
-    def process_result_value(self, value: Any, dialect: Any) -> Any:
-        ...
-
-
-class BaseFieldProtocol(sqlalchemy.TypeDecorator, FieldProtocol):
-    """
-    When implementing a field representation from SQLAlchemy, the protocol will be enforced
-    """
 
     @abstractmethod
     def load_dialect_impl(self, dialect: Any) -> Any:
