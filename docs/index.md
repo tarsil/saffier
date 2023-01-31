@@ -29,3 +29,15 @@
 **Source Code**: [https://github.com/dymmond/saffier](https://github.com/dymmond/saffier)
 
 ---
+
+## Motivation
+
+Almost every project, in one way or another uses one (or many) databases. An ORM is simply an mapping
+of the top of an existing database. ORM extends for Object Relational Mapping and bridges object-oriented
+programs and relational databases.
+
+Two of the most well known ORMs are from Django and SQLAlchemy. Both have their own strenghts and
+weaknesses and specific use cases.
+
+This ORM is built on the top of SQLAlchemy core and aims to simplify the way the setup and queries
+are done into a more common and familiar interface.
