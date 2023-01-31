@@ -20,3 +20,12 @@ class SaffierField(Field):
             if len(value) > self.max_length:
                 raise ValueError("Must have no more than {max_length} characters.")
         return value
+
+
+class AnyField(Field):
+    """
+    Always matches.
+    """
+
+    def validate(self, value: Any) -> Any:
+        return value

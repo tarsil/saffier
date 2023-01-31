@@ -12,7 +12,7 @@ from saffier.types import DictAny
 DIALECTS = {"postgres": "postgres"}
 
 
-class GUIDField(BaseFieldProtocol):
+class GUID(BaseFieldProtocol):
     """
     GUID type representation.
     """
@@ -40,7 +40,7 @@ class GUIDField(BaseFieldProtocol):
         return value
 
 
-class IPField(BaseFieldProtocol):
+class IPAddress(BaseFieldProtocol):
     """
     Representation of an IP field.
     """
@@ -65,7 +65,7 @@ class IPField(BaseFieldProtocol):
         return value
 
 
-class ListField(BaseFieldProtocol):
+class List(BaseFieldProtocol):
     """
     Representation of a List.
     """

@@ -1,13 +1,10 @@
 from datetime import date, datetime
-from typing import Any, Optional, Tuple, Type, Union
+from typing import Any, Optional, Sequence, Tuple, Type, Union
 
 import sqlalchemy
-from django.db.models import CharField as DChar
-from pydantic import validators
-from typesystem import String
 
-from saffier.pydantic import SaffierField
-from saffier.sqlalchemy.fields import GUIDField, IPField, ListField
+from saffier._internal import AnyField, SaffierField
+from saffier.sqlalchemy.fields import GUID, IPAddress, List
 from saffier.types import DictAny
 
 
@@ -100,14 +97,10 @@ class FloatField(Field):
     """
 
     def __init__(self, **kwargs: DictAny) -> None:
-        assert "max_digits" in kwargs, "max_digits is required"
-        assert "decimal_places" in kwargs, "decimal_places is required"
         super().__init__(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
-        return sqlalchemy.Float(
-            precision=self.validator.max_digits, decimal_return_scale=self.validator.decimal_places
-        )
+        return sqlalchemy.Float()
 
 
 class BigIntegerField(Field):
@@ -256,3 +249,62 @@ class OneToOneField(ForeignKey):
             nullable=self.null,
             unique=True,
         )
+
+
+class ChoiceField(Field):
+    """
+    Representation of an Enum
+    """
+
+    def __init__(
+        self,
+        choices: Sequence[Union[Tuple[str, str], Tuple[str, int]]],
+        **kwargs: DictAny,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.choices = choices
+
+    def get_validator(self, **kwargs: DictAny) -> AnyField:
+        return AnyField(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        return sqlalchemy.Enum(self.choices)
+
+
+class DecimalField(SaffierField):
+    """
+    Representation of a DecimalField
+    """
+
+    def __init__(self, max_digits: int, decimal_places: int, **kwargs):
+        assert max_digits, "max_digits is required"
+        assert decimal_places, "decimal_places is required"
+        self.max_digits = max_digits
+        self.decimal_places = decimal_places
+        super().__init__(**kwargs)
+
+    def get_column_type(self):
+        return sqlalchemy.Numeric(precision=self.max_digits, scale=self.decimal_places)
+
+
+class UUIDField(Field):
+    """
+    Representation of UUUID
+    """
+
+    def get_column_type(self):
+        return GUID()
+
+
+class IPAddressField(Field):
+    """
+    Representation of UUUID
+    """
+
+    def get_column_type(self):
+        return IPAddress()
+
+
+class ListField(Field):
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        return List()
