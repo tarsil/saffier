@@ -21,6 +21,12 @@ class SaffierField(Field):
                 raise ValueError("Must have no more than {max_length} characters.")
         return value
 
+    def get_default_value(self) -> Any:
+        default = getattr(self, "default", None)
+        if callable(default):
+            return default()
+        return default
+
 
 class AnyField(Field):
     """
