@@ -4,7 +4,6 @@ from tests.settings import DATABASE_URL
 import saffier
 from saffier.core import fields
 from saffier.core.db import Database
-from saffier.core.fields import SaffierField
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 
 database = Database(url=DATABASE_URL)
