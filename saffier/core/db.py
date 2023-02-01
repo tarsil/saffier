@@ -1,5 +1,4 @@
 from typing import Any, Optional, Union
-from urllib.parse import SplitResult, parse_qsl, unquote, urlsplit
 
 from databases.core import Database as EncodeDatabase
 from databases.core import DatabaseURL

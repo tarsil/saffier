@@ -1,10 +1,22 @@
+import typing
 from datetime import date, datetime
-from typing import Any, Optional, Sequence, Tuple, Type, Union
 
 import sqlalchemy
-import typesystem
 
-from saffier._internal import AnyField, SaffierField
+from saffier.core.fields import (
+    URL,
+    UUID,
+    Any,
+    Boolean,
+    Date,
+    DateTime,
+    Decimal,
+    Email,
+    Float,
+    Integer,
+)
+from saffier.core.fields import IPAddress as CoreIPAddress
+from saffier.core.fields import SaffierField, String, Time
 from saffier.sqlalchemy.fields import GUID, IPAddress, List
 from saffier.types import DictAny
 
@@ -16,6 +28,7 @@ class Field:
 
     def __init__(
         self,
+        *,
         primary_key: bool = False,
         index: bool = False,
         unique: bool = False,
@@ -23,11 +36,13 @@ class Field:
     ) -> None:
         if primary_key:
             kwargs["read_only"] = True
-        self.null = kwargs.pop("null", False)
+        self.null = kwargs.get("null", False)
         self.primary_key = primary_key
         self.index = index
         self.unique = unique
-        self.validator: Union["SaffierField", Type["SaffierField"]] = self.get_validator(**kwargs)
+        self.validator: typing.Union[
+            "SaffierField", typing.Type["SaffierField"]
+        ] = self.get_validator(**kwargs)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """
@@ -68,7 +83,7 @@ class CharField(Field):
         super().__init__(**kwargs)
 
     def get_validator(self, **kwargs: DictAny) -> SaffierField:
-        return SaffierField(**kwargs)
+        return String(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.String(length=self.validator.max_length)
@@ -79,6 +94,9 @@ class TextField(Field):
     Representation of a TextField for a big length of text
     """
 
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return String(**kwargs)
+
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Text()
 
@@ -87,6 +105,9 @@ class IntegerField(Field):
     """
     Representation of an IntegerField
     """
+
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Integer(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Integer()
@@ -100,6 +121,9 @@ class FloatField(Field):
     def __init__(self, **kwargs: DictAny) -> None:
         super().__init__(**kwargs)
 
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Float(**kwargs)
+
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Float()
 
@@ -109,6 +133,9 @@ class BigIntegerField(Field):
     Represents a BigIntegerField
     """
 
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Integer(**kwargs)
+
     def get_column_type(self):
         return sqlalchemy.BigInteger()
 
@@ -117,6 +144,9 @@ class BooleanField(Field):
     """
     Representation of a boolean
     """
+
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Boolean(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Boolean()
@@ -145,7 +175,7 @@ class DateTimeField(AutoNowMixin):
     def get_validator(self, **kwargs) -> SaffierField:
         if self.auto_now_add or self.auto_now:
             kwargs["default"] = datetime.now
-        return SaffierField(**kwargs)
+        return DateTime(**kwargs)
 
     def get_column_type(self):
         return sqlalchemy.DateTime()
@@ -159,7 +189,7 @@ class DateField(AutoNowMixin):
     def get_validator(self, **kwargs) -> SaffierField:
         if self.auto_now_add or self.auto_now:
             kwargs["default"] = date.today
-        return SaffierField(**kwargs)
+        return Date(**kwargs)
 
     def get_column_type(self):
         return sqlalchemy.Date()
@@ -170,6 +200,9 @@ class TimeField(Field):
     Representation of time
     """
 
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Time(**kwargs)
+
     def get_column_type(self):
         return sqlalchemy.Time()
 
@@ -178,6 +211,9 @@ class JSONField(Field):
     """
     JSON Representation of an object field
     """
+
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Any(**kwargs)
 
     def get_column_type(self):
         return sqlalchemy.JSON()
@@ -189,10 +225,10 @@ class ForeignKey(Field):
     """
 
     class ForeignKeyValidator(SaffierField):
-        def validate(self, value: Any) -> Any:
+        def validate(self, value: typing.Any) -> typing.Any:
             return value.pk
 
-    def __init__(self, to: Any, null: bool = False, on_delete: Optional[str] = None):
+    def __init__(self, to: typing.Any, null: bool = False, on_delete: typing.Optional[str] = None):
         super().__init__(null=null)
         self.to = to
         self.on_delete = on_delete
@@ -259,20 +295,20 @@ class ChoiceField(Field):
 
     def __init__(
         self,
-        choices: Sequence[Union[Tuple[str, str], Tuple[str, int]]],
+        choices: typing.Sequence[typing.Union[typing.Tuple[str, str], typing.Tuple[str, int]]],
         **kwargs: DictAny,
     ) -> None:
         super().__init__(**kwargs)
         self.choices = choices
 
-    def get_validator(self, **kwargs: DictAny) -> AnyField:
-        return AnyField(**kwargs)
+    def get_validator(self, **kwargs: DictAny) -> Any:
+        return Any(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Enum(self.choices)
 
 
-class DecimalField(SaffierField):
+class DecimalField(Field):
     """
     Representation of a DecimalField
     """
@@ -284,6 +320,9 @@ class DecimalField(SaffierField):
         self.decimal_places = decimal_places
         super().__init__(**kwargs)
 
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Decimal(**kwargs)
+
     def get_column_type(self):
         return sqlalchemy.Numeric(precision=self.max_digits, scale=self.decimal_places)
 
@@ -292,6 +331,9 @@ class UUIDField(Field):
     """
     Representation of UUUID
     """
+
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return UUID(**kwargs)
 
     def get_column_type(self):
         return GUID()
@@ -302,8 +344,27 @@ class IPAddressField(Field):
     Representation of UUUID
     """
 
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return CoreIPAddress(**kwargs)
+
     def get_column_type(self):
         return IPAddress()
+
+
+class Email(CharField):
+    def get_validator(self, **kwargs) -> SaffierField:
+        return Email(**kwargs)
+
+    def get_column_type(self):
+        return sqlalchemy.String(length=self.validator.max_length)
+
+
+class URL(CharField):
+    def get_validator(self, **kwargs) -> SaffierField:
+        return URL(**kwargs)
+
+    def get_column_type(self):
+        return sqlalchemy.String(length=self.validator.max_length)
 
 
 class ListField(Field):

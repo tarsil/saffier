@@ -1,4 +1,4 @@
-from saffier.fields import CharField, DateField, DateTimeField, TextField
+from saffier.fields import DateField
 from saffier.types import DictAny
 
 
@@ -7,7 +7,7 @@ class ModelUtil:
     Utils used by the Registry
     """
 
-    def _update_auto_now_fields(values: DictAny, fields: DictAny) -> DictAny:
+    def _update_auto_now_fields(self, values: DictAny, fields: DictAny) -> DictAny:
         """
         Updates the auto fields
         """
