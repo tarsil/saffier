@@ -43,7 +43,6 @@ class Registry:
         return str(url)
 
     def _get_engine(self):
-        breakpoint()
         url = self._get_database_url()
         engine = create_async_engine(url)
         return engine

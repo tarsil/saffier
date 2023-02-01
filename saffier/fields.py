@@ -16,6 +16,7 @@ class Field:
 
     def __init__(
         self,
+        *,
         primary_key: bool = False,
         index: bool = False,
         unique: bool = False,
@@ -23,7 +24,7 @@ class Field:
     ) -> None:
         if primary_key:
             kwargs["read_only"] = True
-        self.null = kwargs.pop("null", False)
+        self.null = kwargs.get("null", False)
         self.primary_key = primary_key
         self.index = index
         self.unique = unique

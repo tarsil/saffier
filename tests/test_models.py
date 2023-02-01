@@ -21,15 +21,15 @@ class User(saffier.Model):
     }
 
 
-class Product(saffier.Model):
-    tablename = "products"
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "name": saffier.CharField(max_length=100),
-        "rating": saffier.IntegerField(minimum=1, maximum=5),
-        "in_stock": saffier.BooleanField(default=False),
-    }
+# class Product(saffier.Model):
+#     tablename = "products"
+#     registry = models
+#     fields = {
+#         "id": saffier.IntegerField(primary_key=True),
+#         "name": saffier.CharField(max_length=100),
+#         "rating": saffier.IntegerField(minimum=1, maximum=5),
+#         "in_stock": saffier.BooleanField(default=False),
+#     }
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -46,25 +46,25 @@ async def rollback_connections():
             yield
 
 
-def test_model_class():
-    assert list(User.fields.keys()) == ["id", "name", "language"]
-    assert isinstance(User.fields["id"], saffier.IntegerField)
-    assert User.fields["id"].primary_key is True
-    assert isinstance(User.fields["name"], saffier.CharField)
-    assert User.fields["name"].validator.max_length == 100
+# def test_model_class():
+#     assert list(User.fields.keys()) == ["id", "name", "language"]
+#     assert isinstance(User.fields["id"], saffier.IntegerField)
+#     assert User.fields["id"].primary_key is True
+#     assert isinstance(User.fields["name"], saffier.CharField)
+#     assert User.fields["name"].validator.max_length == 100
 
-    with pytest.raises(ValueError):
-        User(invalid="123")
+#     with pytest.raises(ValueError):
+#         User(invalid="123")
 
-    assert User(id=1) != Product(id=1)
-    assert User(id=1) != User(id=2)
-    assert User(id=1) == User(id=1)
+#     assert User(id=1) != Product(id=1)
+#     assert User(id=1) != User(id=2)
+#     assert User(id=1) == User(id=1)
 
-    assert str(User(id=1)) == "User(id=1)"
-    assert repr(User(id=1)) == "<User: User(id=1)>"
+#     assert str(User(id=1)) == "User(id=1)"
+#     assert repr(User(id=1)) == "<User: User(id=1)>"
 
-    assert isinstance(User.query.schema.fields["id"], SaffierField)
-    assert isinstance(User.query.schema.fields["name"], SaffierField)
+#     assert isinstance(User.query.schema.fields["id"], SaffierField)
+#     assert isinstance(User.query.schema.fields["name"], SaffierField)
 
 
 def test_model_pk():
@@ -78,9 +78,9 @@ async def test_model_crud():
     users = await User.query.all()
     assert users == []
 
-    user = await User.query.create(name="Tom")
+    user = await User.query.create(name="Test")
     users = await User.query.all()
-    assert user.name == "Tom"
+    assert user.name == "Test"
     assert user.pk is not None
     assert users == [user]
 

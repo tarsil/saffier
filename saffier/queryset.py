@@ -1,6 +1,7 @@
 import typing
 
 import sqlalchemy
+from typesystem import Schema as ISchema
 
 from saffier._internal import Schema
 from saffier.constants import FILTER_OPERATORS
@@ -111,12 +112,14 @@ class QuerySet(ModelUtil):
             return self._filter_query(_exclude=True, **kwargs)
 
     def _filter_query(self, _exclude: bool = False, **kwargs):
+        from saffier.models import Model
+
         clauses = []
         filter_clauses = self.filter_clauses
         select_related = list(self._select_related)
 
         if kwargs.get("pk"):
-            pk_name = self.model_cls.pkname
+            pk_name = self.model_class.pkname
             kwargs[pk_name] = kwargs.pop("pk")
 
         for key, value in kwargs.items():
@@ -134,7 +137,7 @@ class QuerySet(ModelUtil):
                     field_name = parts[-1]
                     related_parts = parts[:-1]
 
-                model_cls = self.model_cls
+                model_class = self.model_class
                 if related_parts:
                     # Add any implied select_related
                     related_str = "__".join(related_parts)
@@ -144,9 +147,9 @@ class QuerySet(ModelUtil):
                     # Walk the relationships to the actual model class
                     # against which the comparison is being made.
                     for part in related_parts:
-                        model_cls = model_cls.fields[part].target
+                        model_class = model_class.fields[part].target
 
-                column = model_cls.table.columns[field_name]
+                column = model_class.table.columns[field_name]
 
             else:
                 op = "exact"
@@ -207,7 +210,7 @@ class QuerySet(ModelUtil):
             filter_clauses.extend(search_clauses)
 
         return self.__class__(
-            model_cls=self.model_class,
+            model_class=self.model_class,
             filter_clauses=filter_clauses,
             select_related=self._select_related,
             limit_count=self.limit_count,
@@ -217,7 +220,7 @@ class QuerySet(ModelUtil):
 
     def order_by(self, *order_by):
         return self.__class__(
-            model_cls=self.model_class,
+            model_class=self.model_class,
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
             limit_count=self.limit_count,
@@ -231,7 +234,7 @@ class QuerySet(ModelUtil):
 
         related = list(self._select_related) + related
         return self.__class__(
-            model_cls=self.model_class,
+            model_class=self.model_class,
             filter_clauses=self.filter_clauses,
             select_related=related,
             limit_count=self.limit_count,
@@ -240,13 +243,13 @@ class QuerySet(ModelUtil):
         )
 
     async def exists(self) -> bool:
-        expression = self._build_select_expression()
+        expression = self._build_select()
         expression = sqlalchemy.exists(expression).select()
         return await self.database.fetch_val(expression)
 
     def limit(self, limit_count: int):
         return self.__class__(
-            model_cls=self.model_class,
+            model_class=self.model_class,
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
             limit_count=limit_count,
@@ -256,7 +259,7 @@ class QuerySet(ModelUtil):
 
     def limit_offset(self, offset: int):
         return self.__class__(
-            model_cls=self.model_class,
+            model_class=self.model_class,
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
             limit_count=self.limit_count,
@@ -265,7 +268,7 @@ class QuerySet(ModelUtil):
         )
 
     async def count(self) -> int:
-        expression = self._build_select_expression().alias("subquery_for_count")
+        expression = self._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         return await self.database.fetch_val(expression)
 
@@ -273,7 +276,7 @@ class QuerySet(ModelUtil):
         if kwargs:
             return await self.filter(**kwargs).all()
 
-        expression = self._build_select_expression()
+        expression = self._build_select()
         rows = await self.database.fetch_all(expression)
         return [
             self.model_class._from_row(row, select_related=self._select_related) for row in rows
@@ -283,7 +286,7 @@ class QuerySet(ModelUtil):
         if kwargs:
             return await self.filter(**kwargs).get()
 
-        expression = self._build_select_expression().limit(2)
+        expression = self._build_select().limit(2)
         rows = await self.database.fetch_all(expression)
 
         if not rows:
@@ -309,7 +312,7 @@ class QuerySet(ModelUtil):
             return rows[-1]
 
     def _validate_kwargs(self, **kwargs):
-        fields = self.model_cls.fields
+        fields = self.model_class.fields
         validator = Schema(fields={key: value.validator for key, value in fields.items()})
         kwargs = validator.validate(kwargs)
         for key, value in fields.items():
@@ -344,10 +347,10 @@ class QuerySet(ModelUtil):
 
     async def update(self, **kwargs) -> None:
         fields = {
-            key: field.validator for key, field in self.model_cls.fields.items() if key in kwargs
+            key: field.validator for key, field in self.model_class.fields.items() if key in kwargs
         }
         validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.model_cls.fields)
+        kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.model_class.fields)
         expr = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:
