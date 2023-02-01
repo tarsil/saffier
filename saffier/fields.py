@@ -16,7 +16,7 @@ from saffier.core.fields import (
     Integer,
 )
 from saffier.core.fields import IPAddress as CoreIPAddress
-from saffier.core.fields import SaffierField, String, Text, Time
+from saffier.core.fields import SaffierField, String, Time
 from saffier.sqlalchemy.fields import GUID, IPAddress, List
 from saffier.types import DictAny
 

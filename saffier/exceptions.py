@@ -19,9 +19,6 @@ class SaffierException(Exception):
         return "".join(self.args).strip()
 
 
-from typesystem import ValidationError as IV
-
-
 class DoesNotFound(Exception):
     ...
 

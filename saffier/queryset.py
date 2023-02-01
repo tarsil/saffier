@@ -1,10 +1,9 @@
 import typing
 
 import sqlalchemy
-from core._internal import Schema
-from typesystem import Schema as ISchema
 
 from saffier.constants import FILTER_OPERATORS
+from saffier.core.schemas import Schema
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 from saffier.utils import ModelUtil
@@ -253,7 +252,7 @@ class QuerySet(ModelUtil):
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
             limit_count=limit_count,
-            offset=self._offset,
+            limit_offset=self._offset,
             order_by=self._order_by,
         )
 
@@ -263,7 +262,7 @@ class QuerySet(ModelUtil):
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
             limit_count=self.limit_count,
-            offset=offset,
+            limit_offset=offset,
             order_by=self._order_by,
         )
 
@@ -316,7 +315,6 @@ class QuerySet(ModelUtil):
         validator = Schema(fields={key: value.validator for key, value in fields.items()})
         kwargs = validator.validate(kwargs)
         for key, value in fields.items():
-            breakpoint()
             if value.validator.read_only and value.validator.has_default():
                 kwargs[key] = value.validator.get_default_value()
         return kwargs

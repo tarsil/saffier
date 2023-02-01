@@ -2,15 +2,13 @@ import decimal
 import re
 import typing
 from math import isfinite
-from optparse import NO_DEFAULT
 
-from core.datastructures import ArbitraryHashableBaseModel
-from pydantic import BaseConfig, ValidationError
-from pydantic.fields import FieldInfo, Undefined
+from pydantic import ValidationError
 from typesystem.unique import Uniqueness
 
 from saffier.core import formats
-from saffier.core.base import Message, ValidationResult
+from saffier.core.base import ValidationResult
+from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.core.unique import Uniqueness
 from saffier.types import DictAny
 
@@ -24,13 +22,15 @@ FORMATS = {
     "url": formats.URLFormat(),
 }
 
+NO_DEFAULT = object()
+
 
 class SaffierField(ArbitraryHashableBaseModel):
     """
     The base of all fields used by Saffier
     """
 
-    error_messages = typing.Dict[str, str] = {}
+    error_messages = {}
 
     def __init__(
         self,
@@ -43,12 +43,12 @@ class SaffierField(ArbitraryHashableBaseModel):
         read_only: bool = False,
         **kwargs: typing.Any,
     ) -> None:
+        super().__init__(**kwargs)
         if null and default is NO_DEFAULT:
             default = None
 
         if default is not NO_DEFAULT:
             self.default = default
-        super().__init__(**kwargs)
         self.null = null
         self.read_only = read_only
         self.title = title

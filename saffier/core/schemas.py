@@ -9,11 +9,7 @@ from saffier.types import DictAny
 
 
 class Schema(SaffierField):
-    """
-    The base model for the schemas
-    """
-
-    validation_errors: Dict[str, str] = {
+    error_messages: Dict[str, str] = {
         "type": "Must be an object.",
         "null": "May not be null.",
         "invalid_key": "All object keys must be strings.",
@@ -25,6 +21,9 @@ class Schema(SaffierField):
     ) -> Any:
         super().__init__(default=default, **kwargs)
         self.fields = fields
+        self.required = [
+            key for key, field in fields.items() if not (field.read_only or field.has_default())
+        ]
 
     def validate(self, value: Any) -> Any:
         """
@@ -33,16 +32,22 @@ class Schema(SaffierField):
         if value is None and self.allow_null:
             return None
         elif value is None:
-            raise ValueError(self.validation_errors["null"])
+            raise self.validation_error("null")
         elif not isinstance(value, (dict, Mapping)):
-            raise ValueError(self.validation_errors["type"])
+            raise self.validation_error("type")
 
         validated = {}
         error_messages = []
 
         for key in value.keys():
             if not isinstance(key, str):
-                text = self.validation_errors["invalid_key"]
+                text = self.get_error_message("invalid_key")
+                message = Message(text=text, code="required", index=[key])
+                error_messages.append(message)
+
+        for key in self.required:
+            if key not in value:
+                text = self.get_error_message("required")
                 message = Message(text=text, code="required", index=[key])
                 error_messages.append(message)
 

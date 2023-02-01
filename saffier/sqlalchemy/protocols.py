@@ -1,8 +1,7 @@
 from abc import abstractmethod
-from typing import Any, Protocol
+from typing import Any
 
 import sqlalchemy
-from typing_extensions import Protocol, runtime_checkable
 
 DIALECTS = {"postgres": "postgres"}
 

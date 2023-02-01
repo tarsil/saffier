@@ -1,6 +1,6 @@
 from typing import Any, Iterator, List, Union
 
-from pydantic import BaseConfig, BaseModel, ValidationError
+from pydantic import ValidationError
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel as SaffierBaseModel
 from saffier.types import DictAny
