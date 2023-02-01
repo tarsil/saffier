@@ -1,9 +1,9 @@
 import typing
 
 import sqlalchemy
+from core._internal import Schema
 from typesystem import Schema as ISchema
 
-from saffier._internal import Schema
 from saffier.constants import FILTER_OPERATORS
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
@@ -316,6 +316,7 @@ class QuerySet(ModelUtil):
         validator = Schema(fields={key: value.validator for key, value in fields.items()})
         kwargs = validator.validate(kwargs)
         for key, value in fields.items():
+            breakpoint()
             if value.validator.read_only and value.validator.has_default():
                 kwargs[key] = value.validator.get_default_value()
         return kwargs

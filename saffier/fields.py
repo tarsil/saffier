@@ -2,9 +2,9 @@ from datetime import date, datetime
 from typing import Any, Optional, Sequence, Tuple, Type, Union
 
 import sqlalchemy
-import typesystem
+from core._internal import AnyField, SaffierField
+from typesystem import Integer
 
-from saffier._internal import AnyField, SaffierField
 from saffier.sqlalchemy.fields import GUID, IPAddress, List
 from saffier.types import DictAny
 

@@ -1,9 +1,8 @@
 from optparse import NO_DEFAULT
 from typing import Any, Dict, Mapping, Union
 
-from pydantic import BaseConfig, BaseModel, ValidationError
+from pydantic import BaseConfig, ValidationError
 from pydantic.fields import FieldInfo, Undefined
-from typesystem.fields import Field as IField
 
 from saffier.core.base import Message, ValidationResult
 from saffier.types import DictAny
@@ -12,6 +11,8 @@ NO_DEFAULT = object()
 
 
 class SaffierField(FieldInfo):
+    error_messages = Dict[str, str] = {}
+
     def __init__(
         self, default: Any = NO_DEFAULT, null: bool = False, read_only: bool = False, **kwargs: Any
     ) -> None:
@@ -56,6 +57,19 @@ class SaffierField(FieldInfo):
         if callable(default):
             return default()
         return default
+
+    def __or__(self, other: "SaffierField") -> "Union":
+        if isinstance(self, Union):
+            any_of = self.any_of
+        else:
+            any_of = [self]
+
+        if isinstance(other, Union):
+            any_of += other.any_of
+        else:
+            any_of += [other]
+
+        return Union(any_of=any_of)
 
 
 class AnyField(FieldInfo):

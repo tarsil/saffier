@@ -41,9 +41,10 @@ classifiers = [
 ]
 dependencies = [
     "databases[postgresql, mysql, sqlite]",
+    "orjson >=3.8.5,<4.0.0",
     "pydantic>=1.10.4,<2.0.0",
     "pydantic-factories==1.12.0",
-    "orjson >=3.8.5,<4.0.0",
+    "typesystem>=0.4.1",
 ]
 keywords = ["api", "rest", "http", "asgi", "pydantic", "starlette", "fastapi", "framework", "websocket", "openapi", "ml", "machine learning"]
 
@@ -93,8 +94,9 @@ doc = [
 
 all = [
     "databases[postgresql, mysql, sqlite]",
-    "pydantic>=1.10.4,<2.0.0",
     "orjson>=3.8.5,<4.0.0",
+    "pydantic>=1.10.4,<2.0.0",
+    "typesystem>=0.4.1"
 ]
 
 [tool.hatch.version]

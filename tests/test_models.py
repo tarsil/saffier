@@ -1,8 +1,8 @@
 import pytest
+from core._internal import SaffierField
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier._internal import SaffierField
 from saffier.core.db import Database
 from saffier.fields import CharField, IntegerField
 
@@ -78,6 +78,7 @@ async def test_model_crud():
     users = await User.query.all()
     assert users == []
 
+    breakpoint()
     user = await User.query.create(name="Test")
     users = await User.query.all()
     assert user.name == "Test"
