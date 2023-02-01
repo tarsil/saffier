@@ -1,9 +1,10 @@
 from typing import TYPE_CHECKING, Any, Dict, Mapping, Type
 
-from pydantic import BaseConfig, ValidationError
-from pydantic.fields import FieldInfo, Undefined
+from pydantic import ValidationError
+from pydantic.fields import Undefined
 
 from saffier.core.base import Message
+from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.types import DictAny
 
 if TYPE_CHECKING:
@@ -12,12 +13,12 @@ if TYPE_CHECKING:
 NO_DEFAULT = object()
 
 
-class Schema(FieldInfo):
+class Schema(ArbitraryHashableBaseModel):
     """
-    Schema representation of a Schema for Saffier
+    The base model for the schemas
     """
 
-    validation_errors = {
+    validation_errors: Dict[str, str] = {
         "type": "Must be an object.",
         "null": "May not be null.",
         "invalid_key": "All object keys must be strings.",
@@ -74,7 +75,3 @@ class Schema(FieldInfo):
         if error_messages:
             raise ValidationError(errors=error_messages)
         return validated
-
-    class Config(BaseConfig):
-        extra = "allow"
-        arbitrary_types_allowed = True

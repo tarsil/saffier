@@ -2,13 +2,8 @@ from typing import Any, Iterator, List, Union
 
 from pydantic import BaseConfig, BaseModel, ValidationError
 
+from saffier.core.datastructures import ArbitraryHashableBaseModel as SaffierBaseModel
 from saffier.types import DictAny
-
-
-class SaffierBaseModel(BaseModel):
-    class Config(BaseConfig):
-        arbitrary_types_allowed = True
-        extra = "allow"
 
 
 class Position(SaffierBaseModel):
