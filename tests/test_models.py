@@ -1,5 +1,5 @@
 import pytest
-from core._internal import SaffierField
+from core.fields import SaffierField
 from tests.settings import DATABASE_URL
 
 import saffier

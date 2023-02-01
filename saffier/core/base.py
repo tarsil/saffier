@@ -109,25 +109,9 @@ class Message(SaffierBaseModel):
 
 
 class ValidationResult(SaffierBaseModel):
-    """
-    A pair providing the validated data or validation error.
-    Typically unpacked like so:
-
-    value, error = MySchema.validate_or_error(data)
-    """
-
     def __init__(
         self, *, value: Any = None, error: ValidationError = None, **kwargs: DictAny
     ) -> None:
-        """
-        Either:
-
-        value - The validated data.
-
-        Or:
-
-        error - The validation error.
-        """
         super().__init__(**kwargs)
         assert value is None or error is None
         self.value = value

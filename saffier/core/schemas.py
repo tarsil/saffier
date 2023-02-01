@@ -1,19 +1,14 @@
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Type
+from typing import Any, Dict, Mapping, Type
 
 from pydantic import ValidationError
 from pydantic.fields import Undefined
 
 from saffier.core.base import Message
-from saffier.core.datastructures import ArbitraryHashableBaseModel
+from saffier.core.fields import SaffierField
 from saffier.types import DictAny
 
-if TYPE_CHECKING:
-    from saffier.core._internal import SaffierField
 
-NO_DEFAULT = object()
-
-
-class Schema(ArbitraryHashableBaseModel):
+class Schema(SaffierField):
     """
     The base model for the schemas
     """
@@ -26,13 +21,8 @@ class Schema(ArbitraryHashableBaseModel):
     }
 
     def __init__(
-        self,
-        default: Any = Undefined,
-        *,
-        fields: Dict[str, Type["SaffierField"]],
-        **kwargs: DictAny
+        self, default: Any = Undefined, *, fields: Dict[str, Type[SaffierField]], **kwargs: DictAny
     ) -> Any:
-        kwargs.update(fields=fields)
         super().__init__(default=default, **kwargs)
         self.fields = fields
 
