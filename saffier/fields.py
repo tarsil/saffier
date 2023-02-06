@@ -351,7 +351,7 @@ class IPAddressField(Field):
         return IPAddress()
 
 
-class Email(CharField):
+class EmailField(CharField):
     def get_validator(self, **kwargs) -> SaffierField:
         return Email(**kwargs)
 
@@ -359,7 +359,7 @@ class Email(CharField):
         return sqlalchemy.String(length=self.validator.max_length)
 
 
-class URL(CharField):
+class URLField(CharField):
     def get_validator(self, **kwargs) -> SaffierField:
         return URL(**kwargs)
 

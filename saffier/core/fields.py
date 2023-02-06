@@ -80,7 +80,7 @@ class SaffierField(ArbitraryHashableBaseModel):
         return ValidationError(detail=text)
 
     def get_error_message(self, code: str) -> str:
-        return self.errors[code].format(**self.__dict__)
+        return self.error_messages[code].format(**self.__dict__)
 
     def get_default_value(self) -> typing.Any:
         default = getattr(self, "default", None)
@@ -119,9 +119,6 @@ class String(SaffierField):
         assert max_length is None or isinstance(max_length, int)
         assert pattern is None or isinstance(pattern, (str, typing.Pattern))
 
-        if blank and not self.has_default():
-            self.default = ""
-
         super().__init__(**kwargs)
         self.blank = blank
         self.trim_whitespace = trim_whitespace
@@ -129,6 +126,9 @@ class String(SaffierField):
         self.max_length = max_length
         self.coerse_types = coerse_types
         self.format = format
+
+        if blank and not self.has_default():
+            self.default = ""
 
         if pattern is None:
             self.pattern = None
