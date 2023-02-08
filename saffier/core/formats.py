@@ -38,10 +38,10 @@ IPV6_REGEX = re.compile(r"(?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4}")
 
 
 class BaseFormat:
-    errors: typing.Dict[str, str] = {}
+    error_messages: typing.Dict[str, str] = {}
 
     def validation_error(self, code: str) -> ValidationError:
-        text = self.errors[code].format(**self.__dict__)
+        text = self.error_messages[code].format(**self.__dict__)
         return ValidationError(text=text, code=code)
 
     def is_native_type(self, value: typing.Any) -> bool:
@@ -55,7 +55,7 @@ class BaseFormat:
 
 
 class DateFormat(BaseFormat):
-    errors = {
+    error_messages = {
         "format": "Must be a valid date format.",
         "invalid": "Must be a real date.",
     }
@@ -84,7 +84,7 @@ class DateFormat(BaseFormat):
 
 
 class TimeFormat(BaseFormat):
-    errors = {
+    error_messages = {
         "format": "Must be a valid time format.",
         "invalid": "Must be a real time.",
     }
@@ -117,7 +117,7 @@ class TimeFormat(BaseFormat):
 
 
 class DateTimeFormat(BaseFormat):
-    errors = {
+    error_messages = {
         "format": "Must be a valid datetime format.",
         "invalid": "Must be a real datetime.",
     }
@@ -168,7 +168,7 @@ class DateTimeFormat(BaseFormat):
 
 
 class UUIDFormat(BaseFormat):
-    errors = {"format": "Must be a valid UUID format."}
+    error_messages = {"format": "Must be a valid UUID format."}
 
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, uuid.UUID)
@@ -190,7 +190,7 @@ class UUIDFormat(BaseFormat):
 
 
 class EmailFormat(BaseFormat):
-    errors = {"format": "Must be a valid email format."}
+    error_messages = {"format": "Must be a valid email format."}
 
     def is_native_type(self, value: typing.Any) -> bool:
         return False
@@ -210,7 +210,7 @@ class EmailFormat(BaseFormat):
 
 
 class IPAddressFormat(BaseFormat):
-    errors = {
+    error_messages = {
         "format": "Must be a valid IP format.",
         "invalid": "Must be a real IP.",
     }
@@ -243,7 +243,7 @@ class IPAddressFormat(BaseFormat):
 
 
 class URLFormat(BaseFormat):
-    errors = {"invalid": "Must be a real URL."}
+    error_messages = {"invalid": "Must be a real URL."}
 
     def is_native_type(self, value: typing.Any) -> bool:
         return False

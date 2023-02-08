@@ -9,15 +9,6 @@ from saffier.fields import CharField, TextField
 from saffier.utils import ModelUtil
 
 
-class BaseManager(ModelUtil):
-    def get_queryset(self):
-        """
-        Return a new QuerySet object.
-        The subclasses can override this behaviour to manage the custom Manager.
-        """
-        ...
-
-
 class QuerySet(ModelUtil):
     """
     QuerySet object used for query retrieving.
