@@ -66,9 +66,6 @@ class SaffierField(ArbitraryHashableBaseModel):
     def has_default(self) -> bool:
         return hasattr(self, "default")
 
-    def transform(self, obj: typing.Any) -> typing.Any:
-        return obj
-
     def validation_error(
         self, code: str, value: typing.Optional[typing.Any] = None
     ) -> ValidationError:
@@ -288,9 +285,6 @@ class Float(Number):
 
 class Decimal(Number):
     field_type = decimal.Decimal
-
-    def transform(self, obj: typing.Any) -> typing.Any:
-        return None if obj is None else float(obj)
 
 
 class Boolean(SaffierField):

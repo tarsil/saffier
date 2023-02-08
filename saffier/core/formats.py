@@ -50,9 +50,6 @@ class BaseFormat:
     def validate(self, value: typing.Any) -> typing.Union[typing.Any, ValidationError]:
         raise NotImplementedError()  # pragma: no cover
 
-    def transform(self, obj: typing.Any) -> typing.Optional[str]:
-        raise NotImplementedError()  # pragma: no cover
-
 
 class DateFormat(BaseFormat):
     error_messages = {
@@ -73,14 +70,6 @@ class DateFormat(BaseFormat):
             return datetime.date(**kwargs)
         except ValueError:
             raise self.validation_error("invalid")
-
-    def transform(self, obj: typing.Optional[datetime.date]) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        assert isinstance(obj, datetime.date)
-
-        return obj.isoformat()
 
 
 class TimeFormat(BaseFormat):
@@ -106,14 +95,6 @@ class TimeFormat(BaseFormat):
             return datetime.time(tzinfo=None, **kwargs)
         except ValueError:
             raise self.validation_error("invalid")
-
-    def transform(self, obj: typing.Optional[datetime.time]) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        assert isinstance(obj, datetime.time)
-
-        return obj.isoformat()
 
 
 class DateTimeFormat(BaseFormat):
@@ -153,19 +134,6 @@ class DateTimeFormat(BaseFormat):
         except ValueError:
             raise self.validation_error("invalid")
 
-    def transform(self, obj: typing.Optional[datetime.datetime]) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        assert isinstance(obj, datetime.datetime)
-
-        value = obj.isoformat()
-
-        if value.endswith("+00:00"):
-            value = value[:-6] + "Z"
-
-        return value
-
 
 class UUIDFormat(BaseFormat):
     error_messages = {"format": "Must be a valid UUID format."}
@@ -180,14 +148,6 @@ class UUIDFormat(BaseFormat):
 
         return uuid.UUID(value)
 
-    def transform(self, obj: typing.Optional[uuid.UUID]) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        assert isinstance(obj, uuid.UUID)
-
-        return str(obj)
-
 
 class EmailFormat(BaseFormat):
     error_messages = {"format": "Must be a valid email format."}
@@ -201,12 +161,6 @@ class EmailFormat(BaseFormat):
             raise self.validation_error("format")
 
         return value
-
-    def transform(self, obj: typing.Optional[str]) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        return obj
 
 
 class IPAddressFormat(BaseFormat):
@@ -231,16 +185,6 @@ class IPAddressFormat(BaseFormat):
         except ValueError:
             raise self.validation_error("invalid")
 
-    def transform(
-        self, obj: typing.Union[ipaddress.IPv4Address, ipaddress.IPv6Address, None]
-    ) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        assert isinstance(obj, (ipaddress.IPv4Address, ipaddress.IPv6Address))
-
-        return str(obj)
-
 
 class URLFormat(BaseFormat):
     error_messages = {"invalid": "Must be a real URL."}
@@ -254,9 +198,3 @@ class URLFormat(BaseFormat):
             raise self.validation_error("invalid")
 
         return str(value)
-
-    def transform(self, obj: typing.Optional[str]) -> typing.Optional[str]:
-        if obj is None:
-            return None
-
-        return obj
