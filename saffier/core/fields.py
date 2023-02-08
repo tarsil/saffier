@@ -145,6 +145,8 @@ class String(SaffierField):
             return ""
         elif value is None:
             raise self.validation_error("null")
+        elif self.format in FORMATS and FORMATS[self.format].is_native_type(value):
+            return value
         elif not isinstance(value, str):
             raise self.validation_error("type")
 

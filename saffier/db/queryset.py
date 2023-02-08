@@ -357,6 +357,7 @@ class QuerySet(ModelUtil):
         fields = {
             key: field.validator for key, field in self.model_class.fields.items() if key in kwargs
         }
+
         validator = Schema(fields=fields)
         kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.model_class.fields)
         expr = self.table.update().values(**kwargs)

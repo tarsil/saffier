@@ -1,4 +1,4 @@
-from saffier.fields import DateField
+from saffier.fields import DateField, DateTimeField
 from saffier.types import DictAny
 
 
@@ -12,6 +12,6 @@ class ModelUtil:
         Updates the auto fields
         """
         for k, v in fields.items():
-            if isinstance(v, (DateField, DateField)) and v.auto_now:
+            if isinstance(v, (DateField, DateTimeField)) and v.auto_now:
                 values[k] = v.validator.get_default_value()
         return values

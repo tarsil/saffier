@@ -50,7 +50,7 @@ class BaseFormat:
     def validate(self, value: typing.Any) -> typing.Union[typing.Any, ValidationError]:
         raise NotImplementedError()  # pragma: no cover
 
-    def serialize(self, obj: typing.Any) -> typing.Optional[str]:
+    def transform(self, obj: typing.Any) -> typing.Optional[str]:
         raise NotImplementedError()  # pragma: no cover
 
 
@@ -74,7 +74,7 @@ class DateFormat(BaseFormat):
         except ValueError:
             raise self.validation_error("invalid")
 
-    def serialize(self, obj: typing.Optional[datetime.date]) -> typing.Optional[str]:
+    def transform(self, obj: typing.Optional[datetime.date]) -> typing.Optional[str]:
         if obj is None:
             return None
 
@@ -107,7 +107,7 @@ class TimeFormat(BaseFormat):
         except ValueError:
             raise self.validation_error("invalid")
 
-    def serialize(self, obj: typing.Optional[datetime.time]) -> typing.Optional[str]:
+    def transform(self, obj: typing.Optional[datetime.time]) -> typing.Optional[str]:
         if obj is None:
             return None
 

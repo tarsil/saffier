@@ -9,7 +9,7 @@ from saffier.sqlalchemy.protocols import BaseFieldProtocol
 from saffier.sqlalchemy.types import SubList
 from saffier.types import DictAny
 
-DIALECTS = {"postgres": "postgres"}
+DIALECTS = {"postgres": "postgres", "postgresql": "postgresql"}
 
 
 class GUID(BaseFieldProtocol):
@@ -49,7 +49,7 @@ class IPAddress(BaseFieldProtocol):
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any):
-        if dialect.name != DIALECTS["postgres"]:
+        if dialect.name not in DIALECTS.keys():
             return dialect.type_descriptor(sqlalchemy.CHAR(45))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.INET())
 

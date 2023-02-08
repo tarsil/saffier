@@ -235,9 +235,9 @@ class ForeignKey(Field):
 
     @property
     def target(self):
-        if hasattr(self, "_target"):
+        if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry_models[self.to]
+                self._target = self.registry.models[self.to]
             else:
                 self._target = self.to
         return self._target
@@ -329,7 +329,7 @@ class DecimalField(Field):
 
 class UUIDField(Field):
     """
-    Representation of UUUID
+    Representation of UUID
     """
 
     def get_validator(self, **kwargs: DictAny) -> SaffierField:

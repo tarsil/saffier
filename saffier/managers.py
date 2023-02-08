@@ -1,4 +1,4 @@
-from saffier import queryset
+from saffier.db import queryset
 
 
 class ModelManager(queryset.QuerySet):
