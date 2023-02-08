@@ -1,10 +1,10 @@
 from typing import Any, Dict, Mapping, Type
 
-from pydantic import ValidationError
 from pydantic.fields import Undefined
 
 from saffier.core.base import Message
 from saffier.core.fields import SaffierField
+from saffier.exceptions import ValidationError
 from saffier.types import DictAny
 
 
@@ -65,8 +65,8 @@ class Schema(SaffierField):
             if not error:
                 validated[key] = child_value
             else:
-                error_messages += error.messages(add_prefix=key)
+                error_messages += error.messages(prefix=key)
 
         if error_messages:
-            raise ValidationError(errors=error_messages)
+            raise ValidationError(messages=error_messages)
         return validated

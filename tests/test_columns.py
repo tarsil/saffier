@@ -117,14 +117,13 @@ async def test_model_crud():
     await user.update(
         ipaddress="192.168.1.1",
         name="Chris",
-        email="chirs@encode.io",
+        email="test@encode.io",
         url="https://encode.io",
     )
 
     user = await User.query.get()
     assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
     assert user.url == "https://encode.io"
-    # Test auto_now update
     await product.update(
         data={"foo": 1234},
     )

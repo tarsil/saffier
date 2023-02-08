@@ -3,13 +3,11 @@ import re
 import typing
 from math import isfinite
 
-from pydantic import ValidationError
-from typesystem.unique import Uniqueness
-
 from saffier.core import formats
 from saffier.core.base import ValidationResult
 from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.core.unique import Uniqueness
+from saffier.exceptions import ValidationError
 from saffier.types import DictAny
 
 FORMATS = {
@@ -77,7 +75,7 @@ class SaffierField(ArbitraryHashableBaseModel):
         text = self.get_error_message(code)
         if value:
             text = text.format(*value)
-        return ValidationError(detail=text)
+        return ValidationError(text=text, code=code)
 
     def get_error_message(self, code: str) -> str:
         return self.error_messages[code].format(**self.__dict__)

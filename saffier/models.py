@@ -1,11 +1,11 @@
 from typing import Any
 
 import sqlalchemy
-import typesystem
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from saffier.core.db import Database
-from saffier.queryset import QuerySet
+from saffier.core.schemas import Schema
+from saffier.managers import ModelManager
 from saffier.types import DictAny
 from saffier.utils import ModelUtil
 
@@ -103,7 +103,7 @@ class AbstractModelMeta(metaclass=ModelMeta):
 
 
 class Model(AbstractModelMeta, ModelUtil):
-    query = QuerySet()
+    query = ModelManager()
 
     def __init__(self, **kwargs: DictAny) -> None:
         if "pk" in kwargs:
@@ -142,7 +142,7 @@ class Model(AbstractModelMeta, ModelUtil):
 
     async def update(self, **kwargs):
         fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
-        validator = typesystem.Schema(fields=fields)
+        validator = Schema(fields=fields)
         kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expr = self.table.update().values(**kwargs).where(pk_column == self.pk)

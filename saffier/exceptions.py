@@ -1,5 +1,7 @@
 import typing
 
+from saffier.core.base import BaseError
+
 
 class SaffierException(Exception):
     def __init__(
@@ -27,5 +29,5 @@ class MultipleObjectsReturned(Exception):
     ...
 
 
-class ValidationError(SaffierException, ValueError):
+class ValidationError(BaseError):
     ...
