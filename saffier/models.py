@@ -1,10 +1,12 @@
 from typing import Any
 
 import sqlalchemy
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from saffier.core.db import Database
 from saffier.core.schemas import Schema
+from saffier.fields import Field
 from saffier.managers import ModelManager
 from saffier.types import DictAny
 from saffier.utils import ModelUtil
@@ -64,7 +66,7 @@ class Registry:
         await engine.dispose()
 
 
-class ModelMeta(type):
+class OldModelMeta(type):
     """
     Metaclass for the Saffier models
     """
@@ -98,12 +100,67 @@ class ModelMeta(type):
         return cls._table.columns
 
 
+class BaseMeta:
+    def __init__(self, **kwargs) -> None:
+        self.registry = kwargs.get("registry", None)
+        self.name = kwargs.get("name", None)
+
+
+class ModelMeta(type):
+    """
+    Metaclass for the Saffier models
+    """
+
+    def __new__(cls, name: str, bases: Any, attrs: Any):
+        model_class = super().__new__(cls, name, bases, attrs)
+        Meta = BaseMeta
+
+        # Set the metaclass
+        if "Meta" in attrs:
+            setattr(cls, "_meta", attrs["Meta"]) if "Meta" in attrs else setattr(
+                cls, "_meta", Meta
+            )
+            metadata = cls._meta
+            breakpoint()
+
+            if hasattr(metadata, "registry"):
+                registry = metadata.registry
+
+                model_class.database = registry.database
+                registry.models[name] = model_class
+
+                if getattr(metadata, "name", None) not in attrs:
+                    name = f"{name.lower()}s"
+                    setattr(model_class, "name", name)
+
+        fields = {}
+        for name, field in attrs.items():
+            if (not name.startswith("_") and not name.endswith("_")) and isinstance(field, Field):
+                fields[name] = field
+                setattr(field, "registry", attrs.get("registry"))
+                if field.primary_key:
+                    model_class.pkname = name
+        setattr(model_class, "fields", fields)
+        return model_class
+
+    @property
+    def table(cls):
+        if not hasattr(cls, "_table"):
+            cls._table = cls.build_table()
+        return cls._table
+
+    @property
+    def columns(cls) -> sqlalchemy.sql.ColumnCollection:
+        return cls._table.columns
+
+
 class AbstractModelMeta(metaclass=ModelMeta):
     ...
 
 
 class Model(AbstractModelMeta, ModelUtil):
     query = ModelManager()
+    Meta = BaseMeta
 
     def __init__(self, **kwargs: DictAny) -> None:
         if "pk" in kwargs:
