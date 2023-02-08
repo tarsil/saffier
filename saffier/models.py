@@ -1,7 +1,8 @@
+import typing
 from typing import Any
 
 import sqlalchemy
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, dataclasses
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from saffier.core.db import Database
@@ -65,30 +66,6 @@ class Registry:
 
         await engine.dispose()
 
-
-class OldModelMeta(type):
-    """
-    Metaclass for the Saffier models
-    """
-
-    def __new__(cls, name: str, bases: Any, attrs: Any):
-        model_class = super().__new__(cls, name, bases, attrs)
-
-        if "registry" in attrs:
-            model_class.database = attrs["registry"].database
-            attrs["registry"].models[name] = model_class
-
-            if "tablename" not in attrs:
-                tablename = f"{name.lower()}s"
-                setattr(model_class, "tablename", tablename)
-
-        for name, field in attrs.get("fields", {}).items():
-            setattr(field, "registry", attrs.get("registry"))
-            if field.primary_key:
-                model_class.pkname = name
-
-        return model_class
-
     @property
     def table(cls):
         if not hasattr(cls, "_table"):
@@ -101,9 +78,8 @@ class OldModelMeta(type):
 
 
 class BaseMeta:
-    def __init__(self, **kwargs) -> None:
-        self.registry = kwargs.get("registry", None)
-        self.name = kwargs.get("name", None)
+    registry: Any
+    tablename: typing.Optional[str] = None
 
 
 class ModelMeta(type):
@@ -113,34 +89,30 @@ class ModelMeta(type):
 
     def __new__(cls, name: str, bases: Any, attrs: Any):
         model_class = super().__new__(cls, name, bases, attrs)
-        Meta = BaseMeta
 
         # Set the metaclass
-        if "Meta" in attrs:
-            setattr(cls, "_meta", attrs["Meta"]) if "Meta" in attrs else setattr(
-                cls, "_meta", Meta
-            )
-            metadata = cls._meta
-            breakpoint()
+        attr_meta = attrs.pop("Meta", None)
+        if not attr_meta:
+            return model_class
 
-            if hasattr(metadata, "registry"):
-                registry = metadata.registry
+        registry = attr_meta.registry
+        model_class.database = registry.database
+        registry.models[name] = model_class
 
-                model_class.database = registry.database
-                registry.models[name] = model_class
-
-                if getattr(metadata, "name", None) not in attrs:
-                    name = f"{name.lower()}s"
-                    setattr(model_class, "name", name)
+        if getattr(attr_meta, "tablename", None) is None:
+            name = f"{name.lower()}s"
 
         fields = {}
         for name, field in attrs.items():
             if (not name.startswith("_") and not name.endswith("_")) and isinstance(field, Field):
                 fields[name] = field
-                setattr(field, "registry", attrs.get("registry"))
+                setattr(field, "registry", registry)
                 if field.primary_key:
                     model_class.pkname = name
+
         setattr(model_class, "fields", fields)
+        setattr(model_class.Meta, "registry", registry)
+        setattr(model_class.Meta, "tablename", name)
         return model_class
 
     @property
@@ -160,7 +132,6 @@ class AbstractModelMeta(metaclass=ModelMeta):
 
 class Model(AbstractModelMeta, ModelUtil):
     query = ModelManager()
-    Meta = BaseMeta
 
     def __init__(self, **kwargs: DictAny) -> None:
         if "pk" in kwargs:
@@ -186,8 +157,8 @@ class Model(AbstractModelMeta, ModelUtil):
 
     @classmethod
     def build_table(cls):
-        tablename = cls.tablename
-        metadata = cls.registry._metadata
+        tablename = cls.Meta.tablename
+        metadata = cls.Meta.registry._metadata
         columns = []
         for name, field in cls.fields.items():
             columns.append(field.get_column(name))

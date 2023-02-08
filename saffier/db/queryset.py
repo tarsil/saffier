@@ -37,7 +37,7 @@ class QuerySet(ModelUtil):
 
     @property
     def database(self):
-        return self.model_class.registry.database
+        return self.model_class.Meta.registry.database
 
     @property
     def table(self) -> sqlalchemy.Table:

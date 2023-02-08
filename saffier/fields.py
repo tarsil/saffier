@@ -237,7 +237,7 @@ class ForeignKey(Field):
     def target(self):
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]
+                self._target = self.Meta.registry.models[self.to]
             else:
                 self._target = self.to
         return self._target
