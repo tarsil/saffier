@@ -27,35 +27,35 @@ class StatusEnum(Enum):
 
 
 class Product(saffier.Model):
-    registry = models
-    fields = {
-        "id": fields.IntegerField(primary_key=True),
-        "uuid": fields.UUIDField(null=True),
-        "created": fields.DateTimeField(default=datetime.datetime.now),
-        "created_day": fields.DateField(default=datetime.date.today),
-        "created_time": fields.TimeField(default=time),
-        "created_date": fields.DateField(auto_now_add=True),
-        "created_datetime": fields.DateTimeField(auto_now_add=True),
-        "updated_datetime": fields.DateTimeField(auto_now=True),
-        "updated_date": fields.DateField(auto_now=True),
-        "data": fields.JSONField(default={}),
-        "description": fields.CharField(blank=True, max_length=255),
-        "huge_number": fields.BigIntegerField(default=0),
-        "price": fields.DecimalField(max_digits=5, decimal_places=2, null=True),
-        "status": fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT),
-        "value": fields.FloatField(null=True),
-    }
+    id = fields.IntegerField(primary_key=True)
+    uuid = fields.UUIDField(null=True)
+    created = fields.DateTimeField(default=datetime.datetime.now)
+    created_day = fields.DateField(default=datetime.date.today)
+    created_time = fields.TimeField(default=time)
+    created_date = fields.DateField(auto_now_add=True)
+    created_datetime = fields.DateTimeField(auto_now_add=True)
+    updated_datetime = fields.DateTimeField(auto_now=True)
+    updated_date = fields.DateField(auto_now=True)
+    data = fields.JSONField(default={})
+    description = fields.CharField(blank=True, max_length=255)
+    huge_number = fields.BigIntegerField(default=0)
+    price = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
+    value = fields.FloatField(null=True)
+
+    class Meta:
+        registry = models
 
 
 class User(saffier.Model):
-    registry = models
-    fields = {
-        "id": fields.UUIDField(primary_key=True, default=uuid.uuid4),
-        "name": fields.CharField(null=True, max_length=16),
-        "email": fields.EmailField(null=True, max_length=256),
-        "ipaddress": fields.IPAddressField(null=True),
-        "url": fields.URLField(null=True, max_length=2048),
-    }
+    id = fields.UUIDField(primary_key=True, default=uuid.uuid4)
+    name = fields.CharField(null=True, max_length=16)
+    email = fields.EmailField(null=True, max_length=256)
+    ipaddress = fields.IPAddressField(null=True)
+    url = fields.URLField(null=True, max_length=2048)
+
+    class Meta:
+        registry = models
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -94,7 +94,7 @@ async def test_model_crud():
         value=123.456,
         status=StatusEnum.RELEASED,
         price=decimal.Decimal("999.99"),
-        uuid=uuid.UUID("01175cde-c18f-4a13-a492-21bd9e1cb01b"),
+        uuid=uuid.UUID("f4e87646-bafa-431e-a0cb-e84f2fcf6b55"),
     )
 
     product = await Product.query.get()
@@ -102,7 +102,7 @@ async def test_model_crud():
     assert product.data == {"foo": 123}
     assert product.status == StatusEnum.RELEASED
     assert product.price == decimal.Decimal("999.99")
-    assert product.uuid == uuid.UUID("01175cde-c18f-4a13-a492-21bd9e1cb01b")
+    assert product.uuid == uuid.UUID("f4e87646-bafa-431e-a0cb-e84f2fcf6b55")
 
     last_updated_datetime = product.updated_datetime
     last_updated_date = product.updated_date
@@ -116,14 +116,14 @@ async def test_model_crud():
 
     await user.update(
         ipaddress="192.168.1.1",
-        name="Chris",
-        email="test@encode.io",
-        url="https://encode.io",
+        name="Test",
+        email="test@saffier.com",
+        url="https://saffier.com",
     )
 
     user = await User.query.get()
     assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
-    assert user.url == "https://encode.io"
+    assert user.url == "https://saffier.com"
     await product.update(
         data={"foo": 1234},
     )

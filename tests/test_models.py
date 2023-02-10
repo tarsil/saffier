@@ -13,23 +13,23 @@ pytestmark = pytest.mark.anyio
 
 
 class User(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "name": saffier.CharField(max_length=100),
-        "language": saffier.CharField(max_length=200, null=True),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    name = saffier.CharField(max_length=100)
+    language = saffier.CharField(max_length=200, null=True)
+
+    class Meta:
+        registry = models
 
 
 class Product(saffier.Model):
-    tablename = "products"
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "name": saffier.CharField(max_length=100),
-        "rating": saffier.IntegerField(minimum=1, maximum=5),
-        "in_stock": saffier.BooleanField(default=False),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    name = saffier.CharField(max_length=100)
+    rating = saffier.IntegerField(minimum=1, maximum=5)
+    in_stock = saffier.BooleanField(default=False)
+
+    class Meta:
+        registry = models
+        name = "products"
 
 
 @pytest.fixture(autouse=True, scope="function")
