@@ -1,3 +1,5 @@
+import typing
+
 import sqlalchemy
 
 from saffier.core.metaclass import ModelMeta
