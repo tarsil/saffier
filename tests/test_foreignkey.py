@@ -15,64 +15,64 @@ models = saffier.Registry(database=database)
 
 
 class Album(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "name": saffier.CharField(max_length=100),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
 
 
 class Track(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "album": saffier.ForeignKey("Album", on_delete=saffier.CASCADE),
-        "title": saffier.CharField(max_length=100),
-        "position": saffier.IntegerField(),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    album = saffier.ForeignKey("Album", on_delete=saffier.CASCADE)
+    title = saffier.CharField(max_length=100)
+    position = saffier.IntegerField()
+
+    class Meta:
+        registry = models
 
 
 class Organisation(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "ident": saffier.CharField(max_length=100),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    ident = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
 
 
 class Team(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "org": saffier.ForeignKey(Organisation, on_delete=saffier.RESTRICT),
-        "name": saffier.CharField(max_length=100),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    org = saffier.ForeignKey(Organisation, on_delete=saffier.RESTRICT)
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
 
 
 class Member(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "team": saffier.ForeignKey(Team, on_delete=saffier.SET_NULL, null=True),
-        "email": saffier.CharField(max_length=100),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    team = saffier.ForeignKey(Team, on_delete=saffier.SET_NULL, null=True)
+    email = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
 
 
 class Profile(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "website": saffier.CharField(max_length=100),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    website = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
 
 
 class Person(saffier.Model):
-    registry = models
-    fields = {
-        "id": saffier.IntegerField(primary_key=True),
-        "email": saffier.CharField(max_length=100),
-        "profile": saffier.OneToOneField(Profile),
-    }
+    id = saffier.IntegerField(primary_key=True)
+    email = saffier.CharField(max_length=100)
+    profile = saffier.OneToOneField(Profile)
+
+    class Meta:
+        registry = models
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -97,7 +97,6 @@ async def test_model_crud():
 
     track = await Track.query.get(title="The Bird")
     assert track.album.pk == album.pk
-    assert not hasattr(track.album, "name")
     await track.album.load()
     assert track.album.name == "Malibu"
 
@@ -226,7 +225,7 @@ async def test_on_delete_retstrict():
 async def test_on_delete_set_null():
     organisation = await Organisation.query.create(ident="Encode")
     team = await Team.query.create(org=organisation, name="Maintainers")
-    await Member.query.create(email="member@encode.io", team=team)
+    await Member.query.create(email="member@saffier.com", team=team)
 
     await team.delete()
 
@@ -235,15 +234,14 @@ async def test_on_delete_set_null():
 
 
 async def test_one_to_one_crud():
-    profile = await Profile.query.create(website="https://encode.io")
-    await Person.query.create(email="info@encode.io", profile=profile)
+    profile = await Profile.query.create(website="https://saffier.com")
+    await Person.query.create(email="info@saffier.com", profile=profile)
 
-    person = await Person.query.get(email="info@encode.io")
+    person = await Person.query.get(email="info@saffier.com")
     assert person.profile.pk == profile.pk
-    assert not hasattr(person.profile, "website")
 
     await person.profile.load()
-    assert person.profile.website == "https://encode.io"
+    assert person.profile.website == "https://saffier.com"
 
     exceptions = (
         asyncpg.exceptions.UniqueViolationError,
@@ -252,13 +250,13 @@ async def test_one_to_one_crud():
     )
 
     with pytest.raises(exceptions):
-        await Person.query.create(email="contact@encode.io", profile=profile)
+        await Person.query.create(email="contact@saffier.com", profile=profile)
 
 
 async def test_nullable_foreign_key():
-    await Member.query.create(email="dev@encode.io")
+    await Member.query.create(email="dev@saffier.com")
 
     member = await Member.query.get()
 
-    assert member.email == "dev@encode.io"
+    assert member.email == "dev@saffier.com"
     assert member.team.pk is None

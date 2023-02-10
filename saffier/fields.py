@@ -237,7 +237,7 @@ class ForeignKey(Field):
     def target(self):
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.Meta.registry.models[self.to]
+                self._target = self.registry.models[self.to]
             else:
                 self._target = self.to
         return self._target
@@ -252,7 +252,7 @@ class ForeignKey(Field):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target.Meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
@@ -276,7 +276,7 @@ class OneToOneField(ForeignKey):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target.Meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(

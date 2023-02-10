@@ -77,11 +77,6 @@ class Registry:
         return cls._table.columns
 
 
-class BaseMeta:
-    registry: Any
-    tablename: typing.Optional[str] = None
-
-
 class ModelMeta(type):
     """
     Metaclass for the Saffier models
@@ -95,12 +90,17 @@ class ModelMeta(type):
         if not attr_meta:
             return model_class
 
+        if getattr(attr_meta, "registry", None) is None:
+            raise RuntimeError("registry is missing from the Meta class.")
+
         registry = attr_meta.registry
         model_class.database = registry.database
         registry.models[name] = model_class
 
+        # Making sure the tablename is always set if the value is not provided
         if getattr(attr_meta, "tablename", None) is None:
-            name = f"{name.lower()}s"
+            tablename = f"{name.lower()}s"
+            setattr(model_class.Meta, "tablename", tablename)
 
         fields = {}
         for name, field in attrs.items():
@@ -111,8 +111,6 @@ class ModelMeta(type):
                     model_class.pkname = name
 
         setattr(model_class, "fields", fields)
-        setattr(model_class.Meta, "registry", registry)
-        setattr(model_class.Meta, "tablename", name)
         return model_class
 
     @property
