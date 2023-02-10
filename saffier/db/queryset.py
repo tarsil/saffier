@@ -6,7 +6,7 @@ from saffier.constants import FILTER_OPERATORS
 from saffier.core.schemas import Schema
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
-from saffier.utils import ModelUtil
+from saffier.core.utils import ModelUtil
 
 
 class QuerySet(ModelUtil):
