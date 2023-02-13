@@ -47,6 +47,31 @@ class MetaInfo:
         self.is_model: bool = False
 
 
+def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Registry:
+    """
+    When a registry is missing from the Meta class, it should look up for the bases
+    and obtain the first found registry.
+
+    If not found, then a ImproperlyConfigured exception is raised.
+    """
+    found_registry: Registry = None
+
+    for base in bases:
+        meta: MetaInfo = getattr(base, "_meta", None)
+        if not meta:
+            continue
+
+        if getattr(meta, "registry", None) is not None:
+            found_registry = getattr(meta, "registry")
+            break
+
+    if not found_registry:
+        raise ImproperlyConfigured(
+            "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
+        )
+    return found_registry
+
+
 class BaseModelMeta(type):
     __slots__ = ()
 
@@ -149,7 +174,10 @@ class BaseModelMeta(type):
         new_class = model_class(cls, name, bases, attrs)
 
         if getattr(meta, "registry", None) is None:
-            return new_class
+            if hasattr(new_class, "_db_model") and new_class._db_model:
+                meta.registry = _check_model_inherited_registry(bases)
+            else:
+                return new_class
 
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
@@ -168,6 +196,7 @@ class BaseModelMeta(type):
             if field.primary_key:
                 new_class.pkname = name
 
+        new_class._db_model = True
         setattr(new_class, "fields", meta.fields_mapping)
         return new_class
 

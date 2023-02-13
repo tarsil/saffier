@@ -15,6 +15,7 @@ class Model(ModelMeta, ModelUtil):
 
     query = ModelManager()
     _meta = MetaInfo(None)
+    _db_model: bool = False
 
     def __init__(self, **kwargs: DictAny) -> None:
         if "pk" in kwargs:
