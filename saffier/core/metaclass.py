@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 import sqlalchemy
 
 from saffier import fields as saffier_fields
+from saffier.core.registry import Registry
 from saffier.exceptions import ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
 
 if TYPE_CHECKING:
-    from saffier.core.registry import Registry
     from saffier.models import Model
 
 
@@ -28,19 +28,23 @@ class MetaInfo:
         "pk",
         "one_to_one_fields",
         "pk_attribute",
+        "is_inherited",
+        "is_model",
     )
 
     def __init__(self, meta: "Model.Meta") -> None:
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: typing.Set = set()
         self.fields_mapping: typing.Dict[str, Field] = {}
-        self.registry: typing.Optional[typing.Type["Registry"]] = getattr(meta, "registry", None)
+        self.registry: typing.Optional[typing.Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: typing.Optional[str] = getattr(meta, "tablename", None)
         self.parents: typing.Any = getattr(meta, "parents", None) or []
         self.pk: Field = None
         self.one_to_one_fields: typing.Set[str] = set()
         self.foreign_key_fields: typing.Set[str] = set()
-        self.pk_attribute = getattr(meta, "pk_attribute", "")
+        self.pk_attribute: Field = getattr(meta, "pk_attribute", "")
+        self.is_inherited: bool = getattr(meta, "is_inherited", False)
+        self.is_model: bool = False
 
 
 class BaseModelMeta(type):
@@ -64,6 +68,7 @@ class BaseModelMeta(type):
 
             If a primary_key field is not provided, it it automatically generate one BigIntegerField for the model.
             """
+
             for parent in base.__mro__[1:]:
                 __search_for_fields(parent, attrs)
 
@@ -112,7 +117,7 @@ class BaseModelMeta(type):
         for key, value in attrs.items():
             if isinstance(value, Field):
                 if getattr(meta_class, "abstract", None):
-                    value = copy.deepcopy(value)
+                    value = copy.copy(value)
 
                 fields[key] = value
 
@@ -159,7 +164,7 @@ class BaseModelMeta(type):
             registry.models[name] = new_class
 
         for name, field in meta.fields_mapping.items():
-            setattr(field, "registry", meta.registry)
+            setattr(field, "registry", registry)
             if field.primary_key:
                 new_class.pkname = name
 
@@ -168,8 +173,16 @@ class BaseModelMeta(type):
 
     @property
     def table(cls):
+        """
+        Making sure the tables on inheritance state, creates the new
+        one properly.
+        """
         if not hasattr(cls, "_table"):
             cls._table = cls.build_table()
+        elif hasattr(cls, "_table"):
+            table = cls._table
+            if table.name.lower() != cls._meta.tablename:
+                cls._table = cls.build_table()
         return cls._table
 
     @property

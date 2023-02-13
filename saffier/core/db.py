@@ -1,9 +1,11 @@
-from typing import Any, Optional, Union
+import typing
+from typing import TYPE_CHECKING, Optional, Union
 
 from databases.core import Database as EncodeDatabase
 from databases.core import DatabaseURL
 
-from saffier.types import DictAny
+if TYPE_CHECKING:
+    from saffier.types import DictAny
 
 
 class Database(EncodeDatabase):
@@ -35,7 +37,7 @@ class Database(EncodeDatabase):
         *,
         config: Optional["DictAny"] = None,
         force_rollback: bool = False,
-        **options: Any,
+        **options: typing.Any,
     ):
         assert config is None or (
             url is not None and config is None

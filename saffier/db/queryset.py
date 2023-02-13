@@ -324,6 +324,7 @@ class QuerySet(ModelUtil):
         instance = self.model_class(**kwargs)
         expression = self.table.insert().values(**kwargs)
 
+        # breakpoint()
         if self.pkname not in kwargs:
             instance.pk = await self.database.execute(expression)
         else:

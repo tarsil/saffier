@@ -18,6 +18,7 @@ class User(saffier.Model):
 
     class Meta:
         registry = models
+        abstract = True
 
 
 class Profile(User):
@@ -51,24 +52,21 @@ async def rollback_connections():
             yield
 
 
-async def test_model_inheritance():
-    user = await User.query.create(name="Test", language="EN")
+async def test_model_does_not_exist():
+    with pytest.raises(Exception):
+        await User.query.create(name="Test", language="EN")
+
+
+async def test_model_abstract():
     profile = await Profile.query.create(name="Test2", language="PT", age=23)
+    contact = await Contact.query.create(
+        name="Test2", language="PT", age="25", address="Westminster, London"
+    )
 
-    users = await User.query.all()
     profiles = await Profile.query.all()
-
-    assert len(users) == 1
-    assert len(profiles) == 1
-    assert users[0].pk == user.pk
-    assert profiles[0].pk == profile.pk
-
-
-async def test_model_triple_inheritace():
-    contact = await Contact.query.create(name="Test", language="EN", age="25", address="Far")
-
     contacts = await Contact.query.all()
 
+    assert len(profiles) == 1
     assert len(contacts) == 1
-    assert contact.age == "25"
-    assert contact.address == "Far"
+    assert profiles[0].pk == profile.pk
+    assert contacts[0].pk == contact.pk

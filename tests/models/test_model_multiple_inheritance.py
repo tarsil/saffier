@@ -12,15 +12,15 @@ nother = Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-class User(saffier.Model):
+class BaseUser(saffier.Model):
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
     class Meta:
-        registry = models
+        abstract = True
 
 
-class Profile(User):
+class Profile(BaseUser):
     age = saffier.IntegerField()
 
     class Meta:
@@ -28,10 +28,16 @@ class Profile(User):
         tablename = "profiles"
 
 
-class Contact(Profile):
-    age = saffier.CharField(max_length=255)
-    address = saffier.CharField(max_length=255)
+class Address(saffier.Model):
+    line_one = saffier.CharField(max_length=255, null=True)
+    post_code = saffier.CharField(max_length=255, null=True)
 
+    class Meta:
+        registry = models
+        tablename = "addresses"
+
+
+class Contact(BaseUser, Address):
     class Meta:
         registry = models
         tablename = "contacts"
@@ -52,23 +58,15 @@ async def rollback_connections():
 
 
 async def test_model_inheritance():
-    user = await User.query.create(name="Test", language="EN")
-    profile = await Profile.query.create(name="Test2", language="PT", age=23)
+    await Profile.query.create(name="test", language="EN", age=23)
+    await Address.query.create(line_one="teste")
+    contact = await Contact.query.create(name="test2", language="AU", age=25, post_code="line")
 
-    users = await User.query.all()
     profiles = await Profile.query.all()
-
-    assert len(users) == 1
-    assert len(profiles) == 1
-    assert users[0].pk == user.pk
-    assert profiles[0].pk == profile.pk
-
-
-async def test_model_triple_inheritace():
-    contact = await Contact.query.create(name="Test", language="EN", age="25", address="Far")
-
+    addresses = await Address.query.all()
     contacts = await Contact.query.all()
 
+    assert contact.post_code == "line"
+    assert len(profiles) == 1
+    assert len(addresses) == 1
     assert len(contacts) == 1
-    assert contact.age == "25"
-    assert contact.address == "Far"

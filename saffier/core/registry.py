@@ -58,13 +58,3 @@ class Registry(ArbitraryHashableBaseModel):
                 await conn.run_sync(self.metadata.drop_all)
 
         await engine.dispose()
-
-    @property
-    def table(cls):
-        if not hasattr(cls, "_table"):
-            cls._table = cls.build_table()
-        return cls._table
-
-    @property
-    def columns(cls) -> sqlalchemy.sql.ColumnCollection:
-        return cls._table.columns
