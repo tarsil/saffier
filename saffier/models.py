@@ -1,6 +1,6 @@
 import sqlalchemy
 
-from saffier.core.metaclass import ModelMeta
+from saffier.core.metaclass import MetaInfo, ModelMeta
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.managers import ModelManager
@@ -8,7 +8,13 @@ from saffier.types import DictAny
 
 
 class Model(ModelMeta, ModelUtil):
+    """
+    The models will always have an id attribute as primery key.
+    The primary key can be whatever desired, from IntegerField, FloatField to UUIDField as long as the `id` field is explicitly declared or else it defaults to BigIntegerField.
+    """
+
     query = ModelManager()
+    _meta = MetaInfo(None)
 
     def __init__(self, **kwargs: DictAny) -> None:
         if "pk" in kwargs:
@@ -17,6 +23,26 @@ class Model(ModelMeta, ModelUtil):
             if k not in self.fields:
                 raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
             setattr(self, k, v)
+
+    class Meta:
+        """
+        The `Meta` class used to configure each metadata of the model.
+        Abstract classes are not generated in the database, instead, they are simply used as
+        a reference for field generation.
+
+        Usage:
+
+        .. code-block:: python3
+
+            class User(Model):
+                ...
+
+                class Meta:
+                    registry = models
+                    tablename = "users"
+                    unique_together = (("field_a", "field_b"))
+
+        """
 
     @property
     def pk(self):
@@ -34,8 +60,8 @@ class Model(ModelMeta, ModelUtil):
 
     @classmethod
     def build_table(cls):
-        tablename = cls.Meta.tablename
-        metadata = cls.Meta.registry._metadata
+        tablename = cls._meta.tablename
+        metadata = cls._meta.registry._metadata
         columns = []
         for name, field in cls.fields.items():
             columns.append(field.get_column(name))

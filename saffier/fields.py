@@ -40,9 +40,9 @@ class Field:
         self.primary_key = primary_key
         self.index = index
         self.unique = unique
-        self.validator: typing.Union[
-            "SaffierField", typing.Type["SaffierField"]
-        ] = self.get_validator(**kwargs)
+        self.validator: typing.Union[SaffierField, typing.Type[SaffierField]] = self.get_validator(
+            **kwargs
+        )
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """
@@ -252,7 +252,7 @@ class ForeignKey(Field):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.Meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
@@ -276,7 +276,7 @@ class OneToOneField(ForeignKey):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.Meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(

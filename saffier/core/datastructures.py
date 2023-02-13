@@ -13,7 +13,7 @@ class HashableBaseModel(BaseModel):
     HashableBaseModel handles those corner cases.
     """
 
-    # __slots__ = ["__weakref__"]
+    __slots__ = ["__weakref__"]
 
     def __hash__(self):
         values = {}
