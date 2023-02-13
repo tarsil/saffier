@@ -8,6 +8,11 @@ from saffier.types import DictAny
 
 
 class Model(ModelMeta, ModelUtil):
+    """
+    The models will always have an id attribute as primery key.
+    The primary key can be whatever desired, from IntegerField, FloatField to UUIDField as long as the `id` field is explicitly declared or else it defaults to BigIntegerField.
+    """
+
     query = ModelManager()
     _meta = MetaInfo(None)
 
@@ -22,6 +27,8 @@ class Model(ModelMeta, ModelUtil):
     class Meta:
         """
         The `Meta` class used to configure each metadata of the model.
+        Abstract classes are not generated in the database, instead, they are simply used as
+        a reference for field generation.
 
         Usage:
 

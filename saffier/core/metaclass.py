@@ -61,6 +61,8 @@ class BaseModelMeta(type):
 
             If a class attribute is an instance of the Field, then it will be added to the
             field_mapping but only if the key does not exist already.
+
+            If a primary_key field is not provided, it it automatically generate one BigIntegerField for the model.
             """
             for parent in base.__mro__[1:]:
                 __search_for_fields(parent, attrs)
@@ -85,6 +87,7 @@ class BaseModelMeta(type):
             # Making sure the inherited fields are before the new defined.
             attrs = {**inherited_fields, **attrs}
 
+        # Handle with multiple primary keys and auto generated field if no primary key is provided
         if name != "Model":
             is_pk_present = False
             for key, value in attrs.items():
@@ -117,6 +120,7 @@ class BaseModelMeta(type):
                     one_to_one_fields.add(value)
                 elif isinstance(value, saffier_fields.ForeignKey):
                     foreign_key_fields.add(value)
+
         for slot in fields:
             attrs.pop(slot, None)
         attrs["_meta"] = meta = MetaInfo(meta_class)

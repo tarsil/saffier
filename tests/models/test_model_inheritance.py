@@ -7,21 +7,22 @@ from saffier.core.db import Database
 
 database = Database(url=DATABASE_URL)
 models = Registry(database=database)
+nother = Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
+from uuid import uuid4
+
 
 class User(saffier.Model):
-    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
     class Meta:
-        abstract = True
         registry = models
 
 
-class Profile(User):
+class Profile(saffier.Model):
     age = saffier.IntegerField()
 
     class Meta:
@@ -44,6 +45,7 @@ async def rollback_connections():
 
 
 async def test_model_inheritance():
+    breakpoint()
     user = await User.query.create(name="Test", language="EN")
     profile = await Profile.query.create(name="Test2", language="PT", age=23)
 
