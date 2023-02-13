@@ -1,4 +1,5 @@
 import typing
+from copy import deepcopy
 from datetime import date, datetime
 
 import sqlalchemy
@@ -40,9 +41,9 @@ class Field:
         self.primary_key = primary_key
         self.index = index
         self.unique = unique
-        self.validator: typing.Union[
-            "SaffierField", typing.Type["SaffierField"]
-        ] = self.get_validator(**kwargs)
+        self.validator: typing.Union[SaffierField, typing.Type[SaffierField]] = self.get_validator(
+            **kwargs
+        )
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """

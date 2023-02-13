@@ -2,12 +2,11 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.core import fields
+from saffier import Registry
 from saffier.core.db import Database
-from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 
 database = Database(url=DATABASE_URL)
-models = saffier.Registry(database=database)
+models = Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
@@ -44,8 +43,9 @@ async def rollback_connections():
 
 
 async def test_model_inheritance():
+    breakpoint()
     user = await User.query.create(name="Test", language="EN")
-    profile = await Profile.query.create(name="Test2", language="PT", age=25)
+    profile = await Profile.query.create(name="Test2", language="PT", age=23)
 
     users = await User.query.all()
     profiles = await Profile.query.all()

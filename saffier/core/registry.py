@@ -1,21 +1,22 @@
 import sqlalchemy
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.core.db import Database
-from saffier.types import DictAny
 
 
-class Registry:
+class Registry(ArbitraryHashableBaseModel):
     """
     Registers a database connection object
     """
 
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, **kwargs) -> None:
+        super().__init__(**kwargs)
         assert isinstance(
             database, Database
         ), "database must be an instance of saffier.core.db.Database"
         self.database = database
-        self.models: DictAny = {}
+        self.models = {}
         self._metadata = sqlalchemy.MetaData()
 
     @property

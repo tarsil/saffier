@@ -41,6 +41,7 @@ classifiers = [
 ]
 dependencies = [
     "databases[postgresql, mysql, sqlite]",
+    "orjson >=3.8.5,<4.0.0",
     "pydantic>=1.10.4,<2.0.0",
 ]
 keywords = ["api", "rest", "http", "asgi", "pydantic", "starlette", "fastapi", "framework", "websocket", "openapi", "ml", "machine learning"]
@@ -66,11 +67,13 @@ test = [
     "freezegun>=1.2.2,<2.0.0",
     "mock==5.0.1",
     "pydantic==1.10.4",
+    "types-orjson ==3.6.2",
 ]
 
 dev = [
     "autoflake >=1.4.0",
     "flake8>=3.8.3,<6.0.0",
+    "uvicorn[standard] >=0.19.0",
     "pre-commit>=2.17.0,<3.0.0",
     "loguru>=0.6.0,<0.7.0",
     "watchfiles>=0.16.1,<0.20.0"
@@ -88,6 +91,7 @@ doc = [
 
 all = [
     "databases[postgresql, mysql, sqlite]",
+    "orjson>=3.8.5,<4.0.0",
     "pydantic>=1.10.4,<2.0.0",
 ]
 

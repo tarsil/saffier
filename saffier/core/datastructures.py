@@ -1,5 +1,9 @@
+import inspect
+from typing import Any
+
 from pydantic import BaseModel
 
+from saffier.types import DictAny
 
 object_setattr = object.__setattr__
 
@@ -13,7 +17,7 @@ class HashableBaseModel(BaseModel):
     HashableBaseModel handles those corner cases.
     """
 
-    # __slots__ = ["__weakref__"]
+    __slots__ = ["__weakref__"]
 
     def __hash__(self):
         values = {}

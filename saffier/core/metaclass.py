@@ -1,16 +1,10 @@
+import copy
 from typing import Any
 
 import sqlalchemy
 
 from saffier.fields import Field
 from saffier.types import DictAny
-
-# class BaseTypeMeta:
-#     def add_value_to_class(self, name: str, value: Any):
-#         """
-#         Adds a value to the class
-#         """
-#         setattr(self, name, value)
 
 
 class BaseMeta:
@@ -53,9 +47,32 @@ class BaseModelMeta(type):
             tablename = f"{name.lower()}s"
             setattr(new_class.Meta, "tablename", tablename)
 
+        # Set the parents of the new_class
+        setattr(meta, "parents", parents)
+
+        inherited_attributes = set()
+        for base in new_class.mro():
+            # Models without the Meta are not considered models anyway
+            if base not in parents or not hasattr(base, "Meta"):
+                for k, v in base.__dict__.items():
+                    if v is not None:
+                        inherited_attributes.add(v)
+                continue
+
+            parent_fields = base.fields
+            base_parents = base.Meta.parents.copy()
+            for name, field in parent_fields.items():
+                if name not in new_class.__dict__ and name not in inherited_attributes:
+                    breakpoint()
+                    new_field = copy.deepcopy(field)
+                    setattr(new_class, name, new_field)
+                    attrs[k] = new_field
+
         fields = {}
         for name, field in attrs.items():
-            if (not name.startswith("_") and not name.endswith("_")) and isinstance(field, Field):
+            if (not name.startswith("__") and not name.endswith("__")) and isinstance(
+                field, Field
+            ):
                 fields[name] = field
                 setattr(field, "registry", registry)
                 if field.primary_key:

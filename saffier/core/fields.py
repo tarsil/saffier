@@ -177,7 +177,7 @@ class String(SaffierField):
 
 
 class Number(SaffierField):
-    field_type: typing.Optional[type] = None
+    field_type: typing.Any = None
     error_messages = {
         "type": "Must be a number.",
         "null": "May not be null.",
