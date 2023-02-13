@@ -17,6 +17,7 @@ class User(saffier.Model):
     language = saffier.CharField(max_length=200, null=True)
 
     class Meta:
+        abstract = True
         registry = models
 
 
@@ -43,7 +44,6 @@ async def rollback_connections():
 
 
 async def test_model_inheritance():
-    breakpoint()
     user = await User.query.create(name="Test", language="EN")
     profile = await Profile.query.create(name="Test2", language="PT", age=23)
 

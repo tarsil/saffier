@@ -1,5 +1,4 @@
 import typing
-from copy import deepcopy
 from datetime import date, datetime
 
 import sqlalchemy
@@ -253,7 +252,7 @@ class ForeignKey(Field):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.Meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
@@ -277,7 +276,7 @@ class OneToOneField(ForeignKey):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.Meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(

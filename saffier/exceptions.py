@@ -31,3 +31,7 @@ class MultipleObjectsReturned(Exception):
 
 class ValidationError(BaseError):
     ...
+
+
+class ImproperlyConfigured(SaffierException):
+    ...

@@ -4,9 +4,9 @@ import sqlalchemy
 
 from saffier.constants import FILTER_OPERATORS
 from saffier.core.schemas import Schema
+from saffier.core.utils import ModelUtil
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
-from saffier.core.utils import ModelUtil
 
 
 class QuerySet(ModelUtil):
@@ -37,7 +37,7 @@ class QuerySet(ModelUtil):
 
     @property
     def database(self):
-        return self.model_class.Meta.registry.database
+        return self.model_class._meta.registry.database
 
     @property
     def table(self) -> sqlalchemy.Table:
