@@ -40,10 +40,14 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP",
 ]
 dependencies = [
-    "databases>=0.7.0",
-    "orjson>=3.8.5,<4.0.0",
-    "pydantic>=1.10.4,<2.0.0",
-    "sqlalchemy==1.4.46"
+    "alembic>=1.9.3,<2.0.0",
+    "click>=8.1.3,<9.0.0",
+    "loguru>6.0.0,<7.0.0",
+    "databases[postgresql, mysql, sqlite]",
+    "orjson >=3.8.5,<4.0.0",
+    "pydantic>=1.10.5,<2.0.0",
+    "sqlalchemy==1.4.46",
+    "toml>=0.10.2,<0.20.0"
 ]
 keywords = ["api", "rest", "http", "asgi", "pydantic", "starlette", "fastapi", "framework", "websocket", "openapi", "ml", "machine learning"]
 
@@ -67,7 +71,7 @@ test = [
     "isort>=5.0.6,<6.0.0",
     "freezegun>=1.2.2,<2.0.0",
     "mock==5.0.1",
-    "pydantic==1.10.5",
+    "pydantic>=1.10.5",
     "types-orjson ==3.6.2",
 ]
 
@@ -107,6 +111,9 @@ all = [
     "orjson>=3.8.5,<4.0.0",
     "pydantic>=1.10.4,<2.0.0",
 ]
+
+# [project.scripts]
+# saffier-migrate = "esmerald.core.management:run_from_command_line"
 
 [tool.hatch.version]
 path = "saffier/__init__.py"
