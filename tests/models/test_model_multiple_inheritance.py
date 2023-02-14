@@ -3,7 +3,7 @@ from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Registry
-from saffier.core.db import Database
+from saffier.db.connection import Database
 
 database = Database(url=DATABASE_URL)
 models = Registry(database=database)

@@ -9,7 +9,7 @@ from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import fields
-from saffier.core.db import Database
+from saffier.db.connection import Database
 
 pytestmark = pytest.mark.anyio
 

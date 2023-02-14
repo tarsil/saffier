@@ -1,5 +1,7 @@
 import typing
 
+from saffier.types import Empty, HashableType
+
 
 class Uniqueness:
     """
@@ -9,8 +11,9 @@ class Uniqueness:
     into hashable representations that can.
     """
 
-    TRUE = object()
-    FALSE = object()
+    TRUE = Empty()
+    FALSE = Empty()
+    HASHABLE_TYPES = (int, bool, str, float, list, dict)
 
     def __init__(self, items: list = None) -> None:
         self._set: set = set()
@@ -29,7 +32,7 @@ class Uniqueness:
         """
         Coerce a primitive into a uniquely hashable type, for uniqueness checks.
         """
-        assert (element is None) or isinstance(element, (bool, int, float, str, list, dict))
+        assert (element is None) or isinstance(element, HashableType)
 
         if element is True:
             return self.TRUE

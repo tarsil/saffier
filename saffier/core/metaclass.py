@@ -170,6 +170,7 @@ class BaseModelMeta(type):
         parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
         if not parents:
             return model_class(cls, name, bases, attrs)
+
         meta.parents = parents
         new_class = model_class(cls, name, bases, attrs)
 

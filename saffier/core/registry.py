@@ -2,7 +2,7 @@ import sqlalchemy
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel
-from saffier.core.db import Database
+from saffier.db.connection import Database
 
 
 class Registry(ArbitraryHashableBaseModel):

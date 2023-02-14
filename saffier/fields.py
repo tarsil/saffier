@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 import sqlalchemy
 
-from saffier.core.fields import (
+from saffier.db.fields import (
     URL,
     UUID,
     Any,
@@ -15,8 +15,8 @@ from saffier.core.fields import (
     Float,
     Integer,
 )
-from saffier.core.fields import IPAddress as CoreIPAddress
-from saffier.core.fields import SaffierField, String, Time
+from saffier.db.fields import IPAddress as CoreIPAddress
+from saffier.db.fields import SaffierField, String, Time
 from saffier.sqlalchemy.fields import GUID, IPAddress, List
 from saffier.types import DictAny
 
