@@ -1,4 +1,5 @@
 import copy
+import inspect
 import typing
 from typing import TYPE_CHECKING
 
@@ -6,6 +7,7 @@ import sqlalchemy
 
 from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
+from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
@@ -30,6 +32,8 @@ class MetaInfo:
         "pk_attribute",
         "is_inherited",
         "is_model",
+        "manager",
+        "_model",
     )
 
     def __init__(self, meta: "Model.Meta") -> None:
@@ -45,6 +49,8 @@ class MetaInfo:
         self.pk_attribute: Field = getattr(meta, "pk_attribute", "")
         self.is_inherited: bool = getattr(meta, "is_inherited", False)
         self.is_model: bool = False
+        self._model: typing.Type["Model"] = None
+        self.manager = getattr(meta, "manager", Manager())
 
 
 def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Registry:
@@ -103,6 +109,10 @@ class BaseModelMeta(type):
                 for key, value in base.__dict__.items():
                     if isinstance(value, Field) and key not in attrs:
                         attrs[key] = value
+
+                for key, value in inspect.getmembers(base):
+                    if isinstance(value, Manager) and key not in attrs:
+                        attrs[key] = value.__class__()
             else:
                 # abstract classes
                 for key, value in meta.fields_mapping.items():
@@ -196,6 +206,13 @@ class BaseModelMeta(type):
             setattr(field, "registry", registry)
             if field.primary_key:
                 new_class.pkname = name
+
+        # for key, value in inspect.getmembers(new_class):
+        #     if isinstance(value, Manager):
+        #         value.model_class = new_class
+
+        meta._model = new_class
+        meta.manager.model_class = new_class
 
         new_class._db_model = True
         setattr(new_class, "fields", meta.fields_mapping)

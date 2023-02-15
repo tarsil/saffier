@@ -33,7 +33,10 @@ class QuerySet(ModelUtil):
         self._order_by = [] if order_by is None else order_by
 
     def __get__(self, instance, owner):
+        #     breakpoint()
         return self.__class__(model_class=owner)
+
+    #     return self.get_queryset()
 
     @property
     def database(self):
@@ -324,7 +327,6 @@ class QuerySet(ModelUtil):
         instance = self.model_class(**kwargs)
         expression = self.table.insert().values(**kwargs)
 
-        # breakpoint()
         if self.pkname not in kwargs:
             instance.pk = await self.database.execute(expression)
         else:

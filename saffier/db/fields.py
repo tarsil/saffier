@@ -70,8 +70,6 @@ class SaffierField(ArbitraryHashableBaseModel):
         self, code: str, value: typing.Optional[typing.Any] = None
     ) -> ValidationError:
         text = self.get_error_message(code)
-        if value:
-            text = text.format(*value)
         return ValidationError(text=text, code=code)
 
     def get_error_message(self, code: str) -> str:

@@ -3,7 +3,9 @@ import sqlalchemy
 from saffier.core.metaclass import MetaInfo, ModelMeta
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.managers import ModelManager
+
+# from saffier.db.manager import Manager
+from saffier.db.manager import Manager
 from saffier.types import DictAny
 
 
@@ -13,7 +15,7 @@ class Model(ModelMeta, ModelUtil):
     The primary key can be whatever desired, from IntegerField, FloatField to UUIDField as long as the `id` field is explicitly declared or else it defaults to BigIntegerField.
     """
 
-    query = ModelManager()
+    query = Manager()
     _meta = MetaInfo(None)
     _db_model: bool = False
 
@@ -41,7 +43,6 @@ class Model(ModelMeta, ModelUtil):
                 class Meta:
                     registry = models
                     tablename = "users"
-                    unique_together = (("field_a", "field_b"))
 
         """
 
