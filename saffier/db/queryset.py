@@ -272,42 +272,53 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
     def search(self, term: typing.Any):
+        """
+        Broader way of searching for a given term
+        """
+        queryset = self._clone()
         if not term:
-            return self
+            return queryset
 
-        filter_clauses = list(self.filter_clauses)
+        filter_clauses = list(queryset.filter_clauses)
         value = f"%{term}%"
 
         search_fields = [
             name
-            for name, field in self.model_class.fields.items()
+            for name, field in queryset.model_class.fields.items()
             if isinstance(field, (CharField, TextField))
         ]
-        search_clauses = [self.table.columns[name].ilike(value) for name in search_fields]
+        search_clauses = [queryset.table.columns[name].ilike(value) for name in search_fields]
 
         if len(search_clauses) > 1:
             filter_clauses.append(sqlalchemy.sql.or_(*search_clauses))
         else:
             filter_clauses.extend(search_clauses)
 
-        return self.__class__(
-            model_class=self.model_class,
-            filter_clauses=filter_clauses,
-            select_related=self._select_related,
-            limit_count=self.limit_count,
-            limit_offset=self._offset,
-            order_by=self._order_by,
-        )
+        return queryset
 
     def order_by(self, *order_by):
-        return self.__class__(
-            model_class=self.model_class,
-            filter_clauses=self.filter_clauses,
-            select_related=self._select_related,
-            limit_count=self.limit_count,
-            limit_offset=self._offset,
-            order_by=order_by,
-        )
+        """
+        Returns a QuerySet ordered by the given fields.
+        """
+        queryset = self._clone()
+        queryset._order_by = order_by
+        return queryset
+
+    def limit(self, limit_count: int):
+        """
+        Returns a QuerySet limited by.
+        """
+        queryset = self._clone()
+        queryset.limit_count = limit_count
+        return queryset
+
+    def limit_offset(self, offset: int):
+        """
+        Returns a Queryset limited by the offset.
+        """
+        queryset = self._clone()
+        queryset._offset = offset
+        return queryset
 
     def select_related(self, related):
         if not isinstance(related, (list, tuple)):
@@ -327,26 +338,6 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         expression = self._build_select()
         expression = sqlalchemy.exists(expression).select()
         return await self.database.fetch_val(expression)
-
-    def limit(self, limit_count: int):
-        return self.__class__(
-            model_class=self.model_class,
-            filter_clauses=self.filter_clauses,
-            select_related=self._select_related,
-            limit_count=limit_count,
-            limit_offset=self._offset,
-            order_by=self._order_by,
-        )
-
-    def limit_offset(self, offset: int):
-        return self.__class__(
-            model_class=self.model_class,
-            filter_clauses=self.filter_clauses,
-            select_related=self._select_related,
-            limit_count=self.limit_count,
-            limit_offset=offset,
-            order_by=self._order_by,
-        )
 
     async def count(self) -> int:
         expression = self._build_select().alias("subquery_for_count")
