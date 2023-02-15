@@ -1,6 +1,7 @@
 import typing
 from typing import TYPE_CHECKING, Optional, Union
 
+from databases.core import Connection as EncodeConnection
 from databases.core import Database as EncodeDatabase
 from databases.core import DatabaseURL
 
@@ -91,3 +92,17 @@ class Database(EncodeDatabase):
         if not "password" in credentials:
             return f"{scheme}://{user}@{host}:{port}/{database}"
         return f"{scheme}://{user}:{password}@{host}:{port}/{database}"
+
+    def connection(self) -> "Connection":
+        if self._global_connection is not None:
+            return self._global_connection
+        try:
+            return self._connection_context.get()
+        except LookupError:
+            connection = Connection(self._backend)
+            self._connection_context.set(connection)
+            return connection
+
+
+class Connection(EncodeConnection):
+    ...

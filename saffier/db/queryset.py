@@ -81,6 +81,10 @@ class QuerySetPrivate:
         if self._offset:
             expression = expression.offset(self._offset)
 
+        if self._group_by:
+            group_by = list(map(self._prepare_group_by, self._group_by))
+            expression = expression.group_by(*group_by)
+
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs):
@@ -177,6 +181,11 @@ class QuerySetPrivate:
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
+    def _prepare_group_by(self, group_by: str):
+        group_by = group_by.lstrip("-")
+        group_col = self.table.columns[group_by]
+        return group_col
+
     def _clone(self) -> "QuerySet[SaffierModel]":
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
@@ -185,6 +194,7 @@ class QuerySetPrivate:
         queryset._select_related = copy.copy(self._select_related)
         queryset._offset = self._offset
         queryset._order_by = copy.copy(self._order_by)
+        queryset._group_by = copy.copy(self._group_by)
         return queryset
 
 
@@ -207,6 +217,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         limit_count=None,
         limit_offset=None,
         order_by=None,
+        group_by=None,
     ):
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -215,6 +226,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._select_related = [] if select_related is None else select_related
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
+        self._group_by = [] if group_by is None else group_by
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
@@ -296,7 +308,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
         return queryset
 
-    def order_by(self, *order_by):
+    def order_by(self, *order_by: str):
         """
         Returns a QuerySet ordered by the given fields.
         """
@@ -320,6 +332,11 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset._offset = offset
         return queryset
 
+    def group_by(self, *group_by: str):
+        queryset = self._clone()
+        queryset._group_by = group_by
+        return queryset
+
     def select_related(self, related):
         if not isinstance(related, (list, tuple)):
             related = [related]
@@ -335,11 +352,17 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         )
 
     async def exists(self) -> bool:
+        """
+        Returns a boolean indicating if a record exists or not.
+        """
         expression = self._build_select()
         expression = sqlalchemy.exists(expression).select()
         return await self.database.fetch_val(expression)
 
     async def count(self) -> int:
+        """
+        Returns an indicating the total records.
+        """
         expression = self._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         return await self.database.fetch_val(expression)

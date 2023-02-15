@@ -198,6 +198,40 @@ async def test_model_order_by():
     assert users[0].id == 2
 
 
+async def test_model_group_by():
+    await User.query.create(name="Bob")
+    await User.query.create(name="Allen")
+    await User.query.create(name="Bob")
+
+    users = await User.query.group_by("language", "id").all()
+    assert users[0].name == "Bob"
+    assert users[1].name == "Allen"
+
+    users = await User.query.group_by("language", "id").all()
+    assert users[1].name == "Allen"
+    assert users[2].name == "Bob"
+
+    users = await User.query.group_by("id").order_by("id").all()
+    assert users[0].name == "Bob"
+    assert users[0].id == 1
+    assert users[1].name == "Allen"
+    assert users[1].id == 2
+
+    users = await User.query.filter(name="Bob").group_by("id").all()
+    assert users[0].name == "Bob"
+    assert users[0].id == 1
+    assert users[1].name == "Bob"
+    assert users[1].id == 3
+
+    users = await User.query.group_by("id").limit(1).all()
+    assert users[0].name == "Bob"
+    assert users[0].id == 1
+
+    users = await User.query.group_by("id").limit(1).offset(1).all()
+    assert users[0].name == "Allen"
+    assert users[0].id == 2
+
+
 async def test_model_exists():
     await User.query.create(name="Test")
     assert await User.query.filter(name="Test").exists() is True
