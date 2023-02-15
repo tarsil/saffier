@@ -297,6 +297,10 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         for value in await self:
             yield value
 
+    def reverse(self):
+        """Reverse the ordering of the queryset"""
+        queryset = self._clone()
+
     def _filter_or_exclude(
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
@@ -475,20 +479,22 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
     async def first(self, **kwargs):
+        queryset = self._clone()
         if kwargs:
-            return await self.filter(**kwargs).first()
+            return await queryset.filter(**kwargs).order_by("id").get()
 
-        rows = await self.limit(1).all()
+        rows = await queryset.limit(1).order_by("id").all()
         if rows:
             return rows[0]
 
     async def last(self, **kwargs):
+        queryset = self._clone()
         if kwargs:
-            return await self.filter(**kwargs).last()
+            return await queryset.filter(**kwargs).order_by("-id").get()
 
-        rows = await self.all()
+        rows = await queryset.order_by("-id").all()
         if rows:
-            return rows[-1]
+            return rows[0]
 
     async def create(self, **kwargs):
         kwargs = self._validate_kwargs(**kwargs)

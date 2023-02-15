@@ -281,6 +281,16 @@ async def test_model_first():
     assert await User.query.filter(name="Lucy").first() is None
 
 
+async def test_model_last():
+    Test = await User.query.create(name="Test")
+    jane = await User.query.create(name="Jane")
+
+    assert await User.query.last() == jane
+    assert await User.query.last(name="Jane") == jane
+    assert await User.query.filter(name="Test").last() == Test
+    assert await User.query.filter(name="Lucy").last() is None
+
+
 async def test_model_search():
     Test = await User.query.create(name="Test", language="English")
     tshirt = await Product.query.create(name="T-Shirt", rating=5)
