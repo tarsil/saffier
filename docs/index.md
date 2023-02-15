@@ -1,7 +1,7 @@
 # Saffier
 
 <p align="center">
-  <a href="https://saffier.dymmond.com"><img src="https://res.cloudinary.com/dymmond/image/upload/v1675104815/Saffier/logo/logo_dowatx.png" alt='Saffier'></a>
+  <a href="https://saffier.tarsild.io"><img src="https://res.cloudinary.com/dymmond/image/upload/v1675104815/Saffier/logo/logo_dowatx.png" alt='Saffier'></a>
 </p>
 
 <p align="center">
@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/dymmond/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
-    <img src="https://github.com/dymmond/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
+<a href="https://github.com/tarsil/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
+    <img src="https://github.com/tarsil/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
 </a>
 
 <a href="https://pypi.org/project/saffier" target="_blank">
@@ -24,9 +24,9 @@
 
 ---
 
-**Documentation**: [https://saffier.dymmond.com](https://saffier.dymmond.com) 📚
+**Documentation**: [https://saffier.tarsild.io](https://saffier.tarsild.io) 📚
 
-**Source Code**: [https://github.com/dymmond/saffier](https://github.com/dymmond/saffier)
+**Source Code**: [https://github.com/tarsil/saffier](https://github.com/tarsil/saffier)
 
 ---
 

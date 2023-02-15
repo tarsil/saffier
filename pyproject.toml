@@ -11,7 +11,7 @@ requires-python = ">=3.8"
 dynamic = ['version']
 license = "MIT"
 authors = [
-    { name = "Tiago Silva", email = "tiago.silva@dymmond.com" },
+    { name = "Tiago Silva", email = "tiago.arasilva@gmail.com" },
 ]
 classifiers = [
     "Intended Audience :: Information Technology",
@@ -47,11 +47,11 @@ dependencies = [
 keywords = ["api", "rest", "http", "asgi", "pydantic", "starlette", "fastapi", "framework", "websocket", "openapi", "ml", "machine learning"]
 
 [project.urls]
-Homepage = "https://github.com/dymmond/saffier"
-Documentation = "https://saffier.dymmond.com/"
-Changelog = "https://saffier.dymmond.com/release-notes/"
+Homepage = "https://github.com/tarsil/saffier"
+Documentation = "https://saffier.tarsild.io/"
+Changelog = "https://saffier.tarsild.io/release-notes/"
 Funding = "https://github.com/sponsors/tarsil"
-Source = "https://github.com/dymmond/saffier"
+Source = "https://github.com/tarsil/saffier"
 
 [project.optional-dependencies]
 test = [
