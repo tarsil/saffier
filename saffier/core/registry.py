@@ -31,7 +31,7 @@ class Registry(ArbitraryHashableBaseModel):
             if url.dialect == "postgressql":
                 url = url.replace(driver="asyncpg")
             elif url.dialect == "mysql":
-                url = url.replace(dricer="aiomysql")
+                url = url.replace(driver="aiomysql")
             elif url.dialect == "sqlite":
                 url = url.replace(driver="aiosqlite")
         return str(url)
