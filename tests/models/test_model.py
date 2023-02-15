@@ -45,6 +45,7 @@ async def rollback_connections():
 async def test_meta_inheritance_registry():
     await Profile.query.create(name="test", language="EN", age=23)
 
+    breakpoint()
     results = await Profile.query.all()
 
     cenas = len(results)

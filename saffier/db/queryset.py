@@ -10,8 +10,15 @@ from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE, SAFFIER_PICKLE_KEY
 from saffier.db.query.iterators import IterableModel
+from saffier.db.query.protocols import AwaitableQuery, QuerySetSingle
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
+
+if typing.TYPE_CHECKING:  # pragma: no cover
+    from saffier.models import Model
+
+
+SaffierModel = typing.TypeVar("SaffierModel", bound="Model")
 
 
 class QuerySetProps:
@@ -169,8 +176,22 @@ class QuerySetPrivate:
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
+    def _clone(self) -> "QuerySet[SaffierModel]":
+        queryset = self.__class__.__new__(self.__class__)
+        queryset.model_class = self.model_class
+        queryset.filter_clauses = self.filter_clauses
+        queryset.limit_count = self.limit_count
+        queryset._select_related = self._select_related
+        queryset._offset = self._offset
+        queryset._order_by = self._order_by
+        return queryset
 
-class QuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
+
+class BaseQuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
+    ...
+
+
+class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     """
     QuerySet object used for query retrieving.
     """
@@ -186,6 +207,7 @@ class QuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
         limit_offset=None,
         order_by=None,
     ):
+        super().__init__(model_class=model_class)
         self.model_class = model_class
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self._select_related = [] if select_related is None else select_related
@@ -195,6 +217,20 @@ class QuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
+
+    def __repr__(self):
+        data = list(self[: REPR_OUTPUT_SIZE + 1])
+        if len(data) > REPR_OUTPUT_SIZE:
+            data[-1] = "...(remaining elements truncated)..."
+        return "<%s %r>" % (self.__class__.__name__, data)
+
+    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
+        for value in await self:
+            yield value
+
+    def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
+        self._make_query()
+        return self._execute().__await__()
 
     def filter(
         self,
