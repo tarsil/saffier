@@ -14,34 +14,11 @@ from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 
 
-class QuerySet(ModelUtil):
+class QuerySetProps:
     """
-    QuerySet object used for query retrieving.
+    Properties used by the Queryset are placed in isolation
+    for clean access and maintainance.
     """
-
-    ESCAPE_CHARACTERS = ["%", "_"]
-
-    def __init__(
-        self,
-        model_class=None,
-        filter_clauses=None,
-        select_related=None,
-        limit_count=None,
-        limit_offset=None,
-        order_by=None,
-    ):
-        self.model_class = model_class
-        self.filter_clauses = [] if filter_clauses is None else filter_clauses
-        self._select_related = [] if select_related is None else select_related
-        self.limit_count = limit_count
-        self._offset = limit_offset
-        self._order_by = [] if order_by is None else order_by
-
-    def __get__(self, instance, owner):
-        #     breakpoint()
-        return self.__class__(model_class=owner)
-
-    #     return self.get_queryset()
 
     @property
     def database(self):
@@ -60,6 +37,8 @@ class QuerySet(ModelUtil):
     def pkname(self):
         return self.model_class.pkname
 
+
+class QuerySetPrivate:
     def _build_select(self):
         tables = [self.table]
         select_from = self.table
@@ -95,28 +74,6 @@ class QuerySet(ModelUtil):
             expression = expression.offset(self._offset)
 
         return expression
-
-    def filter(
-        self,
-        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
-        **kwargs: typing.Any,
-    ):
-        if clause is not None:
-            self.filter_clauses.append(clause)
-            return self
-        else:
-            return self._filter_query(**kwargs)
-
-    def exclude(
-        self,
-        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
-        **kwargs: typing.Any,
-    ):
-        if clause is not None:
-            self.filter_clauses.append(clause)
-            return self
-        else:
-            return self._filter_query(_exclude=True, **kwargs)
 
     def _filter_query(self, _exclude: bool = False, **kwargs):
         from saffier.models import Model
@@ -196,6 +153,70 @@ class QuerySet(ModelUtil):
             limit_offset=self._offset,
             order_by=self._order_by,
         )
+
+    def _validate_kwargs(self, **kwargs):
+        fields = self.model_class.fields
+        validator = Schema(fields={key: value.validator for key, value in fields.items()})
+        kwargs = validator.validate(kwargs)
+        for key, value in fields.items():
+            if value.validator.read_only and value.validator.has_default():
+                kwargs[key] = value.validator.get_default_value()
+        return kwargs
+
+    def _prepare_order_by(self, order_by: str):
+        reverse = order_by.startswith("-")
+        order_by = order_by.lstrip("-")
+        order_col = self.table.columns[order_by]
+        return order_col.desc() if reverse else order_col
+
+
+class QuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
+    """
+    QuerySet object used for query retrieving.
+    """
+
+    ESCAPE_CHARACTERS = ["%", "_"]
+
+    def __init__(
+        self,
+        model_class=None,
+        filter_clauses=None,
+        select_related=None,
+        limit_count=None,
+        limit_offset=None,
+        order_by=None,
+    ):
+        self.model_class = model_class
+        self.filter_clauses = [] if filter_clauses is None else filter_clauses
+        self._select_related = [] if select_related is None else select_related
+        self.limit_count = limit_count
+        self._offset = limit_offset
+        self._order_by = [] if order_by is None else order_by
+
+    def __get__(self, instance, owner):
+        return self.__class__(model_class=owner)
+
+    def filter(
+        self,
+        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: typing.Any,
+    ):
+        if clause is not None:
+            self.filter_clauses.append(clause)
+            return self
+        else:
+            return self._filter_query(**kwargs)
+
+    def exclude(
+        self,
+        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: typing.Any,
+    ):
+        if clause is not None:
+            self.filter_clauses.append(clause)
+            return self
+        else:
+            return self._filter_query(_exclude=True, **kwargs)
 
     def search(self, term: typing.Any):
         if not term:
@@ -318,15 +339,6 @@ class QuerySet(ModelUtil):
         if rows:
             return rows[-1]
 
-    def _validate_kwargs(self, **kwargs):
-        fields = self.model_class.fields
-        validator = Schema(fields={key: value.validator for key, value in fields.items()})
-        kwargs = validator.validate(kwargs)
-        for key, value in fields.items():
-            if value.validator.read_only and value.validator.has_default():
-                kwargs[key] = value.validator.get_default_value()
-        return kwargs
-
     async def create(self, **kwargs):
         kwargs = self._validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
@@ -388,9 +400,3 @@ class QuerySet(ModelUtil):
             kwargs.update(defaults)
             instance = await self.create(**kwargs)
             return instance, True
-
-    def _prepare_order_by(self, order_by: str):
-        reverse = order_by.startswith("-")
-        order_by = order_by.lstrip("-")
-        order_col = self.table.columns[order_by]
-        return order_col.desc() if reverse else order_col
