@@ -41,7 +41,7 @@ classifiers = [
 ]
 dependencies = [
     "databases[postgresql, mysql, sqlite]",
-    "orjson >=3.8.5,<4.0.0",
+    "orjson>=3.8.5,<4.0.0",
     "pydantic>=1.10.4,<2.0.0",
     "sqlalchemy==1.4.46"
 ]
