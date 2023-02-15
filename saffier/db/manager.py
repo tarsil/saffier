@@ -29,11 +29,11 @@ class Manager(QuerySet):
     # def __init__(self, model_class=None):
     #     self.model_class = None
 
-    # def __get__(self, instance, owner):
-    #     return self.__class__(model_class=owner)
+    # # def __get__(self, instance, owner):
+    # #     return self.__class__(model_class=owner)
 
     # def get_queryset(self) -> "QuerySet":
     #     return QuerySet(model_class=self.model_class)
 
     # def __getattr__(self, item):
-    # return getattr(self.get_queryset(), item)
+    #     return getattr(self.get_queryset(), item)

@@ -1,6 +1,6 @@
 site_name: Saffier
 site_description: The only python ORM you will ever need.
-site_url: https://saffier.dymmond.com
+site_url: https://saffier.tarsild.io
 
 theme:
   name: "material"
@@ -29,7 +29,7 @@ theme:
     - content.tabs.link
 
 repo_name: dymmond/saffier
-repo_url: https://github.com/dymmond/saffier
+repo_url: https://github.com/tarsil/saffier
 edit_uri: ""
 plugins:
   - search

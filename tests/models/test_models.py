@@ -281,6 +281,16 @@ async def test_model_first():
     assert await User.query.filter(name="Lucy").first() is None
 
 
+async def test_model_last():
+    Test = await User.query.create(name="Test")
+    jane = await User.query.create(name="Jane")
+
+    assert await User.query.last() == jane
+    assert await User.query.last(name="Jane") == jane
+    assert await User.query.filter(name="Test").last() == Test
+    assert await User.query.filter(name="Lucy").last() is None
+
+
 async def test_model_search():
     Test = await User.query.create(name="Test", language="English")
     tshirt = await Product.query.create(name="T-Shirt", rating=5)
@@ -362,3 +372,98 @@ async def test_model_sqlalchemy_filter_operators():
 
     shirt = await Product.query.create(name="100%-Cotton", rating=3)
     assert shirt == await Product.query.filter(Product.columns.name.contains("Cotton")).get()
+
+
+async def test_model_sqlalchemy_filter_operators_no_get():
+    user = await User.query.create(name="George")
+    users = await User.query.filter(User.columns.name == "George")
+    assert user == users[0]
+
+    users = await User.query.filter(User.columns.name.is_not(None))
+    assert user == users[0]
+
+    users = await User.query.filter(User.columns.name.startswith("G")).filter(
+        User.columns.name.endswith("e")
+    )
+    assert user == users[0]
+
+    assert user == await User.query.exclude(User.columns.name != "Jack").get()
+
+    shirt = await Product.query.create(name="100%-Cotton", rating=3)
+    shirts = await Product.query.filter(Product.columns.name.contains("Cotton"))
+    assert shirt == shirts[0]
+
+
+async def test_get_or_none():
+    user = await User.query.create(name="Charles")
+    assert user == await User.query.filter(name="Charles").get()
+
+    user = await User.query.get_or_none(name="Luigi")
+    assert user is None
+
+    user = await User.query.get_or_none(name="Charles")
+    assert user.pk == 1
+
+
+async def test_get_or_none_without_get():
+    user = await User.query.create(name="Charles")
+    users = await User.query.filter(name="Charles")
+    assert user == users[0]
+
+    user = await User.query.get_or_none(name="Luigi")
+    assert user is None
+
+    user = await User.query.get_or_none(name="Charles")
+    assert user.pk == 1
+
+
+async def test_distinct():
+    await Product.query.create(name="test", rating=5, in_stock=True)
+    await Product.query.create(name="test", rating=4, in_stock=True)
+    await Product.query.create(name="test", rating=2, in_stock=True)
+
+    products = await Product.query.distinct("name").all()
+    assert len(products) == 1
+
+    products = await Product.query.distinct("rating").all()
+    assert len(products) == 3
+
+    products = await Product.query.distinct("name", "in_stock").all()
+    assert len(products) == 1
+
+    products = await Product.query.distinct("in_stock").all()
+    assert len(products) == 1
+
+    products = await Product.query.distinct("rating", "in_stock").all()
+    assert len(products) == 3
+
+
+async def test_distinct_two_without_all():
+    await Product.query.create(name="test", rating=5, in_stock=True)
+    await Product.query.create(name="test", rating=4, in_stock=True)
+    await Product.query.create(name="test", rating=2, in_stock=True)
+
+    products = await Product.query.distinct("name")
+    assert len(products) == 1
+
+    products = await Product.query.distinct("rating")
+    assert len(products) == 3
+
+    products = await Product.query.distinct("name", "in_stock")
+    assert len(products) == 1
+
+    products = await Product.query.distinct("in_stock")
+    assert len(products) == 1
+
+    products = await Product.query.distinct("rating", "in_stock")
+    assert len(products) == 3
+
+
+async def test_select_for_update():
+    await Product.query.create(name="test", rating=5, in_stock=True)
+    await Product.query.create(name="test2", rating=4, in_stock=True)
+    await Product.query.create(name="test3", rating=2, in_stock=True)
+
+    products = await Product.query.select_for_update().filter(name="test")
+    # products = await products.all()
+    cenas = 2

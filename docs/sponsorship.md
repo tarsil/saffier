@@ -12,7 +12,7 @@ Giving a start to Saffier is very simple and helps promoting the work across the
 
 The button is located at the top right.
 
-[https://github.com/dymmond/saffier](https://github.com/dymmond/saffier).
+[https://github.com/tarsil/saffier](https://github.com/tarsil/saffier).
 
 This will help spreading the word about the tool and how helpful has been.
 

@@ -1,11 +1,11 @@
 import sqlalchemy
 
-from saffier.metaclass import MetaInfo, ModelMeta
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 
 # from saffier.db.manager import Manager
 from saffier.db.manager import Manager
+from saffier.metaclass import MetaInfo, ModelMeta
 from saffier.types import DictAny
 
 
@@ -78,8 +78,8 @@ class Model(ModelMeta, ModelUtil):
         validator = Schema(fields=fields)
         kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.fields)
         pk_column = getattr(self.table.c, self.pkname)
-        expr = self.table.update().values(**kwargs).where(pk_column == self.pk)
-        await self.database.execute(expr)
+        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
+        await self.database.execute(expression)
 
         # Update the model instance.
         for key, value in kwargs.items():
@@ -87,17 +87,17 @@ class Model(ModelMeta, ModelUtil):
 
     async def delete(self) -> None:
         pk_column = getattr(self.table.c, self.pkname)
-        expr = self.table.delete().where(pk_column == self.pk)
+        expression = self.table.delete().where(pk_column == self.pk)
 
-        await self.database.execute(expr)
+        await self.database.execute(expression)
 
     async def load(self):
         # Build the select expression.
         pk_column = getattr(self.table.c, self.pkname)
-        expr = self.table.select().where(pk_column == self.pk)
+        expression = self.table.select().where(pk_column == self.pk)
 
         # Perform the fetch.
-        row = await self.database.fetch_one(expr)
+        row = await self.database.fetch_one(expression)
 
         # Update the instance.
         for key, value in dict(row._mapping).items():

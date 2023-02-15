@@ -1,12 +1,15 @@
 import copy
 import typing
 
+import anyio
 import sqlalchemy
 
+import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE
-from saffier.db.query.protocols import AwaitableQuery
+from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE, SAFFIER_PICKLE_KEY
+from saffier.db.query.iterators import IterableModel
+from saffier.db.query.protocols import AwaitableQuery, QuerySetSingle
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 from saffier.types import DictAny
@@ -42,16 +45,16 @@ class QuerySetProps:
         return self.model_class.pkname
 
 
-class QuerySetPrivate:
+class BaseQuerySet(QuerySetProps, ModelUtil):
     def _build_order_by_expression(self, order_by, expression):
         """Builds the order by expression"""
-        order_by = list(map(self._prepare_order_by, self._order_by))
+        order_by = list(map(self._prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
     def _build_group_by_expression(self, group_by, expression):
         """Builds the group by expression"""
-        group_by = list(map(self._prepare_group_by, self._group_by))
+        group_by = list(map(self._prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
@@ -60,8 +63,14 @@ class QuerySetPrivate:
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
         else:
-            clause = sqlalchemy.sql.and_(*self.filter_clauses)
+            clause = sqlalchemy.sql.and_(*filter_clauses)
         expression = expression.where(clause)
+        return expression
+
+    def _build_select_distinct(self, distinct_on, expression):
+        """Filters selects only specific fields"""
+        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
+        expression = expression.distinct(*distinct_on)
         return expression
 
     def _build_tables_select_from_relationship(self):
@@ -83,7 +92,17 @@ class QuerySetPrivate:
 
         return tables, select_from
 
+    def _build_select_for_update(self):
+        # breakpoint()
+        expression = expression.with_for_update(
+            nowait=self._select_for_update_nowait, of=self.model_class
+        )
+        return expression
+
     def _build_select(self):
+        """
+        Builds the query select based on the given parameters and filters.
+        """
         tables, select_from = self._build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(tables)
         expression = expression.select_from(select_from)
@@ -104,6 +123,13 @@ class QuerySetPrivate:
 
         if self._group_by:
             expression = self._build_group_by_expression(self._group_by, expression=expression)
+
+        if self.distinct_on:
+            expression = self._build_select_distinct(self.distinct_on, expression=expression)
+
+        # breakpoint()
+        if self._select_for_update:
+            expression = self._build_select_for_update(expression=expression)
 
         return expression
 
@@ -206,6 +232,10 @@ class QuerySetPrivate:
         group_col = self.table.columns[group_by]
         return group_col
 
+    def _prepare_fields_for_distinct(self, distinct_on: str):
+        distinct_on = self.table.columns[distinct_on]
+        return distinct_on
+
     def _clone(self) -> "QuerySet[SaffierModel]":
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
@@ -215,11 +245,10 @@ class QuerySetPrivate:
         queryset._offset = self._offset
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
+        queryset.distinct_on = copy.copy(self.distinct_on)
+        queryset._select_for_update = self._select_for_update
+        queryset._select_for_update_nowait = self._select_for_update_nowait
         return queryset
-
-
-class BaseQuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
-    ...
 
 
 class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
@@ -238,6 +267,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         limit_offset=None,
         order_by=None,
         group_by=None,
+        distinct_on=None,
+        select_for_update=False,
+        select_for_update_nowait=False,
     ):
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -247,23 +279,27 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
+        self.distinct_on = [] if distinct_on is None else distinct_on
+        self._select_for_update = select_for_update
+        self._select_for_update_nowait = select_for_update_nowait
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
 
-    def __repr__(self):
-        data = list(self[: REPR_OUTPUT_SIZE + 1])
-        if len(data) > REPR_OUTPUT_SIZE:
-            data[-1] = "...(remaining elements truncated)..."
-        return "<%s %r>" % (self.__class__.__name__, data)
+    # def __repr__(self):
+    #     breakpoint()
+    #     data = list(self[: REPR_OUTPUT_SIZE + 1])
+    #     if len(data) > REPR_OUTPUT_SIZE:
+    #         data[-1] = "...(remaining elements truncated)..."
+    #     return "<%s %r>" % (self.__class__.__name__, data)
 
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:
             yield value
 
-    def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
-        self._make_query()
-        return self._execute().__await__()
+    def reverse(self):
+        """Reverse the ordering of the queryset"""
+        queryset = self._clone()
 
     def _filter_or_exclude(
         self,
@@ -353,23 +389,39 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return queryset
 
     def group_by(self, *group_by: str):
+        """
+        Returns the values grouped by the given fields.
+        """
         queryset = self._clone()
         queryset._group_by = group_by
         return queryset
 
+    def distinct(self, *distinct_on: str):
+        """
+        Returns a queryset with distinct results.
+        """
+        queryset = self._clone()
+        queryset.distinct_on = distinct_on
+        return queryset
+
     def select_related(self, related):
+        """Caches teh already selected fields of a query avoiding multiple database calls"""
+        queryset = self._clone()
         if not isinstance(related, (list, tuple)):
             related = [related]
 
         related = list(self._select_related) + related
-        return self.__class__(
-            model_class=self.model_class,
-            filter_clauses=self.filter_clauses,
-            select_related=related,
-            limit_count=self.limit_count,
-            limit_offset=self._offset,
-            order_by=self._order_by,
-        )
+        queryset._select_related = related
+        return queryset
+
+    def select_for_update(self, nowait: bool = False):
+        """
+        Locks a record and allows to update
+        """
+        queryset = self._clone()
+        queryset._select_for_update = True
+        queryset._select_for_update_nowait = nowait
+        return queryset
 
     async def exists(self) -> bool:
         """
@@ -387,14 +439,30 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         expression = sqlalchemy.func.count().select().select_from(expression)
         return await self.database.fetch_val(expression)
 
-    async def all(self, **kwargs):
-        if kwargs:
-            return await self.filter(**kwargs).all()
-
-        expression = self._build_select()
+    async def get_or_none(self, **kwargs):
+        """
+        Fetch one object matching the parameters or returns None.
+        """
+        queryset = self.filter(**kwargs)
+        expression = queryset._build_select().limit(2)
         rows = await self.database.fetch_all(expression)
+
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise MultipleObjectsReturned()
+        return self.model_class._from_row(rows[0], select_related=self._select_related)
+
+    async def all(self, **kwargs):
+        queryset = self._clone()
+        if kwargs:
+            return await queryset.filter(**kwargs).all()
+
+        expression = queryset._build_select()
+        rows = await queryset.database.fetch_all(expression)
         return [
-            self.model_class._from_row(row, select_related=self._select_related) for row in rows
+            queryset.model_class._from_row(row, select_related=self._select_related)
+            for row in rows
         ]
 
     async def get(self, **kwargs):
@@ -411,20 +479,22 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
     async def first(self, **kwargs):
+        queryset = self._clone()
         if kwargs:
-            return await self.filter(**kwargs).first()
+            return await queryset.filter(**kwargs).order_by("id").get()
 
-        rows = await self.limit(1).all()
+        rows = await queryset.limit(1).order_by("id").all()
         if rows:
             return rows[0]
 
     async def last(self, **kwargs):
+        queryset = self._clone()
         if kwargs:
-            return await self.filter(**kwargs).last()
+            return await queryset.filter(**kwargs).order_by("-id").get()
 
-        rows = await self.all()
+        rows = await queryset.order_by("-id").all()
         if rows:
-            return rows[-1]
+            return rows[0]
 
     async def create(self, **kwargs):
         kwargs = self._validate_kwargs(**kwargs)
@@ -487,3 +557,10 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             kwargs.update(defaults)
             instance = await self.create(**kwargs)
             return instance, True
+
+    async def _execute(self) -> typing.List[SaffierModel]:
+        return await self.all()
+
+    def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
+        self._build_select()
+        return self._execute().__await__()
