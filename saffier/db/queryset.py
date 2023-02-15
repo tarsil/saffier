@@ -83,7 +83,7 @@ class QuerySetPrivate:
 
         return expression
 
-    def _filter_query(self, _exclude: bool = False, **kwargs):
+    def _filter_query(self, exclude: bool = False, **kwargs):
         from saffier.models import Model
 
         clauses = []
@@ -148,7 +148,7 @@ class QuerySetPrivate:
 
             clauses.append(clause)
 
-        if _exclude:
+        if exclude:
             filter_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
         else:
             filter_clauses += clauses
@@ -236,11 +236,17 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     def _filter_or_exclude(
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        exclude: bool = False,
         **kwargs: DictAny,
     ):
+        """
+        Filters or excludes a given clause for a specific QuerySet.
+        """
         queryset = self._clone()
         if clause is None:
-            return queryset._filter_query(**kwargs)
+            if not exclude:
+                return queryset._filter_query(**kwargs)
+            return queryset._filter_query(exclude=exclude, **kwargs)
 
         queryset.filter_clauses.append(clause)
         return queryset
@@ -260,11 +266,10 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
     ):
-        if clause is not None:
-            self.filter_clauses.append(clause)
-            return self
-        else:
-            return self._filter_query(_exclude=True, **kwargs)
+        """
+        Exactly the same as the filter but for the exclude.
+        """
+        return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
     def search(self, term: typing.Any):
         if not term:
