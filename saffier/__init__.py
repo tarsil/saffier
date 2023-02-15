@@ -1,7 +1,7 @@
 __version__ = "0.1.0"
 
-from saffier.constants import CASCADE, RESTRICT, SET_NULL
 from saffier.core.registry import Registry
+from saffier.db.constants import CASCADE, RESTRICT, SET_NULL
 from saffier.db.manager import Manager
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import (
