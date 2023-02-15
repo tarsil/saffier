@@ -45,5 +45,5 @@ class AwaitableQuery(typing.Generic[SaffierModel]):
     def _make_query(self):
         raise NotImplementedError()  # pragma: no cover
 
-    def _execute(self) -> typing.Any:
+    async def _execute(self) -> typing.Any:
         raise NotImplementedError()

@@ -92,6 +92,13 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
 
         return tables, select_from
 
+    def _build_select_for_update(self):
+        # breakpoint()
+        expression = expression.with_for_update(
+            nowait=self._select_for_update_nowait, of=self.model_class
+        )
+        return expression
+
     def _build_select(self):
         """
         Builds the query select based on the given parameters and filters.
@@ -119,6 +126,10 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
 
         if self.distinct_on:
             expression = self._build_select_distinct(self.distinct_on, expression=expression)
+
+        # breakpoint()
+        if self._select_for_update:
+            expression = self._build_select_for_update(expression=expression)
 
         return expression
 
@@ -235,6 +246,8 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
+        queryset._select_for_update = self._select_for_update
+        queryset._select_for_update_nowait = self._select_for_update_nowait
         return queryset
 
 
@@ -254,8 +267,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         limit_offset=None,
         order_by=None,
         group_by=None,
-        fields_for_select=None,
         distinct_on=None,
+        select_for_update=False,
+        select_for_update_nowait=False,
     ):
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -266,6 +280,8 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
+        self._select_for_update = select_for_update
+        self._select_for_update_nowait = select_for_update_nowait
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
@@ -385,12 +401,22 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return queryset
 
     def select_related(self, related):
+        """Caches teh already selected fields of a query avoiding multiple database calls"""
         queryset = self._clone()
         if not isinstance(related, (list, tuple)):
             related = [related]
 
         related = list(self._select_related) + related
         queryset._select_related = related
+        return queryset
+
+    def select_for_update(self, nowait: bool = False):
+        """
+        Locks a record and allows to update
+        """
+        queryset = self._clone()
+        queryset._select_for_update = True
+        queryset._select_for_update_nowait = nowait
         return queryset
 
     async def exists(self) -> bool:
@@ -424,13 +450,15 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
     async def all(self, **kwargs):
+        queryset = self._clone()
         if kwargs:
-            return await self.filter(**kwargs).all()
+            return await queryset.filter(**kwargs).all()
 
-        expression = self._build_select()
-        rows = await self.database.fetch_all(expression)
+        expression = queryset._build_select()
+        rows = await queryset.database.fetch_all(expression)
         return [
-            self.model_class._from_row(row, select_related=self._select_related) for row in rows
+            queryset.model_class._from_row(row, select_related=self._select_related)
+            for row in rows
         ]
 
     async def get(self, **kwargs):
@@ -524,6 +552,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             instance = await self.create(**kwargs)
             return instance, True
 
+    async def _execute(self) -> typing.List[SaffierModel]:
+        return await self.all()
+
     def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
-        self._make_query()
+        self._build_select()
         return self._execute().__await__()
