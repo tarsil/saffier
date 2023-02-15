@@ -548,5 +548,4 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return await self.all()
 
     def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
-        self._build_select()
         return self._execute().__await__()
