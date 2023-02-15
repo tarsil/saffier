@@ -23,20 +23,20 @@ jobs:
       mysql:
           image: mysql:5.7
           env:
-            MYSQL_USER: username
-            MYSQL_PASSWORD: password
-            MYSQL_ROOT_PASSWORD: password
-            MYSQL_DATABASE: testsuite
+            MYSQL_USER: mysql
+            MYSQL_PASSWORD: mysql
+            MYSQL_ROOT_PASSWORD: mysql
+            MYSQL_DATABASE: mysql
           ports:
             - 3306:3306
           options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
       postgres:
-        image: postgres:13.2
+        image: postgres:12.3
         env:
-          POSTGRES_USER: username
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: testsuite
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saffier
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
@@ -61,11 +61,11 @@ jobs:
         run: "scripts/build"
       - name: "Run tests with PostgreSQL"
         env:
-          TEST_DATABASE_URL: "postgresql+asyncpg://username:password@localhost:5432/testsuite"
+          TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/saffier"
         run: "scripts/test"
       - name: "Run tests with MySQL"
         env:
-          TEST_DATABASE_URL: "mysql://username:password@localhost:3306/testsuite"
+          TEST_DATABASE_URL: "mysql://mysql:mysql@localhost:3306/saffier"
         run: "scripts/test"
       - name: "Run tests with SQLite"
         env:
