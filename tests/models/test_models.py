@@ -375,17 +375,6 @@ async def test_get_or_none():
     assert user.pk == 1
 
 
-async def xtest_only():
-    await Product.query.create(name="test", rating=5, in_stock=True)
-    await Product.query.create(name="test2", rating=4, in_stock=True)
-    await Product.query.create(name="test3", rating=2, in_stock=True)
-
-    products = await Product.query.only("name")
-    products = await products.all()
-    breakpoint()
-    cenas = 2
-
-
 async def test_distinct():
     await Product.query.create(name="test", rating=5, in_stock=True)
     await Product.query.create(name="test", rating=4, in_stock=True)
