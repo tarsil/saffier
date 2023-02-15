@@ -251,11 +251,12 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
 
-    def __repr__(self):
-        data = list(self[: REPR_OUTPUT_SIZE + 1])
-        if len(data) > REPR_OUTPUT_SIZE:
-            data[-1] = "...(remaining elements truncated)..."
-        return "<%s %r>" % (self.__class__.__name__, data)
+    # def __repr__(self):
+    #     breakpoint()
+    #     data = list(self[: REPR_OUTPUT_SIZE + 1])
+    #     if len(data) > REPR_OUTPUT_SIZE:
+    #         data[-1] = "...(remaining elements truncated)..."
+    #     return "<%s %r>" % (self.__class__.__name__, data)
 
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:
@@ -353,6 +354,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return queryset
 
     def group_by(self, *group_by: str):
+        """
+        Returns the values grouped by the given fields.
+        """
         queryset = self._clone()
         queryset._group_by = group_by
         return queryset
@@ -386,6 +390,20 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         expression = self._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         return await self.database.fetch_val(expression)
+
+    async def get_or_none(self, **kwargs):
+        """
+        Fetch one object matching the parameters or returns None.
+        """
+        queryset = self.filter(**kwargs)
+        expression = queryset._build_select().limit(2)
+        rows = await self.database.fetch_all(expression)
+
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise MultipleObjectsReturned()
+        return self.model_class._from_row(rows[0], select_related=self._select_related)
 
     async def all(self, **kwargs):
         if kwargs:

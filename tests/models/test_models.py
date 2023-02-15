@@ -362,3 +362,17 @@ async def test_model_sqlalchemy_filter_operators():
 
     shirt = await Product.query.create(name="100%-Cotton", rating=3)
     assert shirt == await Product.query.filter(Product.columns.name.contains("Cotton")).get()
+
+
+async def test_get_or_none():
+    user = await User.query.create(name="Charles")
+
+    assert user == await User.query.filter(name="Charles").get()
+
+    user = await User.query.get_or_none(name="Luigi")
+
+    assert user is None
+
+    user = await User.query.get_or_none(name="Charles")
+
+    assert user.pk == 1
