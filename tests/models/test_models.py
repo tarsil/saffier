@@ -366,13 +366,42 @@ async def test_model_sqlalchemy_filter_operators():
 
 async def test_get_or_none():
     user = await User.query.create(name="Charles")
-
     assert user == await User.query.filter(name="Charles").get()
 
     user = await User.query.get_or_none(name="Luigi")
-
     assert user is None
 
     user = await User.query.get_or_none(name="Charles")
-
     assert user.pk == 1
+
+
+async def xtest_only():
+    await Product.query.create(name="test", rating=5, in_stock=True)
+    await Product.query.create(name="test2", rating=4, in_stock=True)
+    await Product.query.create(name="test3", rating=2, in_stock=True)
+
+    products = await Product.query.only("name")
+    products = await products.all()
+    breakpoint()
+    cenas = 2
+
+
+async def test_distinct():
+    await Product.query.create(name="test", rating=5, in_stock=True)
+    await Product.query.create(name="test", rating=4, in_stock=True)
+    await Product.query.create(name="test", rating=2, in_stock=True)
+
+    products = await Product.query.distinct("name").all()
+    assert len(products) == 1
+
+    products = await Product.query.distinct("rating").all()
+    assert len(products) == 3
+
+    products = await Product.query.distinct("name", "in_stock").all()
+    assert len(products) == 1
+
+    products = await Product.query.distinct("in_stock").all()
+    assert len(products) == 1
+
+    products = await Product.query.distinct("rating", "in_stock").all()
+    assert len(products) == 3

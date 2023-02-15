@@ -1,6 +1,5 @@
 import copy
 import typing
-import warnings
 
 import anyio
 import sqlalchemy
@@ -49,13 +48,13 @@ class QuerySetProps:
 class BaseQuerySet(QuerySetProps, ModelUtil):
     def _build_order_by_expression(self, order_by, expression):
         """Builds the order by expression"""
-        order_by = list(map(self._prepare_order_by, self._order_by))
+        order_by = list(map(self._prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
     def _build_group_by_expression(self, group_by, expression):
         """Builds the group by expression"""
-        group_by = list(map(self._prepare_group_by, self._group_by))
+        group_by = list(map(self._prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
@@ -64,8 +63,19 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
         else:
-            clause = sqlalchemy.sql.and_(*self.filter_clauses)
+            clause = sqlalchemy.sql.and_(*filter_clauses)
         expression = expression.where(clause)
+        return expression
+
+    def _build_fields_for_select(self, fields_for_select, expression):
+        """Filters selects only specific fields"""
+        fields = list(map(self._prepare_fields_for_select, fields_for_select))
+        breakpoint()
+
+    def _build_select_distinct(self, distinct_on, expression):
+        """Filters selects only specific fields"""
+        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
+        expression = expression.distinct(*distinct_on)
         return expression
 
     def _build_tables_select_from_relationship(self):
@@ -108,6 +118,14 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
 
         if self._group_by:
             expression = self._build_group_by_expression(self._group_by, expression=expression)
+
+        if self._fields_for_select:
+            expression = self._build_fields_for_select(
+                self._fields_for_select, expression=expression
+            )
+
+        if self.distinct_on:
+            expression = self._build_select_distinct(self.distinct_on, expression=expression)
 
         return expression
 
@@ -210,6 +228,14 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         group_col = self.table.columns[group_by]
         return group_col
 
+    def _prepare_fields_for_select(self, fields_for_select: str):
+        fields_for_select_column = self.table.columns[fields_for_select]
+        return fields_for_select_column
+
+    def _prepare_fields_for_distinct(self, distinct_on: str):
+        distinct_on = self.table.columns[distinct_on]
+        return distinct_on
+
     def _clone(self) -> "QuerySet[SaffierModel]":
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
@@ -219,6 +245,8 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         queryset._offset = self._offset
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
+        queryset._fields_for_select = copy.copy(self._fields_for_select)
+        queryset.distinct_on = copy.copy(self.distinct_on)
         return queryset
 
 
@@ -238,6 +266,8 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         limit_offset=None,
         order_by=None,
         group_by=None,
+        fields_for_select=None,
+        distinct_on=None,
     ):
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -247,6 +277,8 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
+        self._fields_for_select = [] if fields_for_select is None else fields_for_select
+        self.distinct_on = [] if distinct_on is None else distinct_on
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
@@ -261,10 +293,6 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:
             yield value
-
-    def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
-        self._make_query()
-        return self._execute().__await__()
 
     def _filter_or_exclude(
         self,
@@ -359,6 +387,20 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         """
         queryset = self._clone()
         queryset._group_by = group_by
+        return queryset
+
+    def only(self, *fields_for_select: str):
+        breakpoint()
+        queryset = self._clone()
+        queryset._fields_for_select = fields_for_select
+        return queryset
+
+    def distinct(self, *distinct_on: str):
+        """
+        Returns a queryset with distinct results.
+        """
+        queryset = self._clone()
+        queryset.distinct_on = distinct_on
         return queryset
 
     def select_related(self, related):
@@ -505,3 +547,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             kwargs.update(defaults)
             instance = await self.create(**kwargs)
             return instance, True
+
+    def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
+        self._make_query()
+        return self._execute().__await__()
