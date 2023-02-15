@@ -1,5 +1,5 @@
 import typing
-from itertools import chain, islice
+from itertools import islice
 
 import anyio
 

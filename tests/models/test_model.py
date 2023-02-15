@@ -47,4 +47,4 @@ async def xtest_meta_inheritance_registry():
 
     results = await Profile.query.filter()
 
-    cenas = len(results)
+    len(results)

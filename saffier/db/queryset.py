@@ -1,16 +1,12 @@
 import copy
 import typing
-import warnings
 
-import anyio
 import sqlalchemy
 
-import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE, SAFFIER_PICKLE_KEY
-from saffier.db.query.iterators import IterableModel
-from saffier.db.query.protocols import AwaitableQuery, QuerySetSingle
+from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE
+from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 from saffier.types import DictAny
@@ -47,7 +43,31 @@ class QuerySetProps:
 
 
 class QuerySetPrivate:
-    def _build_select(self):
+    def _build_order_by_expression(self, order_by, expression):
+        """Builds the order by expression"""
+        order_by = list(map(self._prepare_order_by, self._order_by))
+        expression = expression.order_by(*order_by)
+        return expression
+
+    def _build_group_by_expression(self, group_by, expression):
+        """Builds the group by expression"""
+        group_by = list(map(self._prepare_group_by, self._group_by))
+        expression = expression.group_by(*group_by)
+        return expression
+
+    def _build_filter_clauses_expression(self, filter_clauses, expression):
+        """Builds the filter clauses expression"""
+        if len(filter_clauses) == 1:
+            clause = filter_clauses[0]
+        else:
+            clause = sqlalchemy.sql.and_(*self.filter_clauses)
+        expression = expression.where(clause)
+        return expression
+
+    def _build_tables_select_from_relationship(self):
+        """
+        Builds the tables relationships
+        """
         tables = [self.table]
         select_from = self.table
 
@@ -61,19 +81,20 @@ class QuerySetPrivate:
                 select_from = sqlalchemy.sql.join(select_from, table)
                 tables.append(table)
 
+        return tables, select_from
+
+    def _build_select(self):
+        tables, select_from = self._build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(tables)
         expression = expression.select_from(select_from)
 
         if self.filter_clauses:
-            if len(self.filter_clauses) == 1:
-                clause = self.filter_clauses[0]
-            else:
-                clause = sqlalchemy.sql.and_(*self.filter_clauses)
-            expression = expression.where(clause)
+            expression = self._build_filter_clauses_expression(
+                self.filter_clauses, expression=expression
+            )
 
         if self._order_by:
-            order_by = list(map(self._prepare_order_by, self._order_by))
-            expression = expression.order_by(*order_by)
+            expression = self._build_order_by_expression(self._order_by, expression=expression)
 
         if self.limit_count:
             expression = expression.limit(self.limit_count)
@@ -82,8 +103,7 @@ class QuerySetPrivate:
             expression = expression.offset(self._offset)
 
         if self._group_by:
-            group_by = list(map(self._prepare_group_by, self._group_by))
-            expression = expression.group_by(*group_by)
+            expression = self._build_group_by_expression(self._group_by, expression=expression)
 
         return expression
 
