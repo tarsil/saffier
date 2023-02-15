@@ -1,15 +1,12 @@
 import copy
 import typing
 
-import anyio
 import sqlalchemy
 
-import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE, SAFFIER_PICKLE_KEY
-from saffier.db.query.iterators import IterableModel
-from saffier.db.query.protocols import AwaitableQuery, QuerySetSingle
+from saffier.db.constants import FILTER_OPERATORS
+from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 from saffier.types import DictAny
@@ -285,13 +282,6 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
-
-    # def __repr__(self):
-    #     breakpoint()
-    #     data = list(self[: REPR_OUTPUT_SIZE + 1])
-    #     if len(data) > REPR_OUTPUT_SIZE:
-    #         data[-1] = "...(remaining elements truncated)..."
-    #     return "<%s %r>" % (self.__class__.__name__, data)
 
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:

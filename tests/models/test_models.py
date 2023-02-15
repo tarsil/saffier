@@ -470,4 +470,3 @@ async def test_select_for_update():
 
     products = await Product.query.select_for_update().filter(name="test")
     # products = await products.all()
-    cenas = 2
