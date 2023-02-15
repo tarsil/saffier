@@ -37,6 +37,7 @@ jobs:
           POSTGRES_USER: username
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testsuite
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
@@ -60,7 +61,7 @@ jobs:
         run: "scripts/build"
       - name: "Run tests with PostgreSQL"
         env:
-          TEST_DATABASE_URL: "postgresql://username:password@localhost:5432/testsuite"
+          TEST_DATABASE_URL: "postgresql+asyncpg://username:password@localhost:5432/testsuite"
         run: "scripts/test"
       - name: "Run tests with MySQL"
         env:
