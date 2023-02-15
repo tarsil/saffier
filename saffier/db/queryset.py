@@ -312,7 +312,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset.limit_count = limit_count
         return queryset
 
-    def limit_offset(self, offset: int):
+    def offset(self, offset: int):
         """
         Returns a Queryset limited by the offset.
         """

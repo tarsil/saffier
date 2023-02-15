@@ -193,7 +193,7 @@ async def test_model_order_by():
     assert users[0].name == "Bob"
     assert users[0].id == 1
 
-    users = await User.query.order_by("id").limit(1).limit_offset(1).all()
+    users = await User.query.order_by("id").limit(1).offset(1).all()
     assert users[0].name == "Allen"
     assert users[0].id == 2
 
@@ -233,7 +233,7 @@ async def test_offset():
     await User.query.create(name="Test")
     await User.query.create(name="Jane")
 
-    users = await User.query.limit_offset(1).limit(1).all()
+    users = await User.query.offset(1).limit(1).all()
     assert users[0].name == "Jane"
 
 
