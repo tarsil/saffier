@@ -1,12 +1,16 @@
 import copy
 import typing
+import warnings
 
+import anyio
 import sqlalchemy
 
+import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE
-from saffier.db.query.protocols import AwaitableQuery
+from saffier.db.constants import FILTER_OPERATORS, REPR_OUTPUT_SIZE, SAFFIER_PICKLE_KEY
+from saffier.db.query.iterators import IterableModel
+from saffier.db.query.protocols import AwaitableQuery, QuerySetSingle
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 from saffier.types import DictAny
@@ -42,7 +46,7 @@ class QuerySetProps:
         return self.model_class.pkname
 
 
-class QuerySetPrivate:
+class BaseQuerySet(QuerySetProps, ModelUtil):
     def _build_order_by_expression(self, order_by, expression):
         """Builds the order by expression"""
         order_by = list(map(self._prepare_order_by, self._order_by))
@@ -216,10 +220,6 @@ class QuerySetPrivate:
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
         return queryset
-
-
-class BaseQuerySet(QuerySetProps, QuerySetPrivate, ModelUtil):
-    ...
 
 
 class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
