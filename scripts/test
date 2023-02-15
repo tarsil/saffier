@@ -13,8 +13,5 @@ if [ -z $GITHUB_ACTIONS ]; then
     scripts/format
 fi
 
-export saffier_SETTINGS_MODULE='tests.settings.TestSettings'
-
 ${PREFIX}pytest $@
 
-unset saffier_SETTINGS_MODULE

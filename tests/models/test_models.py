@@ -417,6 +417,8 @@ async def test_get_or_none_without_get():
     assert user.pk == 1
 
 
+@pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
+@pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
 async def test_distinct():
     await Product.query.create(name="test", rating=5, in_stock=True)
     await Product.query.create(name="test", rating=4, in_stock=True)
@@ -438,6 +440,8 @@ async def test_distinct():
     assert len(products) == 3
 
 
+@pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
+@pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
 async def test_distinct_two_without_all():
     await Product.query.create(name="test", rating=5, in_stock=True)
     await Product.query.create(name="test", rating=4, in_stock=True)
@@ -466,4 +470,3 @@ async def test_select_for_update():
 
     products = await Product.query.select_for_update().filter(name="test")
     # products = await products.all()
-    cenas = 2
