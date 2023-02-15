@@ -13,6 +13,7 @@ from saffier.db.query.iterators import IterableModel
 from saffier.db.query.protocols import AwaitableQuery, QuerySetSingle
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
+from saffier.types import DictAny
 
 if typing.TYPE_CHECKING:  # pragma: no cover
     from saffier.models import Model
@@ -179,11 +180,11 @@ class QuerySetPrivate:
     def _clone(self) -> "QuerySet[SaffierModel]":
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
-        queryset.filter_clauses = self.filter_clauses
+        queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.limit_count = self.limit_count
-        queryset._select_related = self._select_related
+        queryset._select_related = copy.copy(self._select_related)
         queryset._offset = self._offset
-        queryset._order_by = self._order_by
+        queryset._order_by = copy.copy(self._order_by)
         return queryset
 
 
@@ -210,8 +211,8 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         super().__init__(model_class=model_class)
         self.model_class = model_class
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
-        self._select_related = [] if select_related is None else select_related
         self.limit_count = limit_count
+        self._select_related = [] if select_related is None else select_related
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
 
@@ -232,16 +233,27 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._make_query()
         return self._execute().__await__()
 
+    def _filter_or_exclude(
+        self,
+        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: DictAny,
+    ):
+        queryset = self._clone()
+        if clause is None:
+            return queryset._filter_query(**kwargs)
+
+        queryset.filter_clauses.append(clause)
+        return queryset
+
     def filter(
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
     ):
-        if clause is not None:
-            self.filter_clauses.append(clause)
-            return self
-        else:
-            return self._filter_query(**kwargs)
+        """
+        Filters the QuerySet by the given kwargs and clause.
+        """
+        return self._filter_or_exclude(clause=clause, **kwargs)
 
     def exclude(
         self,

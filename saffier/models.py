@@ -1,6 +1,6 @@
 import sqlalchemy
 
-from saffier.core.metaclass import MetaInfo, ModelMeta
+from saffier.metaclass import MetaInfo, ModelMeta
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 

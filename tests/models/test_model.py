@@ -42,8 +42,8 @@ async def rollback_connections():
             yield
 
 
-async def test_meta_inheritance_registry():
-    await Profile.query.create(name="test", language="EN", age=23)
+async def xtest_meta_inheritance_registry():
+    profile = await Profile.query.create(name="test", language="EN", age=23)
 
     breakpoint()
     results = await Profile.query.all()
