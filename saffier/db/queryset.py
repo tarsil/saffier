@@ -297,10 +297,6 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         for value in await self:
             yield value
 
-    def reverse(self):
-        """Reverse the ordering of the queryset"""
-        queryset = self._clone()
-
     def _filter_or_exclude(
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
