@@ -38,6 +38,14 @@ plugins:
 
 nav:
   - Saffier: "index.md"
+  - Models: "models.md"
+  - Queries: "queries.md"
+  - Fields: "fields.md"
+  - Relationships: "relationships.md"
+  - Registry: "registry.md"
+  - Database: "database.md"
+  - Managers: "managers.md"
+  - Exceptions: "exceptions.md"
   - Saffier People: "saffier-people.md"
   - Contributing: "contributing.md"
   - Sponsorship: "sponsorship.md"
