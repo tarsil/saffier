@@ -1,6 +1,7 @@
 __version__ = "0.1.0"
 
 from saffier.core.registry import Registry
+from saffier.db.connection import Database
 from saffier.db.constants import CASCADE, RESTRICT, SET_NULL
 from saffier.db.manager import Manager
 from saffier.db.queryset import QuerySet
@@ -31,6 +32,7 @@ __all__ = [
     "CASCADE",
     "CharField",
     "ChoiceField",
+    "Database",
     "DateField",
     "DateTimeField",
     "DecimalField",
