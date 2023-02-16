@@ -3,6 +3,7 @@ from enum import Enum
 
 import pytest
 from asyncpg.exceptions import UniqueViolationError
+from pymysql.err import IntegrityError
 from tests.settings import DATABASE_URL
 
 import saffier
@@ -98,6 +99,7 @@ async def test_unique_together_multiple_name_age():
         await HubUser.query.create(name="Test", email="test@example.com", age=18)
 
 
+@pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
 async def test_unique_together_multiple_single_string():
     await Product.query.create(name="android", sku="12345")
 
@@ -105,8 +107,25 @@ async def test_unique_together_multiple_single_string():
         await Product.query.create(name="android", sku="12345")
 
 
+@pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
 async def test_unique_together_multiple_single_string_two():
     await Product.query.create(name="android", sku="12345")
 
     with pytest.raises(UniqueViolationError):
+        await Product.query.create(name="iphone", sku="12345")
+
+
+@pytest.mark.skipif(database.url.dialect == "postgresql", reason="Not supported on MySQL")
+async def test_unique_together_multiple_single_string():
+    await Product.query.create(name="android", sku="12345")
+
+    with pytest.raises(IntegrityError):
+        await Product.query.create(name="android", sku="12345")
+
+
+@pytest.mark.skipif(database.url.dialect == "postgresql", reason="Not supported on MySQL")
+async def test_unique_together_multiple_single_string_two():
+    await Product.query.create(name="android", sku="12345")
+
+    with pytest.raises(IntegrityError):
         await Product.query.create(name="iphone", sku="12345")
