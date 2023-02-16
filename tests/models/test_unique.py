@@ -47,6 +47,7 @@ async def rollback_transactions():
             yield
 
 
+@pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
 async def test_unique():
     await User.query.create(name="Tiago", email="test@example.com")
 
