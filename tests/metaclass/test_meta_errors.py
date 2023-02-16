@@ -69,3 +69,49 @@ async def test_improperly_configured_for_multiple_primary_keys():
                 registry = models
 
     assert raised.value.args[0] == "Cannot create model BaseModel with multiple primary keys."
+
+
+@pytest.mark.parametrize("_type,value", [("int", 1), ("dict", dict(name="test")), ("set", set())])
+async def test_improperly_configured_for_unique_together(_type, value):
+    with pytest.raises(ImproperlyConfigured) as raised:
+
+        class BaseModel(saffier.Model):
+            name = saffier.IntegerField()
+            query = ObjectsManager()
+            languages = ObjectsManager()
+
+            class Meta:
+                registry = models
+                unique_together = value
+
+    assert raised.value.args[0] == f"unique_together must be a tuple or list. Got {_type} instead."
+
+
+@pytest.mark.parametrize(
+    "value",
+    [(1, dict), ["str", 1, set], [1], [dict], [set], [set, dict, list, tuple]],
+    ids=[
+        "int-and-dict",
+        "str-int-set",
+        "list-of-int",
+        "list-of-dict",
+        "list-of-set",
+        "list-of-set-dict-tuple-and-lists",
+    ],
+)
+async def test_value_error_for_unique_together(value):
+    with pytest.raises(ValueError) as raised:
+
+        class BaseModel(saffier.Model):
+            name = saffier.IntegerField()
+            query = ObjectsManager()
+            languages = ObjectsManager()
+
+            class Meta:
+                registry = models
+                unique_together = value
+
+    assert (
+        raised.value.args[0]
+        == "The values inside the unique_together must be a string or a tuple of strings."
+    )

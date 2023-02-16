@@ -84,8 +84,9 @@ class Model(ModelMeta, ModelUtil):
 
         # Handle the uniqueness together
         uniques = []
-        if unique_together:
-            uniques.append(cls._get_unique_constraints(unique_together))
+        for field in unique_together or []:
+            unique_constraint = cls._get_unique_constraints(field)
+            uniques.append(unique_constraint)
 
         return sqlalchemy.Table(tablename, metadata, *columns, *uniques, extend_existing=True)
 
@@ -98,6 +99,8 @@ class Model(ModelMeta, ModelUtil):
 
         The columns must be a a list or tuple of strings.
         """
+        if isinstance(columns, str):
+            return sqlalchemy.UniqueConstraint(columns)
         return sqlalchemy.UniqueConstraint(*columns)
 
     @property

@@ -225,14 +225,16 @@ class BaseModelMeta(type):
         if getattr(meta, "unique_together", None) is not None:
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
-                value_type = type(unique_together.__name__)
+                value_type = type(unique_together).__name__
                 raise ImproperlyConfigured(
                     f"unique_together must be a tuple or list. Got {value_type} instead."
                 )
             else:
                 for value in unique_together:
-                    if not isinstance(value, str):
-                        raise ValueError("The values inside the unique_together must be a string.")
+                    if not isinstance(value, (str, tuple)):
+                        raise ValueError(
+                            "The values inside the unique_together must be a string or a tuple of strings."
+                        )
 
         registry = meta.registry
         new_class.database = registry.database
