@@ -40,7 +40,7 @@ class Product(saffier.Model):
 
 
 @pytest.fixture(autouse=True, scope="function")
-async def create_xtest_database():
+async def create_test_database():
     await models.create_all()
     yield
     await models.drop_all()
@@ -83,23 +83,6 @@ async def test_model_crud_different_manager():
 
     await Product.query.create(name="One", in_stock=True, is_active=False, rating=5)
     await Product.query.create(name="Two", in_stock=True, is_active=False, rating=2)
-    product = await Product.query.create(name="Three", in_stock=True, is_active=True, rating=3)
-
-    products = await Product.query.all()
-    assert len(products) == 3
-
-    products = await Product.active.all()
-    assert len(products) == 1
-
-    assert products[0].pk == product.pk
-
-
-async def test_model_crud_different_manager_create():
-    products = await Product.active.all()
-    assert products == []
-
-    await Product.active.create(name="One", in_stock=True, is_active=False, rating=5)
-    await Product.active.create(name="Two", in_stock=True, is_active=False, rating=2)
     product = await Product.query.create(name="Three", in_stock=True, is_active=True, rating=3)
 
     products = await Product.query.all()

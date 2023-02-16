@@ -89,7 +89,7 @@ def _check_manager_for_bases(
             if isinstance(value, Manager) and key not in attrs:
                 attrs[key] = value.__class__()
     else:
-        if not getattr(meta, "abstract", False):
+        if not meta.abstract:
             for key, value in inspect.getmembers(base):
                 if isinstance(value, Manager) and key not in attrs:
                     attrs[key] = value.__class__()
@@ -123,7 +123,7 @@ class BaseModelMeta(type):
             meta: MetaInfo = getattr(base, "_meta", None)
             if not meta:
                 # Mixins and other classes
-                for key, value in base.__dict__.items():
+                for key, value in inspect.getmembers(base):
                     if isinstance(value, Field) and key not in attrs:
                         attrs[key] = value
 

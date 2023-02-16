@@ -440,6 +440,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
     async def all(self, **kwargs):
+        """
+        Returns the queryset records based on specific filters
+        """
         queryset = self._clone()
         if kwargs:
             return await queryset.filter(**kwargs).all()
@@ -452,6 +455,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         ]
 
     async def get(self, **kwargs):
+        """
+        Returns a single record based on the given kwargs.
+        """
         if kwargs:
             return await self.filter(**kwargs).get()
 
@@ -465,6 +471,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
     async def first(self, **kwargs):
+        """
+        Returns the first record of a given queryset.
+        """
         queryset = self._clone()
         if kwargs:
             return await queryset.filter(**kwargs).order_by("id").get()
@@ -474,6 +483,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             return rows[0]
 
     async def last(self, **kwargs):
+        """
+        Returns the last record of a given queryset.
+        """
         queryset = self._clone()
         if kwargs:
             return await queryset.filter(**kwargs).order_by("-id").get()
@@ -483,6 +495,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             return rows[0]
 
     async def create(self, **kwargs):
+        """
+        Creates a record in a specific table.
+        """
         kwargs = self._validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
         expression = self.table.insert().values(**kwargs)
@@ -495,6 +510,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return instance
 
     async def bulk_create(self, objs: typing.List[typing.Dict]) -> None:
+        """
+        Bulk creates records in a table
+        """
         new_objs = [self._validate_kwargs(**obj) for obj in objs]
 
         expression = self.table.insert().values(new_objs)
@@ -508,6 +526,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         await self.database.execute(expression)
 
     async def update(self, **kwargs) -> None:
+        """
+        Updates a record in a specific table with the given kwargs.
+        """
         fields = {
             key: field.validator for key, field in self.model_class.fields.items() if key in kwargs
         }
@@ -524,6 +545,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     async def get_or_create(
         self, defaults: typing.Dict[str, typing.Any], **kwargs
     ) -> typing.Tuple[typing.Any, bool]:
+        """
+        Creates a record in a specific table or updates if already exists.
+        """
         try:
             instance = await self.get(**kwargs)
             return instance, False
@@ -535,6 +559,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     async def update_or_create(
         self, defaults: typing.Dict[str, typing.Any], **kwargs
     ) -> typing.Tuple[typing.Any, bool]:
+        """
+        Updates a record in a specific table or creates a new one.
+        """
         try:
             instance = await self.get(**kwargs)
             await instance.update(**defaults)
