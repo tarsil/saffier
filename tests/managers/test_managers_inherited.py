@@ -89,8 +89,22 @@ async def test_inherited_base_model_managers_product():
     await Product.query.create(name="test5", rating=2)
     await Product.query.create(name="test6", rating=1)
 
-    users = await Product.query.all()
-    assert len(users) == 6
+    products = await Product.query.all()
+    assert len(products) == 6
 
-    users = await Product.ratings.all()
-    assert len(users) == 3
+    products = await Product.ratings.all()
+    assert len(products) == 3
+
+
+async def test_raises_key_error_on_non_existing_field_for_product():
+    await Product.query.create(name="test", rating=5)
+
+    with pytest.raises(KeyError):
+        await Product.languages.all()
+
+
+async def test_raises_key_error_on_non_existing_field_for_user():
+    await User.query.create(name="test", language="EN")
+
+    with pytest.raises(KeyError):
+        await User.ratings.all()
