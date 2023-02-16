@@ -164,7 +164,7 @@ class BaseModelMeta(type):
 
                 if not isinstance(attrs["id"], Field) or not attrs["id"].primary_key:
                     raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present"
+                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
                     )
 
         for key, value in attrs.items():
@@ -215,6 +215,14 @@ class BaseModelMeta(type):
 
         registry = meta.registry
         new_class.database = registry.database
+
+        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        if meta.abstract:
+            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
+            if len(managers) > 1:
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
 
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:

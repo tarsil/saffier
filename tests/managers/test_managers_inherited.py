@@ -81,7 +81,8 @@ async def test_inherited_base_model_managers():
     assert len(users) == 2
 
 
-async def test_inherited_base_model_managers_product():
+@pytest.mark.parametrize("manager,total", [("query", 6), ("ratings", 3)])
+async def test_inherited_base_model_managers_product(manager, total):
     await Product.query.create(name="test", rating=5)
     await Product.query.create(name="test2", rating=4)
     await Product.query.create(name="test3", rating=3)
@@ -89,11 +90,8 @@ async def test_inherited_base_model_managers_product():
     await Product.query.create(name="test5", rating=2)
     await Product.query.create(name="test6", rating=1)
 
-    products = await Product.query.all()
-    assert len(products) == 6
-
-    products = await Product.ratings.all()
-    assert len(products) == 3
+    products = await getattr(Product, manager).all()
+    assert len(products) == total
 
 
 async def test_raises_key_error_on_non_existing_field_for_product():

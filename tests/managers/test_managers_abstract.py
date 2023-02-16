@@ -63,14 +63,12 @@ async def rollback_connections():
             yield
 
 
-async def test_inherited_abstract_base_model_managers():
+@pytest.mark.parametrize("manager,total", [("query", 4), ("languages", 2)])
+async def test_inherited_abstract_base_model_managers(manager, total):
     await HubUser.query.create(name="test", language="EN")
     await HubUser.query.create(name="test2", language="EN")
     await HubUser.query.create(name="test3", language="PT")
     await HubUser.query.create(name="test4", language="PT")
 
-    # users = await HubUser.query.all()
-    # assert len(users) == 4
-
-    users = await HubUser.languages.all()
-    assert len(users) == 2
+    users = await getattr(HubUser, manager).all()
+    assert len(users) == total
