@@ -509,7 +509,6 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             instance.pk = await self.database.execute(expression)
         else:
             await self.database.execute(expression)
-
         return instance
 
     async def bulk_create(self, objs: typing.List[typing.Dict]) -> None:

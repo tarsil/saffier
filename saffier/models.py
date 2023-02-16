@@ -1,3 +1,5 @@
+import typing
+
 import sqlalchemy
 
 from saffier.core.schemas import Schema
@@ -74,10 +76,29 @@ class Model(ModelMeta, ModelUtil):
     def build_table(cls):
         tablename = cls._meta.tablename
         metadata = cls._meta.registry._metadata
+        unique_together = cls._meta.unique_together
+
         columns = []
         for name, field in cls.fields.items():
             columns.append(field.get_column(name))
-        return sqlalchemy.Table(tablename, metadata, *columns, extend_existing=True)
+
+        # Handle the uniqueness together
+        uniques = []
+        if unique_together:
+            uniques.append(cls._get_unique_constraints(unique_together))
+
+        return sqlalchemy.Table(tablename, metadata, *columns, *uniques, extend_existing=True)
+
+    @classmethod
+    def _get_unique_constraints(
+        cls, columns: typing.Sequence
+    ) -> typing.Optional[sqlalchemy.UniqueConstraint]:
+        """
+        Returns the unique constraints for the model.
+
+        The columns must be a a list or tuple of strings.
+        """
+        return sqlalchemy.UniqueConstraint(*columns)
 
     @property
     def table(self) -> sqlalchemy.Table:

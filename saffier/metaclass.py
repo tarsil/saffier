@@ -23,15 +23,12 @@ class MetaInfo:
         "fields_mapping",
         "registry",
         "tablename",
-        "indexes",
         "unique_together",
         "foreign_key_fields",
         "parents",
         "pk",
         "one_to_one_fields",
         "pk_attribute",
-        "is_inherited",
-        "is_model",
         "manager",
         "_model",
     )
@@ -47,10 +44,9 @@ class MetaInfo:
         self.one_to_one_fields: typing.Set[str] = set()
         self.foreign_key_fields: typing.Set[str] = set()
         self.pk_attribute: Field = getattr(meta, "pk_attribute", "")
-        self.is_inherited: bool = getattr(meta, "is_inherited", False)
-        self.is_model: bool = False
         self._model: typing.Type["Model"] = None
-        self.manager = getattr(meta, "manager", Manager())
+        self.manager: typing.Type["Manager"] = getattr(meta, "manager", Manager())
+        self.unique_together: typing.Any = getattr(meta, "unique_together", None)
 
 
 def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Registry:
@@ -202,6 +198,18 @@ class BaseModelMeta(type):
         meta.parents = parents
         new_class = model_class(cls, name, bases, attrs)
 
+        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        if meta.abstract:
+            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
+            if len(managers) > 1:
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
+
+            if getattr(meta, "unique_together", None) is not None:
+                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
+
+        # Handle the registry of models
         if getattr(meta, "registry", None) is None:
             if hasattr(new_class, "_db_model") and new_class._db_model:
                 meta.registry = _check_model_inherited_registry(bases)
@@ -213,16 +221,21 @@ class BaseModelMeta(type):
             tablename = f"{name.lower()}s"
             meta.tablename = tablename
 
+        # Handle unique together
+        if getattr(meta, "unique_together", None) is not None:
+            unique_together = meta.unique_together
+            if not isinstance(unique_together, (list, tuple)):
+                value_type = type(unique_together.__name__)
+                raise ImproperlyConfigured(
+                    f"unique_together must be a tuple or list. Got {value_type} instead."
+                )
+            else:
+                for value in unique_together:
+                    if not isinstance(value, str):
+                        raise ValueError("The values inside the unique_together must be a string.")
+
         registry = meta.registry
         new_class.database = registry.database
-
-        # Abstract classes do not allow multiple managers. This make sure it is enforced.
-        if meta.abstract:
-            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
-            if len(managers) > 1:
-                raise ImproperlyConfigured(
-                    "Multiple managers are not allowed in abstract classes."
-                )
 
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:
