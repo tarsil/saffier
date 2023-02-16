@@ -1,6 +1,10 @@
 import typing
+from enum import Enum
 from inspect import isclass
 
+from orjson import OPT_OMIT_MICROSECONDS  # noqa
+from orjson import OPT_SERIALIZE_NUMPY  # noqa
+from orjson import dumps
 from typing_extensions import get_origin
 
 from saffier.fields import DateField, DateTimeField
@@ -20,6 +24,16 @@ class ModelUtil:
             if isinstance(v, (DateField, DateTimeField)) and v.auto_now:
                 values[k] = v.validator.get_default_value()
         return values
+
+    def _resolve_value(self, value: typing.Any):
+        if isinstance(value, dict):
+            return dumps(
+                value,
+                option=OPT_SERIALIZE_NUMPY | OPT_OMIT_MICROSECONDS,
+            ).decode("utf-8")
+        elif isinstance(value, Enum):
+            return value.name
+        return value
 
 
 def is_class_and_subclass(value: typing.Any, _type: typing.Any) -> bool:

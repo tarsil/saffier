@@ -3,6 +3,7 @@ __version__ = "0.1.0"
 from saffier.core.registry import Registry
 from saffier.db.constants import CASCADE, RESTRICT, SET_NULL
 from saffier.db.manager import Manager
+from saffier.db.queryset import QuerySet
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import (
     BigIntegerField,
@@ -43,6 +44,7 @@ __all__ = [
     "Model",
     "MultipleObjectsReturned",
     "OneToOneField",
+    "QuerySet",
     "RESTRICT",
     "Registry",
     "SET_NULL",

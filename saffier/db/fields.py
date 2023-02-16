@@ -145,7 +145,6 @@ class String(SaffierField):
         elif not isinstance(value, str):
             raise self.validation_error("type")
 
-        # The null character is always invalid.
         value = value.replace("\0", "")
 
         if self.trim_whitespace:

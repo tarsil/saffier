@@ -2,30 +2,21 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier import Registry
 from saffier.db.connection import Database
 
 database = Database(url=DATABASE_URL)
-models = Registry(database=database)
-nother = Registry(database=database)
+models = saffier.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
 
-class BaseUser(saffier.Model):
+class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
     class Meta:
         registry = models
-        abstract = True
-
-
-class Profile(BaseUser):
-    age = saffier.IntegerField()
-
-    def __str__(self):
-        return f"Age: {self.age}, Name:{self.name}"
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -42,9 +33,15 @@ async def rollback_connections():
             yield
 
 
-async def xtest_meta_inheritance_registry():
-    profile = await Profile.query.create(name="test", language="EN", age=23)
+async def test_model_get_or_create():
+    user, created = await User.query.get_or_create(
+        name="Test", defaults={"language": "Portuguese"}
+    )
+    assert created is True
+    assert user.name == "Test"
+    assert user.language == "Portuguese"
 
-    results = await Profile.query.filter()
-
-    len(results)
+    user, created = await User.query.get_or_create(name="Test", defaults={"language": "English"})
+    assert created is False
+    assert user.name == "Test"
+    assert user.language == "Portuguese"

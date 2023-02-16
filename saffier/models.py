@@ -2,9 +2,9 @@ import sqlalchemy
 
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
+from saffier.db.manager import Manager
 
 # from saffier.db.manager import Manager
-from saffier.db.manager import Manager
 from saffier.metaclass import MetaInfo, ModelMeta
 from saffier.types import DictAny
 
@@ -18,10 +18,12 @@ class Model(ModelMeta, ModelUtil):
     query = Manager()
     _meta = MetaInfo(None)
     _db_model: bool = False
+    _raw_query: str = None
 
     def __init__(self, **kwargs: DictAny) -> None:
         if "pk" in kwargs:
             kwargs[self.pkname] = kwargs.pop("pk")
+
         for k, v in kwargs.items():
             if k not in self.fields:
                 raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
@@ -53,6 +55,14 @@ class Model(ModelMeta, ModelUtil):
     @pk.setter
     def pk(self, value):
         setattr(self, self.pkname, value)
+
+    @property
+    def raw_query(self):
+        return getattr(self, self._raw_query)
+
+    @raw_query.setter
+    def raw_query(self, value):
+        setattr(self, self.raw_query, value)
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self}>"

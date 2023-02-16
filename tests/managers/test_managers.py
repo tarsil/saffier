@@ -14,8 +14,7 @@ pytestmark = pytest.mark.anyio
 
 class ActiveManager(Manager):
     def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset()
-        queryset = queryset.filter(is_active=True).all()
+        queryset = super().get_queryset().filter(is_active=True)
         return queryset
 
 
@@ -41,7 +40,7 @@ class Product(saffier.Model):
 
 
 @pytest.fixture(autouse=True, scope="function")
-async def create_xtest_database():
+async def create_test_database():
     await models.create_all()
     yield
     await models.drop_all()
@@ -78,7 +77,7 @@ async def test_model_crud():
     assert users == []
 
 
-async def xtest_model_crud_different_manager():
+async def test_model_crud_different_manager():
     products = await Product.active.all()
     assert products == []
 

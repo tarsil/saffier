@@ -78,6 +78,23 @@ def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Re
     return found_registry
 
 
+def _check_manager_for_bases(
+    base: typing.Tuple[typing.Type, ...], attrs: DictAny, meta: typing.Optional[MetaInfo] = None
+) -> None:
+    """
+    When an abstract class is declared, we must treat the manager's value coming from the top.
+    """
+    if not meta:
+        for key, value in inspect.getmembers(base):
+            if isinstance(value, Manager) and key not in attrs:
+                attrs[key] = value.__class__()
+    else:
+        if not meta.abstract:
+            for key, value in inspect.getmembers(base):
+                if isinstance(value, Manager) and key not in attrs:
+                    attrs[key] = value.__class__()
+
+
 class BaseModelMeta(type):
     __slots__ = ()
 
@@ -106,17 +123,18 @@ class BaseModelMeta(type):
             meta: MetaInfo = getattr(base, "_meta", None)
             if not meta:
                 # Mixins and other classes
-                for key, value in base.__dict__.items():
+                for key, value in inspect.getmembers(base):
                     if isinstance(value, Field) and key not in attrs:
                         attrs[key] = value
 
-                for key, value in inspect.getmembers(base):
-                    if isinstance(value, Manager) and key not in attrs:
-                        attrs[key] = value.__class__()
+                _check_manager_for_bases(base, attrs)
             else:
                 # abstract classes
                 for key, value in meta.fields_mapping.items():
                     attrs[key] = value
+
+                # For managers coming from the top that are not abstract classes
+                _check_manager_for_bases(base, attrs, meta)
 
         # Search in the base classes
         inherited_fields: DictAny = {}
@@ -142,11 +160,11 @@ class BaseModelMeta(type):
 
             if not is_pk_present and not getattr(meta_class, "abstract", None):
                 if "id" not in attrs:
-                    attrs = {"id": BigIntegerField(primary_key=True, **attrs)}
+                    attrs = {"id": BigIntegerField(primary_key=True), **attrs}
 
                 if not isinstance(attrs["id"], Field) or not attrs["id"].primary_key:
                     raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present"
+                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
                     )
 
         for key, value in attrs.items():
@@ -198,6 +216,14 @@ class BaseModelMeta(type):
         registry = meta.registry
         new_class.database = registry.database
 
+        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        if meta.abstract:
+            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
+            if len(managers) > 1:
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
+
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:
             registry.models[name] = new_class
@@ -207,15 +233,15 @@ class BaseModelMeta(type):
             if field.primary_key:
                 new_class.pkname = name
 
-        # for key, value in inspect.getmembers(new_class):
-        #     if isinstance(value, Manager):
-        #         value.model_class = new_class
+        new_class._db_model = True
+        setattr(new_class, "fields", meta.fields_mapping)
+
+        for key, value in attrs.items():
+            if isinstance(value, Manager):
+                value.model_class = new_class
 
         meta._model = new_class
         meta.manager.model_class = new_class
-
-        new_class._db_model = True
-        setattr(new_class, "fields", meta.fields_mapping)
         return new_class
 
     @property
