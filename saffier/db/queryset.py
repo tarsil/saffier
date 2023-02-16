@@ -12,6 +12,7 @@ from saffier.fields import CharField, TextField
 from saffier.types import DictAny
 
 if typing.TYPE_CHECKING:  # pragma: no cover
+    from saffier.db.connection import Database
     from saffier.models import Model
 
 
@@ -25,7 +26,7 @@ class QuerySetProps:
     """
 
     @property
-    def database(self):
+    def database(self) -> "Database":
         return self.model_class._meta.registry.database
 
     @property
@@ -117,6 +118,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         if self.distinct_on:
             expression = self._build_select_distinct(self.distinct_on, expression=expression)
 
+        setattr(self, "_expression", expression)
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs):
@@ -232,6 +234,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
+        queryset._expression = self._expression
         return queryset
 
 
@@ -262,13 +265,29 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
+        self._expression = None
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
 
+    @property
+    def sql(self):
+        return str(self._expression)
+
+    @sql.setter
+    def sql(self, value):
+        setattr(self, "_expression", value)
+
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:
             yield value
+
+    def _set_query_expression(self, expression: typing.Any) -> None:
+        """
+        Sets the value of the sql property to the expression used.
+        """
+        self.sql = expression
+        self.model_class.raw_query = self.sql
 
     def _filter_or_exclude(
         self,
@@ -389,6 +408,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         """
         expression = self._build_select()
         expression = sqlalchemy.exists(expression).select()
+        self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
     async def count(self) -> int:
@@ -397,6 +417,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         """
         expression = self._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
+        self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
     async def get_or_none(self, **kwargs):
@@ -405,6 +426,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         """
         queryset = self.filter(**kwargs)
         expression = queryset._build_select().limit(2)
+        self._set_query_expression(expression)
         rows = await self.database.fetch_all(expression)
 
         if not rows:
@@ -422,7 +444,12 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             return await queryset.filter(**kwargs).all()
 
         expression = queryset._build_select()
+        self._set_query_expression(expression)
+
         rows = await queryset.database.fetch_all(expression)
+
+        # Attach the raw query to the object
+        queryset.model_class.raw_query = self.sql
         return [
             queryset.model_class._from_row(row, select_related=self._select_related)
             for row in rows
@@ -437,6 +464,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
         expression = self._build_select().limit(2)
         rows = await self.database.fetch_all(expression)
+        self._set_query_expression(expression)
 
         if not rows:
             raise DoesNotFound()
@@ -475,6 +503,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         kwargs = self._validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
         expression = self.table.insert().values(**kwargs)
+        self._set_query_expression(expression)
 
         if self.pkname not in kwargs:
             instance.pk = await self.database.execute(expression)
@@ -490,13 +519,57 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         new_objs = [self._validate_kwargs(**obj) for obj in objs]
 
         expression = self.table.insert().values(new_objs)
+        self._set_query_expression(expression)
         await self.database.execute(expression)
+
+    async def bulk_update(self, objs: typing.List[SaffierModel], fields: typing.List[str]) -> None:
+        """
+        Bulk updates records in a table.
+
+        A similar solution was suggested here: https://github.com/encode/orm/pull/148
+
+        It is thought to be a clean approach to a simple problem so it was added here and
+        refactored to be compatible with Saffier.
+        """
+        new_fields = {}
+        for key, field in self.model_class.fields.items():
+            if key in fields:
+                new_fields[key] = field.validator
+
+        validator = Schema(fields=new_fields)
+
+        new_objs = []
+        for obj in objs:
+            new_obj = {}
+            for key, value in obj.__dict__.items():
+                if key in fields:
+                    new_obj[key] = self._resolve_value(value)
+            new_objs.append(new_obj)
+
+        new_objs = [
+            self._update_auto_now_fields(validator.validate(obj), self.model_class.fields)
+            for obj in new_objs
+        ]
+
+        pk = getattr(self.table.c, self.pkname)
+        expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))
+        kwargs = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
+        pks = [{self.pkname: getattr(obj, self.pkname)} for obj in objs]
+
+        query_list = []
+        for pk, value in zip(pks, new_objs):
+            query_list.append({**pk, **value})
+
+        expression = expression.values(kwargs)
+        self._set_query_expression(expression)
+        await self.database.execute_many(str(expression), query_list)
 
     async def delete(self) -> None:
         expression = self.table.delete()
         for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
 
+        self._set_query_expression(expression)
         await self.database.execute(expression)
 
     async def update(self, **kwargs) -> None:
@@ -509,12 +582,13 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
         validator = Schema(fields=fields)
         kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.model_class.fields)
-        expr = self.table.update().values(**kwargs)
+        expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:
-            expr = expr.where(filter_clause)
+            expression = expression.where(filter_clause)
 
-        await self.database.execute(expr)
+        self._set_query_expression(expression)
+        await self.database.execute(expression)
 
     async def get_or_create(
         self, defaults: typing.Dict[str, typing.Any], **kwargs
