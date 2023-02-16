@@ -78,6 +78,23 @@ def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Re
     return found_registry
 
 
+def _check_manager_for_bases(
+    base: typing.Tuple[typing.Type, ...], attrs: DictAny, meta: typing.Optional[MetaInfo] = None
+) -> None:
+    """
+    When an abstract class is declared, we must treat the manager's value coming from the top.
+    """
+    if not meta:
+        for key, value in inspect.getmembers(base):
+            if isinstance(value, Manager) and key not in attrs:
+                attrs[key] = value.__class__()
+    else:
+        if not getattr(meta, "abstract", False):
+            for key, value in inspect.getmembers(base):
+                if isinstance(value, Manager) and key not in attrs:
+                    attrs[key] = value.__class__()
+
+
 class BaseModelMeta(type):
     __slots__ = ()
 
@@ -110,13 +127,14 @@ class BaseModelMeta(type):
                     if isinstance(value, Field) and key not in attrs:
                         attrs[key] = value
 
-                for key, value in inspect.getmembers(base):
-                    if isinstance(value, Manager) and key not in attrs:
-                        attrs[key] = value.__class__()
+                _check_manager_for_bases(base, attrs)
             else:
                 # abstract classes
                 for key, value in meta.fields_mapping.items():
                     attrs[key] = value
+
+                # For managers coming from the top that are not abstract classes
+                _check_manager_for_bases(base, attrs, meta)
 
         # Search in the base classes
         inherited_fields: DictAny = {}
@@ -142,7 +160,7 @@ class BaseModelMeta(type):
 
             if not is_pk_present and not getattr(meta_class, "abstract", None):
                 if "id" not in attrs:
-                    attrs = {"id": BigIntegerField(primary_key=True, **attrs)}
+                    attrs = {"id": BigIntegerField(primary_key=True), **attrs}
 
                 if not isinstance(attrs["id"], Field) or not attrs["id"].primary_key:
                     raise ImproperlyConfigured(
@@ -207,15 +225,15 @@ class BaseModelMeta(type):
             if field.primary_key:
                 new_class.pkname = name
 
-        # for key, value in inspect.getmembers(new_class):
-        #     if isinstance(value, Manager):
-        #         value.model_class = new_class
+        new_class._db_model = True
+        setattr(new_class, "fields", meta.fields_mapping)
+
+        for key, value in attrs.items():
+            if isinstance(value, Manager):
+                value.model_class = new_class
 
         meta._model = new_class
         meta.manager.model_class = new_class
-
-        new_class._db_model = True
-        setattr(new_class, "fields", meta.fields_mapping)
         return new_class
 
     @property
