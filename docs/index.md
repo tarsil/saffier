@@ -66,6 +66,9 @@ with a familiar interface to work with. If you are familiar with Django, then yo
 Saffier leverages the power of **Pyantic** for its fields while offering a friendly, familiar and
 easy to use interface.
 
+This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
+[Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
+design thanks to its origins.
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of
@@ -134,14 +137,9 @@ found throughout the documentation.
 {!> ../docs_src/quickstart/example1.py!}
 ```
 
-You can declare the ID directly as a field but by default, if no ID is provided, Saffier will
-generate one for you.
-
-!!! Warning
-    This is only applied to `postgres` and `mysql`. SQLite is limited in functionality and you
-    might still need to run like the example above.
-
 As stated in the example, if no `tablename` is provided in the `Meta` class, Saffier automatically
 generates the name of the table for you by pluralising the class name.
 
-Exciting! In the documentation we go deeper in explanations and examples, this was just to warm up.
+**Exciting!** 
+
+In the documentation we go deeper in explanations and examples, this was just to warm up. 😁
