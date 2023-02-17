@@ -33,3 +33,22 @@ class should be declare.
 
 Although this looks very simple, in fact **Saffier** is doing a lot of work for you behind the
 scenes.
+
+Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
+within the SQL tables with field names and lookups.
+
+### Attention
+
+If no `id` is declared in the model, **Saffier** will automatically generate an `id` of type
+`BigIntegerField` and **automatically becoming the primary key**.
+
+```python
+{!> ../docs_src/models/declaring_models_no_id.py !}
+```
+
+### Restrictions with primary keys
+
+Primary keys **should always** be declared in an `id` field. If you create a different
+`primary_key` within the model in a different attribute, it will raise an `ImproperlyConfigured`.
+
+**Primary keys must be always declared inside an ID attribute**.
