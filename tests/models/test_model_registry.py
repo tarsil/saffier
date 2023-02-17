@@ -28,6 +28,21 @@ class Profile(BaseUser):
         return f"Age: {self.age}, Name:{self.name}"
 
 
+class BaseUserNonAbstract(saffier.Model):
+    name = saffier.CharField(max_length=100)
+    language = saffier.CharField(max_length=200, null=True)
+
+    class Meta:
+        registry = models
+
+
+class AnotherProfile(BaseUserNonAbstract):
+    age = saffier.IntegerField()
+
+    def __str__(self):
+        return f"Age: {self.age}, Name:{self.name}"
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
@@ -46,3 +61,9 @@ async def test_meta_inheritance_registry():
     await Profile.query.create(name="test", language="EN", age=23)
 
     await Profile.query.all()
+
+
+async def test_meta_inheritance_registry_non_abstract():
+    await AnotherProfile.query.create(name="test", language="EN", age=23)
+
+    await AnotherProfile.query.all()
