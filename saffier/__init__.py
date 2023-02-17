@@ -1,6 +1,7 @@
 __version__ = "0.1.0"
 
 from saffier.core.registry import Registry
+from saffier.db.connection import Database
 from saffier.db.constants import CASCADE, RESTRICT, SET_NULL
 from saffier.db.manager import Manager
 from saffier.db.queryset import QuerySet
@@ -13,6 +14,7 @@ from saffier.fields import (
     DateField,
     DateTimeField,
     DecimalField,
+    EmailField,
     FloatField,
     ForeignKey,
     IntegerField,
@@ -21,6 +23,7 @@ from saffier.fields import (
     OneToOneField,
     TextField,
     TimeField,
+    URLField,
     UUIDField,
 )
 from saffier.models import Model
@@ -31,10 +34,12 @@ __all__ = [
     "CASCADE",
     "CharField",
     "ChoiceField",
+    "Database",
     "DateField",
     "DateTimeField",
     "DecimalField",
     "DoesNotFound",
+    "EmailField",
     "FloatField",
     "ForeignKey",
     "IPAddressField",
@@ -50,5 +55,6 @@ __all__ = [
     "SET_NULL",
     "TextField",
     "TimeField",
+    "URLField",
     "UUIDField",
 ]

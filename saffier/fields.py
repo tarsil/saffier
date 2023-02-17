@@ -17,7 +17,7 @@ from saffier.db.fields import (
 )
 from saffier.db.fields import IPAddress as CoreIPAddress
 from saffier.db.fields import SaffierField, String, Time
-from saffier.sqlalchemy.fields import GUID, IPAddress, List
+from saffier.sqlalchemy.fields import GUID, IPAddress
 from saffier.types import DictAny
 
 
@@ -35,7 +35,10 @@ class Field:
         **kwargs: DictAny,
     ) -> None:
         if primary_key:
+            default_value = kwargs.get("default", None)
+            self.raise_for_non_default(default=default_value)
             kwargs["read_only"] = True
+
         self.null = kwargs.get("null", False)
         self.primary_key = primary_key
         self.index = index
@@ -71,6 +74,12 @@ class Field:
 
     def expand_relationship(self, value):
         return value
+
+    def raise_for_non_default(self, default: typing.Any):
+        if not isinstance(self, (IntegerField, BigIntegerField)) and not default:
+            raise ValueError(
+                "Primary keys other then IntegerField and BigIntegerField, must provide a default."
+            )
 
 
 class CharField(Field):
@@ -365,8 +374,3 @@ class URLField(CharField):
 
     def get_column_type(self):
         return sqlalchemy.String(length=self.validator.max_length)
-
-
-class ListField(Field):
-    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
-        return List()

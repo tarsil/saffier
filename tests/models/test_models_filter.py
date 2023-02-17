@@ -106,3 +106,19 @@ async def test_model_filter():
 
     products = Product.query.exclude(name__icontains="%")
     assert await products.count() == 3
+
+
+async def test_model_nested_filter():
+    await User.query.create(name="Test", language="EN")
+    await User.query.create(name="Test", language="ES")
+    await User.query.create(name="Test", language="PT")
+    await User.query.create(name="Jane", language="ES")
+    await User.query.create(name="Lucy", language="PT")
+
+    users = await User.query.filter(name="Test").filter(language="EN")
+
+    assert len(users) == 1
+
+    users = await User.query.filter(name="Test").filter(language="EN").filter(language="PT")
+
+    assert len(users) == 0
