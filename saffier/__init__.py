@@ -14,6 +14,7 @@ from saffier.fields import (
     DateField,
     DateTimeField,
     DecimalField,
+    EmailField,
     FloatField,
     ForeignKey,
     IntegerField,
@@ -22,6 +23,7 @@ from saffier.fields import (
     OneToOneField,
     TextField,
     TimeField,
+    URLField,
     UUIDField,
 )
 from saffier.models import Model
@@ -37,6 +39,7 @@ __all__ = [
     "DateTimeField",
     "DecimalField",
     "DoesNotFound",
+    "EmailField",
     "FloatField",
     "ForeignKey",
     "IPAddressField",
@@ -52,5 +55,6 @@ __all__ = [
     "SET_NULL",
     "TextField",
     "TimeField",
+    "URLField",
     "UUIDField",
 ]
