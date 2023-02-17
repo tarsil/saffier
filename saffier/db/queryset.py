@@ -225,6 +225,10 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         return distinct_on
 
     def _clone(self) -> "QuerySet[SaffierModel]":
+        """
+        Return a copy of the current QuerySet that's ready for another
+        operation.
+        """
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
         queryset.filter_clauses = copy.copy(self.filter_clauses)
@@ -235,7 +239,12 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = self._expression
+        queryset._cache = self._cache
         return queryset
+
+    def _fetch_all(self):
+        if self._cache is None:
+            self._cache = self._make_query()
 
 
 class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
@@ -266,6 +275,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._expression = None
+        self._cache = None
 
     def __get__(self, instance, owner):
         return self.__class__(model_class=owner)
@@ -623,3 +633,20 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
     def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
         return self._execute().__await__()
+
+    def __class_getitem__(cls, *args, **kwargs):
+        return cls
+
+    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
+        for val in await self:
+            yield val
+
+    def __deepcopy__(self, memo):
+        """Don't populate the QuerySet's cache."""
+        obj = self.__class__()
+        for k, v in self.__dict__.items():
+            if k == "_cache":
+                obj.__dict__[k] = None
+            else:
+                obj.__dict__[k] = copy.deepcopy(v, memo)
+        return obj
