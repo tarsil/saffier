@@ -12,6 +12,7 @@ class Note(saffier.Model):
     a "notes" table for you.
     """
 
+    id = saffier.IntegerField(primary_key=True)
     text = saffier.CharField(max_length=255)
     is_completed = saffier.BooleanField(default=False)
 

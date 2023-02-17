@@ -128,12 +128,18 @@ $ pip install saffier[sqlite]
 The following is an example how to start with **Saffier** and more details and examples can be
 found throughout the documentation.
 
+**Use** `ipython` **to run the following from the console, since it supports** `await`.
+
 ```python
 {!> ../docs_src/quickstart/example1.py!}
 ```
 
 You can declare the ID directly as a field but by default, if no ID is provided, Saffier will
-generate one for you. 
+generate one for you.
+
+!!! Warning
+    This is only applied to `postgres` and `mysql`. SQLite is limited in functionality and you
+    might still need to run like the example above.
 
 As stated in the example, if no `tablename` is provided in the `Meta` class, Saffier automatically
 generates the name of the table for you by pluralising the class name.
