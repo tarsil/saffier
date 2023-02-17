@@ -17,7 +17,7 @@ from saffier.db.fields import (
 )
 from saffier.db.fields import IPAddress as CoreIPAddress
 from saffier.db.fields import SaffierField, String, Time
-from saffier.sqlalchemy.fields import GUID, IPAddress, List
+from saffier.sqlalchemy.fields import GUID, IPAddress
 from saffier.types import DictAny
 
 
@@ -365,8 +365,3 @@ class URLField(CharField):
 
     def get_column_type(self):
         return sqlalchemy.String(length=self.validator.max_length)
-
-
-class ListField(Field):
-    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
-        return List()
