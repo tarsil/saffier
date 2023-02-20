@@ -337,7 +337,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         """
         return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
-    def search(self, term: typing.Any):
+    def lookup(self, term: typing.Any):
         """
         Broader way of searching for a given term
         """
@@ -403,7 +403,14 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         return queryset
 
     def select_related(self, related):
-        """Caches teh already selected fields of a query avoiding multiple database calls"""
+        """
+        Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
+        related-object data when it executes its query.
+
+        This is a performance booster which results in a single more complex query but means
+
+        later use of foreign-key relationships won’t require database queries.
+        """
         queryset = self._clone()
         if not isinstance(related, (list, tuple)):
             related = [related]
@@ -631,7 +638,9 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     async def _execute(self) -> typing.List[SaffierModel]:
         return await self.all()
 
-    def __await__(self) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
+    def __await__(
+        self,
+    ) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
         return self._execute().__await__()
 
     def __class_getitem__(cls, *args, **kwargs):

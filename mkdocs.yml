@@ -39,8 +39,8 @@ plugins:
 nav:
   - Saffier: "index.md"
   - Models: "models.md"
-  - Queries: "queries.md"
   - Fields: "fields.md"
+  - Queries: "queries.md"
   - Relationships: "relationships.md"
   - Registry: "registry.md"
   - Database: "database.md"

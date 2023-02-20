@@ -3,10 +3,10 @@ import sqlite3
 import asyncpg
 import pymysql
 import pytest
-from tests.settings import DATABASE_URL
 
 import saffier
 from saffier.db.connection import Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -116,6 +116,24 @@ async def test_select_related():
     assert track.album.name == "Malibu"
 
     tracks = await Track.query.select_related("album").all()
+    assert len(tracks) == 6
+
+
+async def test_select_related_no_all():
+    album = await Album.query.create(name="Malibu")
+    await Track.query.create(album=album, title="The Bird", position=1)
+    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
+    await Track.query.create(album=album, title="The Waters", position=3)
+
+    fantasies = await Album.query.create(name="Fantasies")
+    await Track.query.create(album=fantasies, title="Help I'm Alive", position=1)
+    await Track.query.create(album=fantasies, title="Sick Muse", position=2)
+    await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
+
+    track = await Track.query.select_related("album").get(title="The Bird")
+    assert track.album.name == "Malibu"
+
+    tracks = await Track.query.select_related("album")
     assert len(tracks) == 6
 
 
