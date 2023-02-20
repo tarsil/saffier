@@ -17,7 +17,7 @@ from saffier.db.fields import (
     Integer,
 )
 from saffier.db.fields import IPAddress as CoreIPAddress
-from saffier.db.fields import SaffierField, String, Time
+from saffier.db.fields import Password, SaffierField, String, Time
 from saffier.sqlalchemy.fields import GUID, IPAddress
 from saffier.types import DictAny
 
@@ -349,6 +349,18 @@ class UUIDField(Field):
 
     def get_column_type(self):
         return GUID()
+
+
+class PasswordField(CharField):
+    """
+    Representation of a Password
+    """
+
+    def get_validator(self, **kwargs: DictAny) -> SaffierField:
+        return Password(**kwargs)
+
+    def get_column_type(self):
+        return sqlalchemy.String(length=self.validator.max_length)
 
 
 class IPAddressField(Field):

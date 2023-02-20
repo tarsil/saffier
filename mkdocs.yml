@@ -28,7 +28,7 @@ theme:
     - search.highlight
     - content.tabs.link
 
-repo_name: dymmond/saffier
+repo_name: tarsil/saffier
 repo_url: https://github.com/tarsil/saffier
 edit_uri: ""
 plugins:
@@ -39,12 +39,11 @@ plugins:
 nav:
   - Saffier: "index.md"
   - Models: "models.md"
+  - Managers: "managers.md"
   - Fields: "fields.md"
   - Queries: "queries.md"
   - Relationships: "relationships.md"
   - Registry: "registry.md"
-  - Database: "database.md"
-  - Managers: "managers.md"
   - Exceptions: "exceptions.md"
   - Saffier People: "saffier-people.md"
   - Contributing: "contributing.md"
