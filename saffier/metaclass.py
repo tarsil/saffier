@@ -270,12 +270,13 @@ class BaseModelMeta(type):
         new_class._db_model = True
         setattr(new_class, "fields", meta.fields_mapping)
 
+        meta._model = new_class
+        meta.manager.model_class = new_class
+
         for key, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
 
-        meta._model = new_class
-        meta.manager.model_class = new_class
         return new_class
 
     @property

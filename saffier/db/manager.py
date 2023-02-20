@@ -30,7 +30,17 @@ class Manager:
         self.model_class = model_class
 
     def get_queryset(self) -> "QuerySet":
+        """
+        Returns the queryset object.
+        """
         return QuerySet(self.model_class)
 
     def __getattr__(self, item):
-        return getattr(self.get_queryset(), item)
+        """
+        Gets the attribute from the queryset and if it does not
+        exist, then lookup in the model.
+        """
+        try:
+            return getattr(self.get_queryset(), item)
+        except AttributeError:
+            return getattr(self.model_class, item)
