@@ -4,6 +4,7 @@ import sqlalchemy
 
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
+from saffier.db.datastructures import Index
 from saffier.db.manager import Manager
 
 # from saffier.db.manager import Manager
@@ -77,6 +78,7 @@ class Model(ModelMeta, ModelUtil):
         tablename = cls._meta.tablename
         metadata = cls._meta.registry._metadata
         unique_together = cls._meta.unique_together
+        index_constraints = cls._meta.indexes
 
         columns = []
         for name, field in cls.fields.items():
@@ -88,7 +90,20 @@ class Model(ModelMeta, ModelUtil):
             unique_constraint = cls._get_unique_constraints(field)
             uniques.append(unique_constraint)
 
-        return sqlalchemy.Table(tablename, metadata, *columns, *uniques, extend_existing=True)
+        # Handle the indexes
+        indexes = []
+        for field in index_constraints or []:
+            index = cls._get_indexes(field)
+            indexes.append(index)
+
+        return sqlalchemy.Table(
+            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True
+        )
+
+    @classmethod
+    def _get_indexes(cls, index: Index) -> typing.Optional[sqlalchemy.Index]:
+        """Creates the index based on the Index fields"""
+        return sqlalchemy.Index(index.name, *index.fields)
 
     @classmethod
     def _get_unique_constraints(

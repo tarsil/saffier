@@ -3,9 +3,6 @@ import typing
 from pydantic import root_validator
 from pydantic.dataclasses import dataclass
 
-from saffier.core.datastructures import ArbitraryHashableBaseModel
-from saffier.types import DictAny
-
 
 @dataclass
 class Index:
@@ -22,7 +19,7 @@ class Index:
     def validate_data(cls, values):
         name = values.get("name")
 
-        if len(name) > cls.max_name_length:
+        if name is not None and len(name) > cls.max_name_length:
             raise ValueError(f"The max length of the index name must be 30. Got {len(name)}")
 
         fields = values.get("fields")
@@ -31,3 +28,9 @@ class Index:
 
         if fields and not all(isinstance(field, str) for field in fields):
             raise ValueError("Index.fields must contain only strings with field names.")
+
+        if name is None:
+            suffix = values.get("suffix", cls.suffix)
+            values["name"] = f"{'_'.join(fields)}_{suffix}"
+
+        return values
