@@ -119,14 +119,16 @@ field is **mandatory** and it will raise an `ImproperlyConfigured` error if no r
 
     <sup>Default: `name of class pluralised`<sup>
 
-* **unique_together** - The unique constrainsts for your model.
-
-    <sup>Default: `None`<sup>
-
 * **abstract** - If the model is abstract or not. If is abstract, then it won't generate the
 database table.
 
     <sup>Default: `False`<sup>
+
+* **unique_together** - The unique constrainsts for your model.
+
+    <sup>Default: `None`<sup>
+
+* **indexes** - The extra custom indexes you want to add to the model
 
 ### Registry
 
@@ -205,6 +207,60 @@ In this example, the `User` class will be represented by a `db_users` mapping in
     Calling `tablename` with a different name than your class it doesn't change the behaviour
     in your codebase. The tablename is used **solely for SQL internal purposes**. You will
     still access the given table in your codebase via main class.
+
+
+### Abstract
+
+As the name suggests, it is when you want to declare an abstract model.
+
+Why do you need an abstract model in the first place? Well, for the same reason when you need to
+declare an abstract class in python but for this case you simply don't want to generate a table
+from that model declaration.
+
+This can be useful if you want to hold common functionality across models and don't want to repeat
+yourself.
+
+The way of declaring an abstract model in **Saffier** is by passing `True` to the `abstract`
+attribute in the [meta](#the-meta-class) class.
+
+#### In a nutshell
+
+In this document we already mentioned abstract models and how to use them but let us use some more
+examples to be even clear.
+
+
+```python hl_lines="10"
+{!> ../docs_src/models/abstract/simple.py !}
+```
+
+This model itself does not do much alone. This simply creates a `BaseModel` and declares the
+[registry](#registry) as well as declares the `abstract` as `True`.
+
+#### Use abstract models to hold common functionality
+
+Taking advantage of the abstract models to hold common functionality is usually the common use
+case for these to be use in the first place.
+
+Let us see a more complex example and how to use it.
+
+```python hl_lines="10"
+{!> ../docs_src/models/abstract/common.py !}
+```
+
+This is already quite a complex example where `User` and `Product` have both common functionality
+like the `id` and `description` as well the `get_description()` function.
+
+#### Limitations
+
+You can do **almost everything** with abstract models and emphasis in **almost**.
+
+Abstract models do not allow you to:
+
+* **Declare** [managers](./managers.md).
+* **Declare** [unique together](#unique-together)
+
+This limitations are intentional as these operations should be done for [models](#declaring-models)
+and not abstact models.
 
 ### Unique together
 
@@ -305,55 +361,51 @@ This will make sure that `is_active` is also unique
 
 For this we used a **list of tuples of strings as well as strings**.
 
-## Abstract
+### Indexes
 
-As the name suggests, it is when you want to declare an abstract model.
+Sometimes you might want to add specific designed indexes to your models. Database indexes also
+somes with costs and you **should always be careful** when creating one.
 
-Why do you need an abstract model in the first place? Well, for the same reason when you need to
-declare an abstract class in python but for this case you simply don't want to generate a table
-from that model declaration.
+If you are familiar with indexes you know what this means but if you are not, just have a quick
+[read](https://www.codecademy.com/article/sql-indexes) and get yourself familiar.
 
-This can be useful if you want to hold common functionality across models and don't want to repeat
-yourself.
+There are different ways of declaring an index.
 
-The way of declaring an abstract model in **Saffier** is by passing `True` to the `abstract`
-attribute in the [meta](#the-meta-class) class.
+Saffier provides an `Index` object that must be used when declaring models indexes or a
+`ValueError` is raised.
 
-### In a nutshell
+```python
+from saffier import Index
+```
+#### Parameters
 
-In this document we already mentioned abstract models and how to use them but let us use some more
-examples to be even clear.
+The `Index` parameters are:
+
+* **fields** - List of model fields in a string format.
+* **name** - The name of the new index. If no name is provided, it will generate one, snake case
+with a suffix `_idx` in the end. Example: `name_email_idx`.
+* **suffix** - The suffix used to generate the index name when the `name` value is not provided.
+
+Let us see some examples.
+
+#### Simple index
+
+The simplest and cleanest way of declaring an index with **Saffier**. You declare it directly in
+the model field.
 
 
 ```python hl_lines="10"
-{!> ../docs_src/models/abstract/simple.py !}
+{!> ../docs_src/models/indexes/simple.py !}
 ```
 
-This model itself does not do much alone. This simply creates a `BaseModel` and declares the
-[registry](#registry) as well as declares the `abstract` as `True`.
+#### With indexes in the meta
 
-### Use abstract models to hold common functionality
-
-Taking advantage of the abstract models to hold common functionality is usually the common use
-case for these to be use in the first place.
-
-Let us see a more complex example and how to use it.
-
-```python hl_lines="10"
-{!> ../docs_src/models/abstract/common.py !}
+```python hl_lines="15"
+{!> ../docs_src/models/indexes/simple2.py !}
 ```
 
-This is already quite a complex example where `User` and `Product` have both common functionality
-like the `id` and `description` as well the `get_description()` function.
+#### With complex indexes in the meta
 
-### Limitations
-
-You can do **almost everything** with abstract models and emphasis in **almost**.
-
-Abstract models do not allow you to:
-
-* **Declare** [managers](./managers.md).
-* **Declare** [unique together](#unique-together)
-
-This limitations are intentional as these operations should be done for [models](#declaring-models)
-and not abstact models.
+```python hl_lines="16-19"
+{!> ../docs_src/models/indexes/complex_together.py !}
+```
