@@ -16,7 +16,7 @@ class User(saffier.Model):
         registry = models
 
 
-class User(saffier.Model):
+class Profile(saffier.Model):
     user = saffier.ForeignKey(User, on_delete=saffier.CASCADE)
 
     class Meta:
