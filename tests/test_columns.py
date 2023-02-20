@@ -53,6 +53,7 @@ class User(saffier.Model):
     email = fields.EmailField(null=True, max_length=256)
     ipaddress = fields.IPAddressField(null=True)
     url = fields.URLField(null=True, max_length=2048)
+    password = fields.PasswordField(null=True, max_length=255)
 
     class Meta:
         registry = models
@@ -119,14 +120,15 @@ async def test_model_crud():
         name="Test",
         email="test@saffier.com",
         url="https://saffier.com",
+        password="12345",
     )
 
     user = await User.query.get()
     assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+    assert user.password == "12345"
+
     assert user.url == "https://saffier.com"
-    await product.update(
-        data={"foo": 1234},
-    )
+    await product.update(data={"foo": 1234})
     assert product.updated_datetime != last_updated_datetime
     assert product.updated_date == last_updated_date
 

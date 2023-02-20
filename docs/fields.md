@@ -338,6 +338,20 @@ class MyModel(saffier.Model):
 
 Similar to [CharField](#charfield) but has no `max_length` restrictions.
 
+#### PasswordField
+
+```python
+import saffier
+
+
+class MyModel(saffier.Model):
+    data = saffier.PasswordField(null=False, max_length=255)
+    ...
+
+```
+
+Similar to [CharField](#charfield) and it can be used to represent a password text.
+
 #### TimeField
 
 ```python
