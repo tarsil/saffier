@@ -312,7 +312,7 @@ exists = await User.query.filter(email="foo@bar.com").exists()
 
 ### Get or none
 
-When querying a model and do not want to raise a [DoesNotExist](./exceptions.md#doesnotexist) and
+When querying a model and do not want to raise a [DoesNotFound](./exceptions.md#doesnotfound) and
 instead returns a `None`.
 
 ```python

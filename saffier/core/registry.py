@@ -11,10 +11,11 @@ class Registry(ArbitraryHashableBaseModel):
     """
 
     def __init__(self, database: Database, **kwargs) -> None:
-        super().__init__(**kwargs)
         assert isinstance(
             database, Database
         ), "database must be an instance of saffier.core.db.Database"
+
+        super().__init__(**kwargs)
         self.database = database
         self.models = {}
         self._metadata = sqlalchemy.MetaData()

@@ -1,6 +1,6 @@
 # Security Policy
 
-If you believe you have encountered a security vulnerability in any of the Dymmond's projects,
+If you believe you have encountered a security vulnerability in any of the tarsil's projects,
 please **do not open a public issue**
 
 To report a security issue in a responsible way, please navigate to the Security tab for the repo and click "Report a vulnerability."

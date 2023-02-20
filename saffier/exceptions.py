@@ -35,7 +35,3 @@ class ValidationError(BaseError):
 
 class ImproperlyConfigured(SaffierException):
     ...
-
-
-class UniqueViolationError(SaffierException):
-    ...

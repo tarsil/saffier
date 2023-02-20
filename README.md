@@ -147,16 +147,15 @@ database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class Note(saffier.Model):
+class User(saffier.Model):
     """
-    The Note model to be created in the database as a table
+    The User model to be created in the database as a table
     If no name is provided the in Meta class, it will generate
-    a "notes" table for you.
+    a "users" table for you.
     """
 
     id = saffier.IntegerField(primary_key=True)
-    text = saffier.CharField(max_length=255)
-    is_completed = saffier.BooleanField(default=False)
+    is_active = saffier.BooleanField(default=False)
 
     class Meta:
         registry = models
@@ -167,11 +166,12 @@ class Note(saffier.Model):
 # The migrations for you
 await models.create_all()
 
-await Note.query.create(text="Buy the stuff.", is_completed=False)
+await User.query.create(is_active=False)
 
-note = await Note.query.get(id=1)
-print(note)
-# Note(id=1)
+user = await User.query.get(id=1)
+print(user)
+# User(id=1)
+
 ```
 
 As stated in the example, if no `tablename` is provided in the `Meta` class, Saffier automatically
