@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.2.1
+
+### Changed
+
+- This was supposed to go in the release 0.2.0 and it was missed. Updated queryset lookup
+for functions allowing accesing the model functions from the manager directly.
+
 ## 0.2.0
 
 ### Added
