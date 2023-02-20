@@ -48,8 +48,8 @@ When investigating for a project different types of ORMs and compared them to ea
 of use cases, SQL Alchemy always took the win but had an issue, the async support (which now there
 are a few solutions). While doing the research I came across [Encode ORM](https://www.encode.io/orm/).
 
-The creator is the one and only, Tom Chrissie, the same creator of Databases, Django Rest Framework,
-Starlette, httpx and a lot more tools used by millions.
+The team is the same behind of Databases, Django Rest Framework, Starlette,
+httpx and a lot more tools used by millions.
 
 There was one issue thou, although ORM was doing a great familiar interface with SQL Alchemy and
 providing the async solution needed, it was, by the time of this writting, incomplete and they
@@ -60,15 +60,21 @@ not even close.
 
 ## Saffier
 
-Saffier is some sort of a fork from ORM but rewritten at its core and with a complete set of tools
-with a familiar interface to work with. If you are familiar with Django, then you came for a treat 😄.
+Saffier is some sort of a fork from [Encode ORM](https://www.encode.io/orm/) but rewritten at its
+core and with a complete set of tools with a familiar interface to work with. 
+If you are familiar with Django, then you came for a treat 😄.
 
-Saffier leverages the power of **Pyantic** for its fields while offering a friendly, familiar and
+This was necessary because the team behind [Encode ORM](https://www.encode.io/orm/) is extremely
+busy and could not dedicate as much time as they would like to the project so I decided to continue
+and improve.
+
+Saffier leverages the power of **Pydantic** for its fields while offering a friendly, familiar and
 easy to use interface.
 
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
 [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
 design thanks to its origins.
+
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of

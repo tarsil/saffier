@@ -69,7 +69,7 @@ class Profile(saffier.Model):
 class Person(saffier.Model):
     id = saffier.IntegerField(primary_key=True)
     email = saffier.CharField(max_length=100)
-    profile = saffier.OneToOneField(Profile)
+    profile = saffier.OneToOneField(Profile, on_delete=saffier.CASCADE)
 
     class Meta:
         registry = models
@@ -116,6 +116,24 @@ async def test_select_related():
     assert track.album.name == "Malibu"
 
     tracks = await Track.query.select_related("album").all()
+    assert len(tracks) == 6
+
+
+async def test_select_related_no_all():
+    album = await Album.query.create(name="Malibu")
+    await Track.query.create(album=album, title="The Bird", position=1)
+    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
+    await Track.query.create(album=album, title="The Waters", position=3)
+
+    fantasies = await Album.query.create(name="Fantasies")
+    await Track.query.create(album=fantasies, title="Help I'm Alive", position=1)
+    await Track.query.create(album=fantasies, title="Sick Muse", position=2)
+    await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
+
+    track = await Track.query.select_related("album").get(title="The Bird")
+    assert track.album.name == "Malibu"
+
+    tracks = await Track.query.select_related("album")
     assert len(tracks) == 6
 
 
@@ -260,3 +278,27 @@ async def test_nullable_foreign_key():
 
     assert member.email == "dev@saffier.com"
     assert member.team.pk is None
+
+
+def test_assertation_error_on_set_null():
+    with pytest.raises(AssertionError) as raised:
+
+        class MyModel(saffier.Model):
+            is_active = saffier.BooleanField(default=True)
+
+        class MyOtherModel(saffier.Model):
+            model = saffier.ForeignKey(MyModel, on_delete=saffier.SET_NULL)
+
+    assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
+
+
+def test_assertation_error_on_missing_on_delete():
+    with pytest.raises(AssertionError) as raised:
+
+        class MyModel(saffier.Model):
+            is_active = saffier.BooleanField(default=True)
+
+        class MyOtherModel(saffier.Model):
+            model = saffier.ForeignKey(MyModel)
+
+    assert raised.value.args[0] == "on_delete must not be null."

@@ -1,8 +1,8 @@
 import pytest
-from tests.settings import DATABASE_URL
 
 import saffier
 from saffier.db.connection import Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)
@@ -44,10 +44,10 @@ async def rollback_connections():
             yield
 
 
-async def test_model_search():
+async def test_model_lookup():
     Test = await User.query.create(name="Test", language="English")
     tshirt = await Product.query.create(name="T-Shirt", rating=5)
 
-    assert await User.query.search(term="").first() == Test
-    assert await User.query.search(term="Test").first() == Test
-    assert await Product.query.search(term="shirt").first() == tshirt
+    assert await User.query.lookup(term="").first() == Test
+    assert await User.query.lookup(term="Test").first() == Test
+    assert await Product.query.lookup(term="shirt").first() == tshirt
