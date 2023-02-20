@@ -56,7 +56,7 @@ async def rollback_transactions():
             yield
 
 
-async def xtest_creates_index_for_table():
+async def test_creates_index_for_table():
     await User.query.create(name="Test", title="a title")
 
     indexes = {value.name for value in User.table.indexes}

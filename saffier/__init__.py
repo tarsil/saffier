@@ -1,8 +1,9 @@
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from saffier.core.registry import Registry
 from saffier.db.connection import Database
 from saffier.db.constants import CASCADE, RESTRICT, SET_NULL
+from saffier.db.datastructures import Index
 from saffier.db.manager import Manager
 from saffier.db.queryset import QuerySet
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
@@ -43,6 +44,7 @@ __all__ = [
     "EmailField",
     "FloatField",
     "ForeignKey",
+    "Index",
     "IPAddressField",
     "IntegerField",
     "JSONField",
