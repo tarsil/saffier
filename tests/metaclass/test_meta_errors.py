@@ -115,3 +115,16 @@ async def test_value_error_for_unique_together(value):
         raised.value.args[0]
         == "The values inside the unique_together must be a string or a tuple of strings."
     )
+
+
+def test_raises_value_error_on_wrong_type():
+    with pytest.raises(ValueError) as raised:
+
+        class User(saffier.Model):
+            name = saffier.CharField(max_length=255)
+
+            class Meta:
+                registry = models
+                indexes = ["name"]
+
+    assert raised.value.args[0] == "Meta.indexes must be a list of Index types."

@@ -3,6 +3,8 @@ import re
 import typing
 from math import isfinite
 
+from pydantic import root_validator
+
 from saffier.core import formats
 from saffier.core.base import ValidationResult
 from saffier.core.datastructures import ArbitraryHashableBaseModel

@@ -7,6 +7,7 @@ import sqlalchemy
 
 from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
+from saffier.db.datastructures import Index
 from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
@@ -24,6 +25,7 @@ class MetaInfo:
         "registry",
         "tablename",
         "unique_together",
+        "indexes",
         "foreign_key_fields",
         "parents",
         "pk",
@@ -47,6 +49,7 @@ class MetaInfo:
         self._model: typing.Type["Model"] = None
         self.manager: typing.Type["Manager"] = getattr(meta, "manager", Manager())
         self.unique_together: typing.Any = getattr(meta, "unique_together", None)
+        self.indexes: typing.Any = getattr(meta, "indexes", None)
 
 
 def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Registry:
@@ -209,6 +212,9 @@ class BaseModelMeta(type):
             if getattr(meta, "unique_together", None) is not None:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
 
+            if getattr(meta, "indexes", None) is not None:
+                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
+
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
             if hasattr(new_class, "_db_model") and new_class._db_model:
@@ -235,6 +241,19 @@ class BaseModelMeta(type):
                         raise ValueError(
                             "The values inside the unique_together must be a string or a tuple of strings."
                         )
+
+        # Handle indexes
+        if getattr(meta, "indexes", None) is not None:
+            indexes = meta.indexes
+            if not isinstance(indexes, (list, tuple)):
+                value_type = type(indexes).__name__
+                raise ImproperlyConfigured(
+                    f"indexes must be a tuple or list. Got {value_type} instead."
+                )
+            else:
+                for value in indexes:
+                    if not isinstance(value, Index):
+                        raise ValueError("Meta.indexes must be a list of Index types.")
 
         registry = meta.registry
         new_class.database = registry.database

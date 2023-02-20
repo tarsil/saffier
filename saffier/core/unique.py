@@ -4,13 +4,6 @@ from saffier.types import Empty, HashableType
 
 
 class Uniqueness:
-    """
-    A set-like class that tests for uniqueness of primitive types.
-    Ensures the `True` and `False` are treated as distinct from `1` and `0`,
-    and coerces non-hashable instances that cannot be added to sets,
-    into hashable representations that can.
-    """
-
     TRUE = Empty()
     FALSE = Empty()
     HASHABLE_TYPES = (int, bool, str, float, list, dict)
