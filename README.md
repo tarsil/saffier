@@ -55,8 +55,7 @@ There was one issue thou, although ORM was doing a great familiar interface with
 providing the async solution needed, it was, by the time of this writting, incomplete and they
 even stated that in the documentation and that is how **Saffier** was born.
 
-Saffier uses some of the same concepts of ORM from Encode but rewritten in **Pydantic** but not all,
-not even close.
+Saffier uses some of the same concepts of ORM from Encode but rewritten in **Pydantic** but not all.
 
 ## Saffier
 
