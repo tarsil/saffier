@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 import sqlalchemy
 
+from saffier.db.constants import SET_NULL
 from saffier.db.fields import (
     URL,
     UUID,
@@ -235,6 +236,11 @@ class ForeignKey(Field):
             return value.pk
 
     def __init__(self, to: typing.Any, null: bool = False, on_delete: typing.Optional[str] = None):
+        assert on_delete is not None, "on_delete must not be null."
+
+        if on_delete == SET_NULL and not null:
+            raise AssertionError("When SET_NULL is enabled, null must be True.")
+
         super().__init__(null=null)
         self.to = to
         self.on_delete = on_delete

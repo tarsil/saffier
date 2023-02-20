@@ -3,10 +3,10 @@ import sqlite3
 import asyncpg
 import pymysql
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
 from saffier.db.connection import Database
-from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -69,7 +69,7 @@ class Profile(saffier.Model):
 class Person(saffier.Model):
     id = saffier.IntegerField(primary_key=True)
     email = saffier.CharField(max_length=100)
-    profile = saffier.OneToOneField(Profile)
+    profile = saffier.OneToOneField(Profile, on_delete=saffier.CASCADE)
 
     class Meta:
         registry = models
@@ -278,3 +278,27 @@ async def test_nullable_foreign_key():
 
     assert member.email == "dev@saffier.com"
     assert member.team.pk is None
+
+
+def test_assertation_error_on_set_null():
+    with pytest.raises(AssertionError) as raised:
+
+        class MyModel(saffier.Model):
+            is_active = saffier.BooleanField(default=True)
+
+        class MyOtherModel(saffier.Model):
+            model = saffier.ForeignKey(MyModel, on_delete=saffier.SET_NULL)
+
+    assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
+
+
+def test_assertation_error_on_missing_on_delete():
+    with pytest.raises(AssertionError) as raised:
+
+        class MyModel(saffier.Model):
+            is_active = saffier.BooleanField(default=True)
+
+        class MyOtherModel(saffier.Model):
+            model = saffier.ForeignKey(MyModel)
+
+    assert raised.value.args[0] == "on_delete must not be null."

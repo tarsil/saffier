@@ -74,6 +74,7 @@ easy to use interface.
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
 [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
 design thanks to its origins.
+
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of
