@@ -127,9 +127,6 @@ class FloatField(Field):
     Representation of a Decimal floating field
     """
 
-    def __init__(self, **kwargs: DictAny) -> None:
-        super().__init__(**kwargs)
-
     def get_validator(self, **kwargs: DictAny) -> SaffierField:
         return Float(**kwargs)
 
