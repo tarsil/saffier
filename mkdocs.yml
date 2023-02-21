@@ -45,6 +45,7 @@ nav:
   - Relationships: "relationships.md"
   - Registry: "registry.md"
   - Exceptions: "exceptions.md"
+  - Migrations: "migrations.md"
   - Saffier People: "saffier-people.md"
   - Contributing: "contributing.md"
   - Sponsorship: "sponsorship.md"

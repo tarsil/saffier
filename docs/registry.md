@@ -7,6 +7,9 @@ Imagine the registry as a mapping between your models and the database where is 
 
 And is just that, nothing else and very simple but effective object.
 
+The registry is also the object that you might want to use when generating migrations using
+Alembic.
+
 ```python hl_lines="19"
 {!> ../docs_src/registry/model.py !}
 ```
