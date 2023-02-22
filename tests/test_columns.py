@@ -167,3 +167,5 @@ async def test_pk_auto_increments():
 
     assert customer.pk == 2
     assert customers[0].pk == 2
+
+    assert len(customers) == 1
