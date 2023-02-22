@@ -59,6 +59,13 @@ class User(saffier.Model):
         registry = models
 
 
+class Customer(saffier.Model):
+    name = fields.CharField(null=True, max_length=16)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -144,3 +151,21 @@ async def test_both_auto_now_and_auto_now_add_raise_error():
             }
 
         await Product.query.create()
+
+
+async def test_pk_auto_increments():
+    customer = await Customer.query.create(name="test")
+    customers = await Customer.query.all()
+
+    assert customer.pk == 1
+    assert customers[0].pk == 1
+
+    await customer.delete()
+
+    customer = await Customer.query.create(name="test")
+    customers = await Customer.query.all()
+
+    assert customer.pk == 2
+    assert customers[0].pk == 2
+
+    assert len(customers) == 1
