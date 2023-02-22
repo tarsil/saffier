@@ -36,7 +36,7 @@ Almost every project, in one way or another uses one (or many) databases. An ORM
 of the top of an existing database. ORM extends for Object Relational Mapping and bridges object-oriented
 programs and relational databases.
 
-Two of the most well known ORMs are from Django and SQLAlchemy. Both have their own strenghts and
+Two of the most well known ORMs are from Django and SQLAlchemy. Both have their own strengths and
 weaknesses and specific use cases.
 
 This ORM is built on the top of SQLAlchemy core and aims to simplify the way the setup and queries
@@ -45,14 +45,14 @@ are done into a more common and familiar interface.
 ## Why this ORM
 
 When investigating for a project different types of ORMs and compared them to each other, for a lot
-of use cases, SQL Alchemy always took the win but had an issue, the async support (which now there
+of use cases, SQLAlchemy always took the win but had an issue, the async support (which now there
 are a few solutions). While doing the research I came across [Encode ORM](https://www.encode.io/orm/).
 
 The team is the same behind of Databases, Django Rest Framework, Starlette,
 httpx and a lot more tools used by millions.
 
-There was one issue thou, although ORM was doing a great familiar interface with SQL Alchemy and
-providing the async solution needed, it was, by the time of this writting, incomplete and they
+There was one issue though, although ORM was doing a great familiar interface with SQLAlchemy and
+providing the async solution needed, it was, by the time of this writing, incomplete and they
 even stated that in the documentation and that is how **Saffier** was born.
 
 Saffier uses some of the same concepts of ORM from Encode but rewritten in **Pydantic** but not all.
@@ -77,7 +77,7 @@ design thanks to its origins.
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of
-SQL Alchemy core.
+SQLAlchemy core.
 
 ### Key features
 
