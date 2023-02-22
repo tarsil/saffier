@@ -45,7 +45,7 @@ are done into a more common and familiar interface.
 ## Why this ORM
 
 When investigating for a project different types of ORMs and compared them to each other, for a lot
-of use cases, SQLAlchemy always took the win but had an issue, the async support (which now there
+of use cases, SQLAlchemyalways took the win but had an issue, the async support (which now there
 are a few solutions). While doing the research I came across [Encode ORM](https://www.encode.io/orm/).
 
 The team is the same behind of Databases, Django Rest Framework, Starlette,

@@ -45,13 +45,13 @@ are done into a more common and familiar interface.
 ## Why this ORM
 
 When investigating for a project different types of ORMs and compared them to each other,
-for a lot of use cases, SQL Alchemy always took the win but had an issue, the async support
+for a lot of use cases, SQLAlchemy always took the win but had an issue, the async support
 (which now there are a few solutions). While doing the research I came across Encode ORM.
 
 The team is the same behind of Databases, Django Rest Framework, Starlette, 
 httpx and a lot more tools used by millions.
 
-There was one issue thou, although ORM was doing a great familiar interface with SQL Alchemy and 
+There was one issue thou, although ORM was doing a great familiar interface with SQLAlchemy and 
 providing the async solution needed, it was, by the time of this writting,
 incomplete and they even stated that in the documentation and that is how Saffier was born.
 
@@ -77,7 +77,7 @@ design thanks to its origins.
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of
-SQL Alchemy core.
+SQLAlchemy core.
 
 ### Key features
 

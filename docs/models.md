@@ -1,10 +1,10 @@
 # Models
 
 Have you ever wondered how time consuming and sometimes how hard is to declare a simple table
-with SQL Alchemy where sometimes it can also be combersome?
+with SQLAlchemy where sometimes it can also be combersome?
 
 What about the Django interface type for tables? Cleaner right? Well, **Saffier** although is on
-the top of SQL Alchemy core, it provides a Django like experience when it comes to create models.
+the top of SQLAlchemy core, it provides a Django like experience when it comes to create models.
 
 ## What is a model
 

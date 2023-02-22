@@ -93,9 +93,9 @@ users = await User.query.filter(email__icontains="foo")
 users = await User.query.filter(id__in=[1, 2, 3])
 ```
 
-#### SQL Alchemy style
+#### SQLAlchemy style
 
-Since Saffier uses SQL Alchemy core, it is also possible to do queries in SQL Alchemy style.
+Since Saffier uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
 The filter accepts also those.
 
 ##### Example
