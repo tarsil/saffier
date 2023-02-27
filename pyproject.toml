@@ -58,6 +58,9 @@ Changelog = "https://saffier.tarsild.io/release-notes/"
 Funding = "https://github.com/sponsors/tarsil"
 Source = "https://github.com/tarsil/saffier"
 
+[project.scripts]
+saffier-admin = "saffier.migration:cli"
+
 [project.optional-dependencies]
 test = [
     "anyio>=3.0.0,<4",
