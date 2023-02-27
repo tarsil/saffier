@@ -1,20 +1,13 @@
 import argparse
 import os
-import sys
 import typing
-from functools import wraps
 from typing import Optional
 
-import toml
 from alembic import __version__ as __alembic_version__
 from alembic import command
 from alembic.config import Config as AlembicConfig
-from alembic.util import CommandError
-from loguru import logger
 
 from saffier import Registry
-from saffier.db.connection import Database
-from saffier.exceptions import ImproperlyConfigured
 from saffier.migrations.decorators import catch_errors
 from saffier.types import DictAny
 
@@ -216,7 +209,7 @@ def migrate(
 ):
     """Alias for 'revision --autogenerate'"""
     config = app._saffier_db["migrate"].migrate.get_config(
-        directory, opts=["autogenerate"], arg=arg
+        directory, options=["autogenerate"], arg=arg
     )
 
     command.revision(
