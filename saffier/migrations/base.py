@@ -8,6 +8,7 @@ from alembic import command
 from alembic.config import Config as AlembicConfig
 
 from saffier import Registry
+from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME
 from saffier.migrations.decorators import catch_errors
 from saffier.types import DictAny
 
@@ -154,7 +155,7 @@ def init(
     config.config_file_name = os.path.join(directory, "alembic.ini")
     config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)
 
-    template = "single"
+    template = DEFAULT_TEMPLATE_NAME
     command.init(config, directory, template, package)
 
 

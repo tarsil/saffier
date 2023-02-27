@@ -20,12 +20,13 @@ from saffier.migrations.base import revision as _revision
 from saffier.migrations.base import show as _show
 from saffier.migrations.base import stamp as _stamp
 from saffier.migrations.base import upgrade as _upgrade
+from saffier.migrations.constants import APP_PARAMETER
 from saffier.migrations.env import MigrationEnv
 
 
 @click.group()
 @click.option(
-    "--app",
+    APP_PARAMETER,
     "path",
     help="Module path to the application to generate the migrations. In a module:path format.",
 )
@@ -167,8 +168,8 @@ def makemigrations(
     default=None,
     help=('Migration script directory (default is "migrations")'),
 )
-@click.argument("revision", default="head")
 @saffier_cli.command()
+@click.argument("revision", default="head")
 @click.pass_context
 def edit(ctx, directory, revision):
     """Edit a revision file"""
@@ -188,11 +189,12 @@ def edit(ctx, directory, revision):
 @click.option(
     "--rev-id", default=None, help=("Specify a hardcoded revision id instead of generating " "one")
 )
+@saffier_cli.command()
 @click.argument("revisions", nargs=-1)
-@saffier_cli.command()
-def merge(directory, message, branch_label, rev_id, revisions):
+@click.pass_context
+def merge(ctx, directory, message, branch_label, rev_id, revisions):
     """Merge two revisions together, creating a new revision file"""
-    _merge(directory, revisions, message, branch_label, rev_id)
+    _merge(ctx.obj, directory, revisions, message, branch_label, rev_id)
 
 
 @click.option(
@@ -210,11 +212,15 @@ def merge(directory, message, branch_label, rev_id, revisions):
 @click.option(
     "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
 )
-@click.argument("revision", default="head")
 @saffier_cli.command()
-def upgrade(directory, sql, tag, arg, revision):
-    """Upgrade to a later version"""
-    _upgrade(directory, revision, sql, tag, arg)
+@click.argument("revision", default="head")
+@click.pass_context
+def migrate(ctx, directory, sql, tag, arg, revision):
+    """
+    Upgrades to the latest version or to a specific version
+    provided by the --tag.
+    """
+    _upgrade(ctx.obj, directory, revision, sql, tag, arg)
 
 
 @click.option(
@@ -232,11 +238,12 @@ def upgrade(directory, sql, tag, arg, revision):
 @click.option(
     "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
 )
+@saffier_cli.command()
 @click.argument("revision", default="-1")
-@saffier_cli.command()
-def downgrade(directory, sql, tag, arg, revision):
+@click.pass_context
+def downgrade(ctx, directory, sql, tag, arg, revision):
     """Revert to a previous version"""
-    _downgrade(directory, revision, sql, tag, arg)
+    _downgrade(ctx.obj, directory, revision, sql, tag, arg)
 
 
 @click.option(
@@ -245,10 +252,12 @@ def downgrade(directory, sql, tag, arg, revision):
     default=None,
     help=('Migration script directory (default is "migrations")'),
 )
+@saffier_cli.command()
 @click.argument("revision", default="head")
-def show(directory, revision):
+@click.pass_context
+def show(ctx, directory, revision):
     """Show the revision denoted by the given symbol."""
-    _show(directory, revision)
+    _show(ctx.obj, directory, revision)
 
 
 @click.option(
@@ -268,9 +277,10 @@ def show(directory, revision):
     help=("Indicate current version (Alembic 0.9.9 or greater is " "required)"),
 )
 @saffier_cli.command()
-def history(directory, rev_range, verbose, indicate_current):
+@click.pass_context
+def history(ctx, directory, rev_range, verbose, indicate_current):
     """List changeset scripts in chronological order."""
-    _history(directory, rev_range, verbose, indicate_current)
+    _history(ctx.obj, directory, rev_range, verbose, indicate_current)
 
 
 @click.option(
@@ -284,21 +294,10 @@ def history(directory, rev_range, verbose, indicate_current):
     "--resolve-dependencies", is_flag=True, help="Treat dependency versions as down revisions"
 )
 @saffier_cli.command()
-def heads(directory, verbose, resolve_dependencies):
+@click.pass_context
+def heads(ctx, directory, verbose, resolve_dependencies):
     """Show current available heads in the script directory"""
-    _heads(directory, verbose, resolve_dependencies)
-
-
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
-def branches(directory, verbose):
-    """Show current branch points"""
-    _branches(directory, verbose)
+    _heads(ctx.obj, directory, verbose, resolve_dependencies)
 
 
 @click.option(
@@ -309,9 +308,24 @@ def branches(directory, verbose):
 )
 @click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
 @saffier_cli.command()
-def current(directory, verbose):
+@click.pass_context
+def branches(ctx, directory, verbose):
+    """Show current branch points"""
+    _branches(ctx.obj, directory, verbose)
+
+
+@click.option(
+    "-d",
+    "--directory",
+    default=None,
+    help=('Migration script directory (default is "migrations")'),
+)
+@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
+@saffier_cli.command()
+@click.pass_context
+def current(ctx, directory, verbose):
     """Display the current revision for each database."""
-    _current(directory, verbose)
+    _current(ctx.obj, directory, verbose)
 
 
 @click.option(
@@ -328,10 +342,11 @@ def current(directory, verbose):
 )
 @click.argument("revision", default="head")
 @saffier_cli.command()
-def stamp(directory, sql, tag, revision):
+@click.pass_context
+def stamp(ctx, directory, sql, tag, revision):
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    _stamp(directory, revision, sql, tag)
+    _stamp(ctx.obj, directory, revision, sql, tag)
 
 
 @click.option(
@@ -341,18 +356,19 @@ def stamp(directory, sql, tag, revision):
     help=('Migration script directory (default is "migrations")'),
 )
 @saffier_cli.command()
-def check(directory):
+@click.pass_context
+def check(ctx, directory):
     """Check if there are any new operations to migrate"""
-    _check(directory)
+    _check(ctx.obj, directory)
 
 
-saffier_cli.add_command(list_templates, name="list_templates")
+saffier_cli.add_command(list_templates, name="list-templates")
 saffier_cli.add_command(init, name="init")
 saffier_cli.add_command(revision, name="revision")
 saffier_cli.add_command(makemigrations, name="makemigrations")
 saffier_cli.add_command(edit, name="edit")
 saffier_cli.add_command(merge, name="merge")
-saffier_cli.add_command(upgrade, name="upgrade")
+saffier_cli.add_command(migrate, name="migrate")
 saffier_cli.add_command(downgrade, name="downgrade")
 saffier_cli.add_command(show, name="show")
 saffier_cli.add_command(history, name="history")

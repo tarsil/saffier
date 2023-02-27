@@ -1,12 +1,19 @@
 import asyncio
 import logging
 import os
+import sys
 from logging.config import fileConfig
 
 from alembic import context
+from rich.console import Console
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from saffier.exceptions import SaffierException
+from saffier.migrations.constants import APP_PARAMETER
 from saffier.migrations.env import MigrationEnv
+
+# The console used for the outputs
+console = Console()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,9 +25,25 @@ fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
 
 
+def get_app_location(argv):
+    """
+    Manually checks for the --app parameter.
+    """
+    if APP_PARAMETER in argv:
+        try:
+            return argv[argv.index(APP_PARAMETER) + 1]
+        except IndexError as e:
+            raise SaffierException(detail=str(e))
+    return None
+
+
 def get_app():
+    """
+    Gets the app via environment variable or via console parameter.
+    """
+    app_path = get_app_location(sys.argv[1:])
     migration = MigrationEnv()
-    app_env = migration.load_from_env(path=None)
+    app_env = migration.load_from_env(path=app_path, enable_logging=False)
     return app_env.app
 
 
@@ -78,7 +101,7 @@ def do_run_migrations(connection):
             script = directives[0]
             if script.upgrade_ops.is_empty():
                 directives[:] = []
-                logger.info("No changes in schema detected.")
+                console.print("[bright_red]No changes in schema detected.")
 
     context.configure(
         connection=connection,

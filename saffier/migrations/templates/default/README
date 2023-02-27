@@ -1,1 +1,1 @@
-Single-database configuration for your application.
+Database configuration with Alembic.

@@ -13,8 +13,12 @@ console = Console()
 
 
 @dataclass
-class App:
-    """Information about a loaded application."""
+class Scaffold:
+    """
+    Simple Application scaffold that holds the
+    information about the app and the path to
+    the same app.
+    """
 
     path: str
     app: typing.Any
@@ -22,15 +26,21 @@ class App:
 
 @dataclass
 class MigrationEnv:
+    """
+    Loads an arbitraty application into the object
+    and returns the App.
+    """
+
     path: typing.Optional[str] = None
     app: typing.Optional[typing.Any] = None
 
-    def load_from_env(self, path: typing.Optional[str]) -> "MigrationEnv":
+    def load_from_env(
+        self, path: typing.Optional[str], enable_logging: bool = True
+    ) -> "MigrationEnv":
         """
-        Loads the environment variables into the object.
+        Loads the environment variables into the scaffold.
         """
-        cwd = Path().cwd()
-        cwd_path = str(cwd)
+        cwd_path = str(Path().cwd())
         if cwd_path not in sys.path:
             sys.path.append(cwd_path)
 
@@ -42,19 +52,23 @@ class MigrationEnv:
             ...
 
         _path = os.getenv(SAFFIER_DISCOVER_APP) if not path else path
-        _app = self.find_app(path=_path)
+        _app = self.find_app(path=_path, enable_logging=enable_logging)
 
         return MigrationEnv(path=_app.path, app=_app.app)
 
     def import_app_from_string(cls, path: str):
+        assert (
+            path is not None
+        ), "Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
         module_str_path, app_name = path.split(":")
         module = import_module(module_str_path)
         app = getattr(module, app_name)
-        return App(path=path, app=app)
+        return Scaffold(path=path, app=app)
 
-    def find_app(self, path: str) -> App:
+    def find_app(self, path: str, enable_logging: bool = True) -> Scaffold:
         """
         Loads the application based on the path provided via env var.
         """
-        console.print(f"Loading the application: [bright_green]{path} from env.")
+        if enable_logging:
+            console.print(f"[bright_blue]Loading application: [bright_green]{path}.")
         return self.import_app_from_string(path)

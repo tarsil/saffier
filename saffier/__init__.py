@@ -1,13 +1,13 @@
 __version__ = "0.2.1"
 
-from saffier.core.registry import Registry
-from saffier.db.connection import Database
-from saffier.db.constants import CASCADE, RESTRICT, SET_NULL
-from saffier.db.datastructures import Index
-from saffier.db.manager import Manager
-from saffier.db.queryset import QuerySet
-from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
-from saffier.fields import (
+from .core.registry import Registry
+from .db.connection import Database
+from .db.constants import CASCADE, RESTRICT, SET_NULL
+from .db.datastructures import Index
+from .db.manager import Manager
+from .db.queryset import QuerySet
+from .exceptions import DoesNotFound, MultipleObjectsReturned
+from .fields import (
     BigIntegerField,
     BooleanField,
     CharField,
@@ -28,7 +28,8 @@ from saffier.fields import (
     URLField,
     UUIDField,
 )
-from saffier.models import Model
+from .migrations import Migrate
+from .models import Model
 
 __all__ = [
     "BigIntegerField",
@@ -49,6 +50,7 @@ __all__ = [
     "IntegerField",
     "JSONField",
     "Manager",
+    "Migrate",
     "Model",
     "MultipleObjectsReturned",
     "OneToOneField",
