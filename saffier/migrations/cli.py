@@ -1,25 +1,9 @@
 """
 Client to interact with Saffier models and migrations.
 """
-import inspect
-import sys
 import typing
-from functools import wraps
-from typing import (
-    Any,
-    Callable,
-    Concatenate,
-    Dict,
-    Iterable,
-    Optional,
-    ParamSpec,
-    Sequence,
-    TypeVar,
-    Union,
-)
 
 import click
-from click import ClickException, Command, Context, Group, pass_context, style
 
 from saffier.migrations.base import branches as _branches
 from saffier.migrations.base import check as _check
@@ -167,7 +151,9 @@ def revision(
 )
 @saffier_cli.command()
 @click.pass_context
-def migrate(ctx, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg):
+def makemigrations(
+    ctx, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg
+):
     """Autogenerate a new revision file (Alias for
     'revision --autogenerate')"""
     _migrate(
@@ -363,7 +349,7 @@ def check(directory):
 saffier_cli.add_command(list_templates, name="list_templates")
 saffier_cli.add_command(init, name="init")
 saffier_cli.add_command(revision, name="revision")
-saffier_cli.add_command(migrate, name="migrate")
+saffier_cli.add_command(makemigrations, name="makemigrations")
 saffier_cli.add_command(edit, name="edit")
 saffier_cli.add_command(merge, name="merge")
 saffier_cli.add_command(upgrade, name="upgrade")

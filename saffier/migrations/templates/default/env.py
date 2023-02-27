@@ -84,7 +84,7 @@ def do_run_migrations(connection):
         connection=connection,
         target_metadata=get_metadata(),
         process_revision_directives=process_revision_directives,
-        **app._saffier_db["migrate"].kwargs
+        **app._saffier_db["migrate"].kwargs,
     )
 
     with context.begin_transaction():

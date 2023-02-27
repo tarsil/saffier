@@ -154,11 +154,7 @@ def init(
     config.config_file_name = os.path.join(directory, "alembic.ini")
     config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)
 
-    if multidb and template is None:
-        template = "multidb"
-    elif template is None:
-        template = "single"
-
+    template = "single"
     command.init(config, directory, template, package)
 
 
