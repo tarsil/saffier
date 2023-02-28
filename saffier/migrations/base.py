@@ -57,7 +57,6 @@ class Migrate:
         app: typing.Optional[typing.Any] = None,
         registry: typing.Optional[Registry] = None,
         directory: str = "migrations",
-        command: str = "db",
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: DictAny,
@@ -65,7 +64,6 @@ class Migrate:
         self.app = app
         self.configure_callbacks = []
         self.registry = registry
-        self.command = command
         self.directory = str(directory)
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
@@ -148,14 +146,15 @@ def init(
     template_directory = None
 
     if template is not None and ("/" in template or "\\" in template):
-        template_directory, template, os.path.split(template)
+        template_directory, template = os.path.split(template)
 
     config = Config(template_directory=template_directory)
     config.set_main_option("script_location", directory)
     config.config_file_name = os.path.join(directory, "alembic.ini")
     config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)
 
-    template = DEFAULT_TEMPLATE_NAME
+    if template is None:
+        template = DEFAULT_TEMPLATE_NAME
     command.init(config, directory, template, package)
 
 

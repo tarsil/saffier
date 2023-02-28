@@ -7,6 +7,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from saffier.exceptions import EnvironmentError
 from saffier.migrations.constants import SAFFIER_DISCOVER_APP
 
 console = Console()
@@ -43,7 +44,6 @@ class MigrationEnv:
         cwd_path = str(Path().cwd())
         if cwd_path not in sys.path:
             sys.path.append(cwd_path)
-
         try:
             import dotenv
 
@@ -57,9 +57,10 @@ class MigrationEnv:
         return MigrationEnv(path=_app.path, app=_app.app)
 
     def import_app_from_string(cls, path: str):
-        assert (
-            path is not None
-        ), "Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
+        if path is None:
+            raise EnvironmentError(
+                detail="Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
+            )
         module_str_path, app_name = path.split(":")
         module = import_module(module_str_path)
         app = getattr(module, app_name)
@@ -70,5 +71,5 @@ class MigrationEnv:
         Loads the application based on the path provided via env var.
         """
         if enable_logging:
-            console.print(f"[bright_blue]Loading application: [bright_green]{path}.")
+            console.print(f"[bright_blue]Loading application: [bright_green]{path}")
         return self.import_app_from_string(path)

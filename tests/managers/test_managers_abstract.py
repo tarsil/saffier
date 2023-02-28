@@ -3,7 +3,7 @@ from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Manager
-from saffier.db.connection import Database
+from saffier.testclient import DatabaseTestClient as Database
 from saffier.db.queryset import QuerySet
 
 database = Database(url=DATABASE_URL)

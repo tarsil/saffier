@@ -5,7 +5,7 @@ from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Registry
-from saffier.db.connection import Database
+from saffier.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
 models = Registry(database=database)

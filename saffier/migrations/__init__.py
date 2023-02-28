@@ -1,3 +1,3 @@
-from .base import Migrate
+from .base import Migrate, alembic_version
 
-__all__ = ["Migrate"]
+__all__ = ["alembic_version", "Migrate"]

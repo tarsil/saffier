@@ -5,8 +5,8 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.db.connection import Database
 from saffier.db.datastructures import Index
+from saffier.testclient import DatabaseTestClient as Database
 
 pytestmark = pytest.mark.anyio
 

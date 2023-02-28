@@ -2,8 +2,8 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.db.connection import Database
 from saffier.exceptions import DoesNotFound
+from saffier.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)

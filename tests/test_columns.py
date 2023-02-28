@@ -9,11 +9,11 @@ from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import fields
-from saffier.db.connection import Database
+from saffier.testclient import DatabaseTestClient
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL)
 models = saffier.Registry(database=database)
 
 
