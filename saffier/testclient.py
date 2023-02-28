@@ -16,7 +16,7 @@ async def _get_scalar_result(engine, sql):
     try:
         async with engine.connect() as conn:
             return await conn.scalar(sql)
-    except Exception as e:
+    except Exception:
         return False
 
 

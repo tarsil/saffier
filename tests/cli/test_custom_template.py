@@ -20,8 +20,8 @@ def run_cmd(app, cmd):
     return stdout, stderr, process.wait()
 
 
-@pytest.fixture(autouse=True)
-async def create_folders():
+@pytest.fixture(scope="module")
+def create_folders():
     os.chdir(os.path.split(os.path.abspath(__file__))[0])
     try:
         os.remove("app.db")
@@ -61,21 +61,21 @@ def test_alembic_version():
         assert isinstance(v, int)
 
 
-def test_migrate_upgrade():
+def test_migrate_upgrade(create_folders):
     (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin init -t ./custom")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("main:app", "saffier-admin makemigrations")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin makemigrations")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("main:app", "saffier-admin migrate")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin migrate")
     assert ss == 0
 
     with open("migrations/README", "rt") as f:
-        assert f.readline().strip() == "Custom template."
+        assert f.readline().strip() == "Custom template"
     with open("migrations/alembic.ini", "rt") as f:
-        assert f.readline().strip() == "# Custom template"
+        assert f.readline().strip() == "# A generic, single database configuration"
     with open("migrations/env.py", "rt") as f:
-        assert f.readline().strip() == "# Custom template"
+        assert f.readline().strip() == "# Custom env template"
     with open("migrations/script.py.mako", "rt") as f:
-        assert f.readline().strip() == "# Custom template"
+        assert f.readline().strip() == "# Custom mako template"
