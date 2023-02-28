@@ -2,8 +2,8 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
+from saffier import Database
 from saffier.db import fields
-from saffier.db.connection import Database
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 
 database = Database(url=DATABASE_URL)

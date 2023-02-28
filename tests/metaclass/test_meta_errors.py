@@ -2,8 +2,7 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier import Manager, QuerySet
-from saffier.db.connection import Database
+from saffier import Database, Manager, QuerySet
 from saffier.exceptions import ImproperlyConfigured
 
 pytestmark = pytest.mark.anyio

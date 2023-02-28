@@ -2,7 +2,7 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.db.connection import Database
+from saffier import Database
 from saffier.exceptions import DoesNotFound
 
 database = Database(url=DATABASE_URL)

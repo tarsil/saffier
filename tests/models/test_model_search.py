@@ -1,8 +1,8 @@
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.db.connection import Database
-from tests.settings import DATABASE_URL
+from saffier import Database
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)

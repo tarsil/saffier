@@ -35,3 +35,7 @@ class ValidationError(BaseError):
 
 class ImproperlyConfigured(SaffierException):
     ...
+
+
+class EnvironmentError(SaffierException):
+    ...
