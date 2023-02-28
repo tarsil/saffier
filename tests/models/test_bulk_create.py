@@ -5,8 +5,7 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier import fields
-from saffier.testclient import DatabaseTestClient as Database
+from saffier import Database, fields
 
 pytestmark = pytest.mark.anyio
 

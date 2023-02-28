@@ -4,8 +4,7 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier import Registry
-from saffier.testclient import DatabaseTestClient as Database
+from saffier import Database, Registry
 
 database = Database(url=DATABASE_URL)
 models = Registry(database=database)

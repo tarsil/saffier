@@ -2,9 +2,8 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier import Manager
+from saffier import Database, Manager
 from saffier.db.queryset import QuerySet
-from saffier.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)

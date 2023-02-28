@@ -41,9 +41,11 @@ class MigrationEnv:
         """
         Loads the environment variables into the scaffold.
         """
-        cwd_path = str(Path().cwd())
-        if cwd_path not in sys.path:
-            sys.path.append(cwd_path)
+        # Adds the current path where the command is being invoked
+        # To the system path
+        command_path = str(Path().cwd())
+        if command_path not in sys.path:
+            sys.path.append(command_path)
         try:
             import dotenv
 

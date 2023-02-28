@@ -15,7 +15,7 @@ models = saffier.Registry(database=database)
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-class User(saffier.Model):
+class AppUser(saffier.Model):
     name = saffier.CharField(max_length=255)
 
     class Meta:
@@ -24,7 +24,3 @@ class User(saffier.Model):
 
 app = Esmerald(routes=[])
 Migrate(app, registry=models)
-
-
-async def add_user():
-    await User.query.create(name="Test")

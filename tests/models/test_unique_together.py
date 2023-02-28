@@ -6,7 +6,7 @@ from asyncpg.exceptions import UniqueViolationError
 from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.testclient import DatabaseTestClient as Database
+from saffier.testclient import Database
 
 pytestmark = pytest.mark.anyio
 
