@@ -13,7 +13,6 @@ from saffier.migrations.base import init as _init
     default=None,
     help=('Migration script directory (default is "migrations")'),
 )
-@click.option("--multidb", is_flag=True, help=("Support multiple databases"))
 @click.option(
     "-t", "--template", default=None, help=('Repository template to use (default is "flask")')
 )
@@ -24,6 +23,6 @@ from saffier.migrations.base import init as _init
 )
 @click.command(name="init")
 @click.pass_context
-def init(ctx, directory, multidb, template, package):
+def init(ctx, directory, template, package):
     """Creates a new migration repository."""
-    _init(ctx.obj, directory, multidb, template, package)
+    _init(ctx.obj, directory, template, package)

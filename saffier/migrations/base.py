@@ -137,7 +137,6 @@ def list_templates():
 def init(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-    multidb: bool = False,
     template: Optional[str] = None,
     package: bool = False,
 ):
