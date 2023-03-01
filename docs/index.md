@@ -94,14 +94,19 @@ specific queries and querysets at ease.
 `bulk_update` and a lot more.
 * **Relationships made it easy** - Support for `OneToOne` and `ForeignKey` in the same Django style.
 * **Constraints** - Unique constraints through meta fields.
+* **Native test client** - We all know how hard it can be to setup that client for those tests you
+need so we give you already one.
 
 And a lot more you can do here.
 
 ## Migrations
 
 Since **Saffier**, like [Encode ORM](https://www.encode.io/orm/), is built on the top of 
-[SQLAlchemy core](https://docs.sqlalchemy.org/en/20/core/), you cam use the widely known
-[Alembic](https://alembic.sqlalchemy.org/en/latest/) to manage the migrations for you.
+[SQLAlchemy core](https://docs.sqlalchemy.org/en/20/core/), it brings its own native migration
+system running on the top of [Alembic](https://alembic.sqlalchemy.org/en/latest/) but making it a
+lot easier to use and more pleasant for you.
+
+Have a look at the [migrations](./migrations.md) for more details.
 
 ## Installation
 
@@ -144,6 +149,12 @@ found throughout the documentation.
 
 As stated in the example, if no `tablename` is provided in the `Meta` class, Saffier automatically
 generates the name of the table for you by pluralising the class name.
+
+## Connect your application
+
+Do you want to have more complex structures and connect to your favourite framework? Have a look
+at [connections](./connection.md) to understand how to do it properly.
+
 
 **Exciting!** 
 

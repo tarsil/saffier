@@ -13,6 +13,7 @@ from saffier.migrations.decorators import catch_errors
 from saffier.types import DictAny
 
 alembic_version = tuple([int(v) for v in __alembic_version__.split(".")[0:3]])
+object_setattr = object.__setattr__
 
 
 class MigrateConfig:
@@ -54,17 +55,18 @@ class Migrate:
 
     def __init__(
         self,
-        app: typing.Optional[typing.Any] = None,
-        registry: typing.Optional[Registry] = None,
-        directory: str = "migrations",
+        app: typing.Any,
+        registry: Registry,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: DictAny,
     ):
+        assert isinstance(registry, Registry), "Registry must be an instance of saffier.Registry"
+
         self.app = app
         self.configure_callbacks = []
         self.registry = registry
-        self.directory = str(directory)
+        self.directory = str("migrations")
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
@@ -76,7 +78,7 @@ class Migrate:
         Sets a saffier dictionary for the app object.
         """
         migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
-        setattr(app, "_saffier_db", {})
+        object_setattr(app, "_saffier_db", {})
         app._saffier_db["migrate"] = migrate
 
     def configure(self, f):
