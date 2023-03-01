@@ -54,7 +54,7 @@ make visually clear.
 ## Migration
 
 This is the object that Saffier requires to make sure you can manage the migrations in a consistent,
-clean and simple a manner. Much like Django migrations type of feeling.
+clean and simple manner. Much like Django migrations type of feeling.
 
 This `Migration` class is not depending of any framework specifically, in fact, Saffier makes sure
 when this object is created, it will plug it into any framework you desire.
@@ -107,8 +107,7 @@ Something like this:
 {!> ../docs_src/migrations/lru.py !}
 ```
 
-This will make sure we don't create objects everything we need to import them anywhere else in the
-code. Nice technique and quite practical.
+This will make sure we don't create objects. Nice technique and quite practical.
 
 Now that we have our details about the database and registry, it is time to use the
 [Migration](#migration) object in the application.
