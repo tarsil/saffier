@@ -241,7 +241,7 @@ saffier-admin --app myproject.main:app init
 What is happenening here? Well, `saffier-admin` is always expecting an `--app` parameter to be
 provided.
 
-This `--app` is the location of your application is `module:app` format and this is because of
+This `--app` is the location of your application in `module:app` format and this is because of
 the fact of being **framework agnostic**. 
 
 Saffier needs to know where your application object is located in order to hook it to that same
@@ -301,7 +301,7 @@ Pretty great so far! Well done 🎉🎉
 
 You have now generated your migrations folder and came with gifts.
 
-A lot of files were generated automatically for your and they are specially tailored for the needs
+A lot of files were generated automatically for you and they are specially tailored for the needs
 and complexity of **Saffier**.
 
 Do you remember when it was mentioned in the [environment variables](#environment-variables) that
