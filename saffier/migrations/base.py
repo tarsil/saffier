@@ -55,13 +55,15 @@ class Migrate:
 
     def __init__(
         self,
-        app: typing.Optional[typing.Any] = None,
-        registry: typing.Optional[Registry] = None,
+        app: typing.Any,
+        registry: Registry,
         directory: str = "migrations",
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: DictAny,
     ):
+        assert isinstance(registry, Registry), "Registry must be an instance of saffier.Registry"
+
         self.app = app
         self.configure_callbacks = []
         self.registry = registry

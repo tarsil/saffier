@@ -64,6 +64,34 @@ such as [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic... Y
 from saffier import Migration
 ```
 
+### Parameters
+
+The parameters availabe when using instantiating a [Migrate](#migration) object are the following:
+
+* **app** - The application instance. Any application you want your migrations to be attached to.
+* **registry** - The registry being used for your models. The registry **must be** an instance
+of `saffier.Registry` or an `AssertationError` is raised.
+* **directory** - The name of the directory where the migrations will be placed. Be careful when
+overriding this value.
+
+    <sup>Default: `migrations`</sup>
+
+* **compare_type** - Flag option that configures the automatic migration generation subsystem 
+to detect column type changes.
+
+    <sup>Default: `True`</sup>
+
+* **render_as_batch** - This option generates migration scripts using batch mode, an operational
+mode that works around limitations of many ALTER commands in the SQLite database by implementing
+a "move and copy" workflow. Enabling this mode should make no difference when working with other
+databases.
+
+    <sup>Default: `True`</sup>
+
+* **kwargs** - A python dictionary with any context variables to be added to alembic.
+
+    <sup>Default: `None`</sup>
+
 ### How to use it
 
 Using the [Migration](#migration) class is very simple in terms of requirements. In the
@@ -117,3 +145,4 @@ I believe you got the idea with the examples above, It was not specified any spe
 unique-like parameter that demanded special attention, just the application itself.
 
 This means you can plug something else like Quart, Ella or even Sanic... Your pick.
+
