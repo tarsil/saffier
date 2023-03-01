@@ -220,8 +220,7 @@ to work with the `migrations`.
 Also, gives a clean design for the time where it is needed to go to production as the procedure is
 very likely to be done using environment variables.
 
-**Except initializing the migrations, this variable must be present**. So to save time you can
-simply do:
+**This variable must be present**. So to save time you can simply do:
 
 ```
 $ export SAFFIER_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
@@ -337,6 +336,21 @@ Let us define our `User` model.
 ```python title="my_project/apps/accounts/models.py"
 {!> ../docs_src/migrations/model.py !}
 ```
+
+Now we need to make sure the models are accessible in the application for discovery. Since
+this example is based on Esmerald scaffold, simply add your `User` model into the
+`my_project/apps/accounts/__init__.py`.
+
+```python title="my_project/apps/accounts/__init__.py"
+from .models import User
+```
+
+!!! Note
+    Since Saffier is agnostic to any framework, there aren't automatic mechanisms that detects
+    Saffier models in the same fashion that Django does with the `INSTALLED_APPS`. So this is
+    one way of exposing your models in the application.
+
+There are many ways of exposing your models of course, so feel free to use any approach you want.
 
 Now it is time to generate the migration.
 
