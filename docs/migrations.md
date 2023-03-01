@@ -487,7 +487,4 @@ For those familiar with Django, the names came from those same operations.
 
 ## Very important
 
-It was mentioned numerous times but besides the `init` any other command needs the
-`SAFFIER_DATABASE_URL` environment variable available.
-
-Check the [environment variables](#environment-variables) for more details.
+Check the [environment variables](#environment-variables) for more details and making sure you follow the right steps.
