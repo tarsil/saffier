@@ -48,6 +48,7 @@ nav:
   - Registry: "registry.md"
   - Exceptions: "exceptions.md"
   - Migrations: "migrations.md"
+  - Tips and Tricks: "tips-and-tricks.md"
   - Test Client: "test-client.md"
   - Saffier People: "saffier-people.md"
   - Contributing: "contributing.md"
