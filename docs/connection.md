@@ -22,7 +22,7 @@ The common lifecycle events are the following:
 * **on_shutdown**
 * **lifespan**
 
-These document will focus on the two more commonly used, `on_startup` and `on_shutdown`.
+This document will focus on the two more commonly used, `on_startup` and `on_shutdown`.
 
 ## Hooking your database connection into your application
 
