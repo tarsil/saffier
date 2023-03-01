@@ -1,5 +1,21 @@
 # Release Notes
 
+## 0.3.0
+
+### Added
+
+- Integrated the support for [native migrations](./migrations.md) with Saffier.
+  
+    * This brings native generated migrations within Saffier under Alembic's package, allowing
+a seemless integration and cross-compatibility with any framework using Saffier.
+
+- Added new [DatabaseTestClient](./test-client.md) delegating the creating of the `test` database
+for each connection string provided. 
+
+    * No more needed to manually create two separate databases thanks to the client that does the
+automatic management for you.
+
+
 ## 0.2.1
 
 ### Changed
