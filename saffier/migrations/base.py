@@ -13,6 +13,7 @@ from saffier.migrations.decorators import catch_errors
 from saffier.types import DictAny
 
 alembic_version = tuple([int(v) for v in __alembic_version__.split(".")[0:3]])
+object_setattr = object.__setattr__
 
 
 class MigrateConfig:
@@ -76,7 +77,7 @@ class Migrate:
         Sets a saffier dictionary for the app object.
         """
         migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
-        setattr(app, "_saffier_db", {})
+        object_setattr(app, "_saffier_db", {})
         app._saffier_db["migrate"] = migrate
 
     def configure(self, f):
