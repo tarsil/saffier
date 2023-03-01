@@ -230,8 +230,8 @@ Or whatever connection string you are using.
 ### Initialise the migrations folder
 
 It is now time to generate the migrations folder. As mentioned before in the
-[environment variables section](#environment-variables), Saffier does not need to have the
-`SAFFIER_DATABASE_URL` to generate the `migrations` folder so without further ado let us generate
+[environment variables section](#environment-variables), Saffier does need to have the
+`SAFFIER_DATABASE_URL` to generate the `migrations` folder. So, without further ado let us generate
 our `migrations`.
 
 ```shell
