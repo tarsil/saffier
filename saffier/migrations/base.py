@@ -57,7 +57,6 @@ class Migrate:
         self,
         app: typing.Any,
         registry: Registry,
-        directory: str = "migrations",
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: DictAny,
@@ -67,7 +66,7 @@ class Migrate:
         self.app = app
         self.configure_callbacks = []
         self.registry = registry
-        self.directory = str(directory)
+        self.directory = str("migrations")
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
