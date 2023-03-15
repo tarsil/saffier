@@ -203,7 +203,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
     def _validate_kwargs(self, **kwargs):
         fields = self.model_class.fields
         validator = Schema(fields={key: value.validator for key, value in fields.items()})
-        kwargs = validator.validate(kwargs)
+        kwargs = validator.check(kwargs)
         for key, value in fields.items():
             if value.validator.read_only and value.validator.has_default():
                 kwargs[key] = value.validator.get_default_value()
@@ -563,7 +563,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             new_objs.append(new_obj)
 
         new_objs = [
-            self._update_auto_now_fields(validator.validate(obj), self.model_class.fields)
+            self._update_auto_now_fields(validator.check(obj), self.model_class.fields)
             for obj in new_objs
         ]
 
@@ -597,7 +597,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         }
 
         validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.model_class.fields)
+        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:

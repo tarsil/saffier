@@ -25,7 +25,7 @@ class Schema(SaffierField):
             key for key, field in fields.items() if not (field.read_only or field.has_default())
         ]
 
-    def validate(self, value: Any) -> Any:
+    def check(self, value: Any) -> Any:
         """
         General function used for validation of the generated schema.
         """

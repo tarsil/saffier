@@ -232,7 +232,7 @@ class ForeignKey(Field):
     """
 
     class ForeignKeyValidator(SaffierField):
-        def validate(self, value: typing.Any) -> typing.Any:
+        def check(self, value: typing.Any) -> typing.Any:
             return value.pk
 
     def __init__(self, to: typing.Any, null: bool = False, on_delete: typing.Optional[str] = None):

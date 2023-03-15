@@ -47,7 +47,7 @@ class BaseFormat:
     def is_native_type(self, value: typing.Any) -> bool:
         raise NotImplementedError()  # pragma: no cover
 
-    def validate(self, value: typing.Any) -> typing.Union[typing.Any, ValidationError]:
+    def check(self, value: typing.Any) -> typing.Union[typing.Any, ValidationError]:
         raise NotImplementedError()  # pragma: no cover
 
 
@@ -60,7 +60,7 @@ class DateFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, datetime.date)
 
-    def validate(self, value: typing.Any) -> datetime.date:
+    def check(self, value: typing.Any) -> datetime.date:
         match = DATE_REGEX.match(value)
         if not match:
             raise self.validation_error("format")
@@ -81,7 +81,7 @@ class TimeFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, datetime.time)
 
-    def validate(self, value: typing.Any) -> datetime.time:
+    def check(self, value: typing.Any) -> datetime.time:
         match = TIME_REGEX.match(value)
         if not match:
             raise self.validation_error("format")
@@ -106,7 +106,7 @@ class DateTimeFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, datetime.datetime)
 
-    def validate(self, value: typing.Any) -> datetime.datetime:
+    def check(self, value: typing.Any) -> datetime.datetime:
         match = DATETIME_REGEX.match(value)
         if not match:
             raise self.validation_error("format")
@@ -141,7 +141,7 @@ class UUIDFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, uuid.UUID)
 
-    def validate(self, value: typing.Any) -> uuid.UUID:
+    def check(self, value: typing.Any) -> uuid.UUID:
         match = UUID_REGEX.match(value)
         if not match:
             raise self.validation_error("format")
@@ -155,7 +155,7 @@ class EmailFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return False
 
-    def validate(self, value: str) -> str:
+    def check(self, value: str) -> str:
         match = EMAIL_REGEX.match(value)
         if not match:
             raise self.validation_error("format")
@@ -172,7 +172,7 @@ class IPAddressFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
-    def validate(
+    def check(
         self, value: typing.Any
     ) -> typing.Union[ipaddress.IPv4Address, ipaddress.IPv6Address]:
         match_ipv4 = IPV4_REGEX.match(value)
@@ -192,7 +192,7 @@ class URLFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return False
 
-    def validate(self, value: typing.Any) -> str:
+    def check(self, value: typing.Any) -> str:
         url = urlparse(value)
         if not all([url.scheme, url.netloc]):
             raise self.validation_error("invalid")

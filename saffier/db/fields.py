@@ -53,12 +53,12 @@ class SaffierField(ArbitraryHashableBaseModel):
         self.description = description
         self.help_text = help_text
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         raise NotImplementedError()  # pragma: no cover
 
     def validate_or_error(self, value: typing.Any) -> ValidationResult:
         try:
-            value = self.validate(value)
+            value = self.check(value)
         except ValidationError as error:
             return ValidationResult(value=None, error=error)
         return ValidationResult(value=value, error=None)
@@ -133,7 +133,7 @@ class String(SaffierField):
             self.pattern = pattern.pattern
             self.pattern_regex = pattern
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         if value is None and self.null:
             return None
         elif value is None and self.blank and self.coerse_types:
@@ -153,7 +153,7 @@ class String(SaffierField):
         if not self.blank and not value:
             if self.null and self.coerse_types:
                 return None
-            raise self.validate("blank")
+            raise self.check("blank")
 
         if self.min_length is not None:
             if len(value) < self.min_length:
@@ -168,7 +168,7 @@ class String(SaffierField):
                 raise self.validation_error("pattern", self.pattern)
 
         if self.format in FORMATS:
-            return FORMATS[self.format].validate(value)
+            return FORMATS[self.format].check(value)
 
         return value
 
@@ -218,7 +218,7 @@ class Number(SaffierField):
         self.multiple_of = multiple_of
         self.coerce_types = coerce_types
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         if value is None and self.null:
             return None
         elif value == "" and self.null and self.coerce_types:
@@ -306,7 +306,7 @@ class Boolean(SaffierField):
         super().__init__(**kwargs)
         self.coerce_types = coerce_types
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         if value is None and self.null:
             return None
         elif value is None:
@@ -348,7 +348,7 @@ class Choice(SaffierField):
         self.coerce_types = coerce_types
         assert all(len(choice) == 2 for choice in self.choices)
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         if value is None and self.null:
             return None
         elif value is None:
@@ -395,7 +395,7 @@ class Union(SaffierField):
         if any([child.allow_null for child in any_of]):
             self.allow_null = True
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         if value is None and self.allow_null:
             return None
         elif value is None:
@@ -421,7 +421,7 @@ class Union(SaffierField):
 
 
 class Any(SaffierField):
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         return value
 
 
@@ -440,7 +440,7 @@ class Const(SaffierField):
         super().__init__(**kwargs)
         self.const = const
 
-    def validate(self, value: typing.Any) -> typing.Any:
+    def check(self, value: typing.Any) -> typing.Any:
         if value != self.const:
             if self.const is None:
                 raise self.validation_error("only_null")

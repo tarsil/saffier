@@ -125,7 +125,7 @@ class Model(ModelMeta, ModelUtil):
     async def update(self, **kwargs):
         fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
         validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.fields)
+        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
