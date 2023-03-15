@@ -28,7 +28,7 @@ class SaffierField(ArbitraryHashableBaseModel):
     The base of all fields used by Saffier
     """
 
-    error_messages: DictAny = {}
+    error_messages: typing.Dict[str, str] = {}
 
     def __init__(
         self,
@@ -87,7 +87,7 @@ class String(SaffierField):
     SaffierField representation of a String.
     """
 
-    error_messages = {
+    error_messages: typing.Dict[str, str] = {
         "type": "Must be a string.",
         "null": "May not be null.",
         "blank": "Must not be blank.",
@@ -175,7 +175,7 @@ class String(SaffierField):
 
 class Number(SaffierField):
     field_type: typing.Any = None
-    error_messages = {
+    error_messages: typing.Dict[str, str] = {
         "type": "Must be a number.",
         "null": "May not be null.",
         "integer": "Must be an integer.",
@@ -285,7 +285,10 @@ class Decimal(Number):
 
 
 class Boolean(SaffierField):
-    error_messages = {"type": "Must be a boolean.", "null": "May not be null."}
+    error_messages: typing.Dict[str, str] = {
+        "type": "Must be a boolean.",
+        "null": "May not be null.",
+    }
     coerse_values = {
         "true": True,
         "false": False,
@@ -324,7 +327,7 @@ class Boolean(SaffierField):
 
 
 class Choice(SaffierField):
-    error_messages = {
+    error_messages: typing.Dict[str, str] = {
         "null": "May not be null.",
         "required": "This field is required.",
         "choice": "Not a valid choice.",
@@ -380,7 +383,10 @@ class DateTime(String):
 
 
 class Union(SaffierField):
-    error_messages = {"null": "May not be null.", "union": "Did not match any valid type."}
+    error_messages: typing.Dict[str, str] = {
+        "null": "May not be null.",
+        "union": "Did not match any valid type.",
+    }
 
     def __init__(self, any_of: typing.List[SaffierField], **kwargs: DictAny):
         super().__init__(**kwargs)
@@ -424,7 +430,10 @@ class Const(SaffierField):
     Only ever matches the given given value.
     """
 
-    errors = {"only_null": "Must be null.", "const": "Must be the value '{const}'."}
+    error_messages: typing.Dict[str, str] = {
+        "only_null": "Must be null.",
+        "const": "Must be the value '{const}'.",
+    }
 
     def __init__(self, const: typing.Any, **kwargs: typing.Any):
         assert "null" not in kwargs

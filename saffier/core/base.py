@@ -1,6 +1,6 @@
 import typing
 from collections.abc import Mapping
-from typing import Any, Generator, Iterator, List, Optional
+from typing import Any, Generator, List, Optional
 
 from pydantic import ValidationError
 

@@ -3,8 +3,6 @@ import typing
 from pydantic import root_validator
 from pydantic.dataclasses import dataclass
 
-from saffier.types import DictAny
-
 
 @dataclass
 class Index:

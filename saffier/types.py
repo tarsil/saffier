@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
 DictStr = Dict[str, str]
 DictStrInt = Dict[str, int]
