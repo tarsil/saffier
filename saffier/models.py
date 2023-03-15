@@ -7,7 +7,6 @@ from saffier.core.utils import ModelUtil
 from saffier.db.datastructures import Index
 from saffier.db.manager import Manager
 
-# from saffier.db.manager import Manager
 from saffier.metaclass import MetaInfo, ModelMeta
 
 
