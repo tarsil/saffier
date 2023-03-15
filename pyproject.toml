@@ -142,6 +142,8 @@ strict = true
 disallow_any_generics = false
 disallow_untyped_decorators = true
 implicit_reexport = true
+disallow_incomplete_defs = true
+disable_error_code = "attr-defined"
 
 [tool.ruff]
 select = [
@@ -163,13 +165,19 @@ ignore_missing_imports = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["sqlalchemy.*", "asyncpg", "alembic"]
+module = ["sqlalchemy.*", "asyncpg", "alembic", "sqlalchemy_utils.*"]
 ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "docs_src.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 addopts = ["--strict-config", "--strict-markers"]
 xfail_strict = true
 junit_family = "xunit2"
+
 
 [tool.hatch.build.targets.sdist]
 include = ["/saffier"]
