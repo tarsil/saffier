@@ -2,6 +2,8 @@
 Client to interact with Saffier models and migrations.
 """
 
+from typing import Any
+
 import click
 
 from saffier.migrations.base import init as _init
@@ -23,6 +25,6 @@ from saffier.migrations.base import init as _init
 )
 @click.command(name="init")
 @click.pass_context
-def init(ctx, directory, template, package):
+def init(ctx: Any, directory: str, template: str, package: bool) -> None:
     """Creates a new migration repository."""
     _init(ctx.obj, directory, template, package)

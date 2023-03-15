@@ -1,6 +1,7 @@
 import asyncio
 import os
 import typing
+from typing import Any
 
 import sqlalchemy as sa
 from databases import DatabaseURL
@@ -12,7 +13,7 @@ from sqlalchemy_utils.functions.orm import quote
 from saffier import Database
 
 
-async def _get_scalar_result(engine, sql):
+async def _get_scalar_result(engine: typing.Any, sql: typing.Any) -> Any:
     try:
         async with engine.connect() as conn:
             return await conn.scalar(sql)
@@ -56,13 +57,13 @@ class DatabaseTestClient(Database):
             if not self.is_database_exist():
                 await self.create_database(self.test_db_url)
 
-    async def is_database_exist(self) -> bool:
+    async def is_database_exist(self) -> Any:
         """
         Checks if a database exists.
         """
         return await self.database_exists(self.test_db_url)
 
-    async def database_exists(self, url):
+    async def database_exists(self, url: str) -> Any:
         url = make_url(url)
         database = url.database
         dialect_name = url.get_dialect().name
@@ -108,7 +109,9 @@ class DatabaseTestClient(Database):
             if engine:
                 await engine.dispose()
 
-    async def create_database(self, url, encoding="utf8", template=None):
+    async def create_database(
+        self, url: str, encoding: str = "utf8", template: typing.Any = None
+    ) -> Any:
         url = make_url(url)
         database = url.database
         dialect_name = url.get_dialect().name
@@ -161,7 +164,7 @@ class DatabaseTestClient(Database):
 
         await engine.dispose()
 
-    async def drop_database(self, url):
+    async def drop_database(self, url: str) -> Any:
         url = make_url(url)
         database = url.database
         dialect_name = url.get_dialect().name

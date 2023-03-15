@@ -9,7 +9,6 @@ from saffier.db.manager import Manager
 
 # from saffier.db.manager import Manager
 from saffier.metaclass import MetaInfo, ModelMeta
-from saffier.types import DictAny
 
 
 class Model(ModelMeta, ModelUtil):

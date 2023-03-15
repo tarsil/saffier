@@ -33,7 +33,7 @@ from saffier.migrations.operations import (
     help="Module path to the application to generate the migrations. In a module:path format.",
 )
 @click.pass_context
-def saffier_cli(ctx: click.Context, path: typing.Optional[str]):
+def saffier_cli(ctx: click.Context, path: typing.Optional[str]) -> None:
     """Performs database migrations"""
     if HELP_PARAMETER not in sys.argv:
         migration = MigrationEnv()

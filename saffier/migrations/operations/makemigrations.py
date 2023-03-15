@@ -2,6 +2,8 @@
 Client to interact with Saffier models and migrations.
 """
 
+from typing import Any
+
 import click
 
 from saffier.migrations.base import migrate as _migrate
@@ -40,8 +42,17 @@ from saffier.migrations.base import migrate as _migrate
 @click.command()
 @click.pass_context
 def makemigrations(
-    ctx, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg
-):
+    ctx: Any,
+    directory: str,
+    message: str,
+    sql: bool,
+    head: str,
+    splice: bool,
+    branch_label: str,
+    version_path: str,
+    rev_id: str,
+    arg: Any,
+) -> None:
     """Autogenerate a new revision file (Alias for
     'revision --autogenerate')"""
     _migrate(
