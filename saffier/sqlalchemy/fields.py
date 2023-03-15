@@ -20,19 +20,19 @@ class GUID(BaseFieldProtocol):
     impl: Any = sqlalchemy.CHAR
     cache_ok: bool = True
 
-    def load_dialect_impl(self, dialect: Any):
+    def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name != DIALECTS["postgres"]:
             return dialect.type_descriptor(sqlalchemy.CHAR(32))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.UUID())
 
-    def process_bind_param(self, value: Any, dialect: Any) -> str:
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
         if value is None:
             return value
         if dialect.name != DIALECTS["postgres"]:
             return value.hex
         return str(value)
 
-    def process_result_value(self, value: Any, dialect: Any):
+    def process_result_value(self, value: Any, dialect: Any) -> Any:
         if value is None:
             return value
         if not isinstance(value, uuid.UUID):
@@ -48,16 +48,16 @@ class IPAddress(BaseFieldProtocol):
     impl: str = sqlalchemy.CHAR
     cache_ok: bool = True
 
-    def load_dialect_impl(self, dialect: Any):
+    def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name not in DIALECTS.keys():
             return dialect.type_descriptor(sqlalchemy.CHAR(45))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.INET())
 
-    def process_bind_param(self, value: Any, dialect: Any) -> str:
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
         if value is not None:
             return str(value)
 
-    def process_result_value(self, value: Any, dialect: Any):
+    def process_result_value(self, value: Any, dialect: Any) -> Any:
         if value is None:
             return value
         if not isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
@@ -90,7 +90,7 @@ class List(BaseFieldProtocol):
 
     def process_result_value(self, value: Any, dialect: Any) -> Any:
         if value is None:
-            return SubList(self.delimiter)
+            return SubList(self.delimiter)  # type: ignore
         if isinstance(value, list):
             return value
-        return SubList(self.delimiter, value.split(self.delimiter))
+        return SubList(self.delimiter, value.split(self.delimiter))  # type: ignore

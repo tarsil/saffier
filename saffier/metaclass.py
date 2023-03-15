@@ -35,39 +35,41 @@ class MetaInfo:
         "_model",
     )
 
-    def __init__(self, meta: "Model.Meta") -> None:
+    def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: typing.Set = set()
         self.fields_mapping: typing.Dict[str, Field] = {}
         self.registry: typing.Optional[typing.Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: typing.Optional[str] = getattr(meta, "tablename", None)
         self.parents: typing.Any = getattr(meta, "parents", None) or []
-        self.pk: Field = None
+        self.pk: typing.Optional[Field] = None
         self.one_to_one_fields: typing.Set[str] = set()
         self.foreign_key_fields: typing.Set[str] = set()
-        self.pk_attribute: Field = getattr(meta, "pk_attribute", "")
-        self._model: typing.Type["Model"] = None
-        self.manager: typing.Type["Manager"] = getattr(meta, "manager", Manager())
+        self.pk_attribute: typing.Union[Field, str] = getattr(meta, "pk_attribute", "")
+        self._model: typing.Optional[typing.Type["Model"]] = None
+        self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: typing.Any = getattr(meta, "unique_together", None)
         self.indexes: typing.Any = getattr(meta, "indexes", None)
 
 
-def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Registry:
+def _check_model_inherited_registry(
+    bases: typing.Tuple[typing.Type, ...]
+) -> typing.Type[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
 
     If not found, then a ImproperlyConfigured exception is raised.
     """
-    found_registry: Registry = None
+    found_registry: typing.Optional[typing.Type[Registry]] = None
 
     for base in bases:
-        meta: MetaInfo = getattr(base, "_meta", None)
+        meta: MetaInfo = getattr(base, "_meta", None)  # type: ignore
         if not meta:
             continue
 
         if getattr(meta, "registry", None) is not None:
-            found_registry = getattr(meta, "registry")
+            found_registry = meta.registry
             break
 
     if not found_registry:
@@ -97,10 +99,12 @@ def _check_manager_for_bases(
 class BaseModelMeta(type):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: DictAny):
+    def __new__(
+        cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: DictAny
+    ) -> typing.Any:
         fields: typing.Dict[str, Field] = {}
-        one_to_one_fields: typing.Set[str] = set()
-        foreign_key_fields: typing.Set[str] = set()
+        one_to_one_fields: typing.Any = set()
+        foreign_key_fields: typing.Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: typing.Any = None
@@ -119,21 +123,21 @@ class BaseModelMeta(type):
             for parent in base.__mro__[1:]:
                 __search_for_fields(parent, attrs)
 
-            meta: MetaInfo = getattr(base, "_meta", None)
+            meta: typing.Union[MetaInfo, None] = getattr(base, "_meta", None)
             if not meta:
                 # Mixins and other classes
                 for key, value in inspect.getmembers(base):
                     if isinstance(value, Field) and key not in attrs:
                         attrs[key] = value
 
-                _check_manager_for_bases(base, attrs)
+                _check_manager_for_bases(base, attrs)  # type: ignore
             else:
                 # abstract classes
                 for key, value in meta.fields_mapping.items():
                     attrs[key] = value
 
                 # For managers coming from the top that are not abstract classes
-                _check_manager_for_bases(base, attrs, meta)
+                _check_manager_for_bases(base, attrs, meta)  # type: ignore
 
         # Search in the base classes
         inherited_fields: DictAny = {}
@@ -263,24 +267,24 @@ class BaseModelMeta(type):
             registry.models[name] = new_class
 
         for name, field in meta.fields_mapping.items():
-            setattr(field, "registry", registry)
+            field.registry = registry
             if field.primary_key:
                 new_class.pkname = name
 
         new_class._db_model = True
-        setattr(new_class, "fields", meta.fields_mapping)
+        new_class.fields = meta.fields_mapping
 
-        meta._model = new_class
+        meta._model = new_class  # type: ignore
         meta.manager.model_class = new_class
 
-        for key, value in attrs.items():
+        for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
 
         return new_class
 
     @property
-    def table(cls):
+    def table(cls) -> typing.Any:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.

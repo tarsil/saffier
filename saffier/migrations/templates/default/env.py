@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from logging.config import fileConfig
+from typing import Any, Union
 
 from alembic import context
 from rich.console import Console
@@ -17,7 +18,7 @@ console = Console()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-config = context.config
+config: Any = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -25,7 +26,7 @@ fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
 
 
-def get_app_location(argv):
+def get_app_location(argv: Any) -> Any:
     """
     Manually checks for the --app parameter.
     """
@@ -33,11 +34,11 @@ def get_app_location(argv):
         try:
             return argv[argv.index(APP_PARAMETER) + 1]
         except IndexError as e:
-            raise SaffierException(detail=str(e))
+            raise SaffierException(detail=str(e))  # noqa
     return None
 
 
-def get_app():
+def get_app() -> Any:
     """
     Gets the app via environment variable or via console parameter.
     """
@@ -47,11 +48,11 @@ def get_app():
     return app_env.app
 
 
-def get_engine_url():
+def get_engine_url() -> Union[str, None]:
     return os.environ.get("SAFFIER_DATABASE_URL")
 
 
-app = get_app()
+app: Any = get_app()
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -67,13 +68,13 @@ target_db = app._saffier_db["migrate"].registry
 # ... etc.
 
 
-def get_metadata():
+def get_metadata() -> Any:
     if hasattr(target_db, "metadatas"):
         return target_db.metadatas[None]
     return target_db.metadata
 
 
-def run_migrations_offline():
+def run_migrations_offline() -> Any:
     """Run migrations in 'offline' mode.
 
     This configures the context with just a URL
@@ -92,11 +93,11 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def do_run_migrations(connection):
+def do_run_migrations(connection: Any) -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
     # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
-    def process_revision_directives(context, revision, directives):
+    def process_revision_directives(context, revision, directives) -> Any:  # type: ignore
         if getattr(config.cmd_opts, "autogenerate", False):
             script = directives[0]
             if script.upgrade_ops.is_empty():
@@ -114,7 +115,7 @@ def do_run_migrations(connection):
         context.run_migrations()
 
 
-async def run_migrations_online():
+async def run_migrations_online() -> Any:
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine

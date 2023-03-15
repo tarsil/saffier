@@ -10,9 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 dynamic = ['version']
 license = "MIT"
-authors = [
-    { name = "Tiago Silva", email = "tiago.arasilva@gmail.com" },
-]
+authors = [{ name = "Tiago Silva", email = "tiago.arasilva@gmail.com" }]
 classifiers = [
     "Intended Audience :: Information Technology",
     "Intended Audience :: System Administrators",
@@ -48,9 +46,22 @@ dependencies = [
     "pydantic>=1.10.5,<2.0.0",
     "rich>=13.3.1,<14.0.0",
     "sqlalchemy==1.4.46",
-    "toml>=0.10.2,<0.20.0"
+    "toml>=0.10.2,<0.20.0",
 ]
-keywords = ["api", "rest", "http", "asgi", "pydantic", "starlette", "fastapi", "framework", "websocket", "openapi", "ml", "machine learning"]
+keywords = [
+    "api",
+    "rest",
+    "http",
+    "asgi",
+    "pydantic",
+    "starlette",
+    "fastapi",
+    "framework",
+    "websocket",
+    "openapi",
+    "ml",
+    "machine learning",
+]
 
 [project.urls]
 Homepage = "https://github.com/tarsil/saffier"
@@ -78,8 +89,9 @@ test = [
     "freezegun>=1.2.2,<2.0.0",
     "mock==5.0.1",
     "pydantic>=1.10.5",
+    "pymysql>=1.0.2,<2.0.0",
     "types-orjson==3.6.2",
-    "pymysql>=1.0.2,<2.0.0"
+    "ruff>=0.0.256,<1.0.0",
 ]
 
 dev = [
@@ -88,7 +100,7 @@ dev = [
     "uvicorn[standard] >=0.19.0",
     "pre-commit>=2.17.0,<4.0.0",
     "loguru>=0.6.0,<0.7.0",
-    "watchfiles>=0.16.1,<0.20.0"
+    "watchfiles>=0.16.1,<0.20.0",
 ]
 
 doc = [
@@ -101,21 +113,13 @@ doc = [
     "pyyaml>=5.3.1,<7.0.0",
 ]
 
-testing = [
-    "sqlalchemy_utils>=0.40.0"
-]
+testing = ["sqlalchemy_utils>=0.40.0"]
 
-postgres = [
-    "databases[postgresql]>=0.7.0",
-]
+postgres = ["databases[postgresql]>=0.7.0"]
 
-mysql = [
-    "databases[mysql]>=0.7.0",
-]
+mysql = ["databases[mysql]>=0.7.0"]
 
-sqlite = [
-    "databases[sqlite]>=0.7.0",
-]
+sqlite = ["databases[sqlite]>=0.7.0"]
 
 all = [
     "databases[postgresql, mysql, sqlite]",
@@ -131,25 +135,49 @@ path = "saffier/__init__.py"
 
 [tool.isort]
 profile = "black"
-known_third_party = ["esmerald", "pydantic", "starlette", "asyncz"]
+known_third_party = ["esmerald", "pydantic", "starlette"]
 
 [tool.mypy]
 strict = true
+disallow_any_generics = false
+disallow_untyped_decorators = true
+implicit_reexport = true
+disallow_incomplete_defs = true
+disable_error_code = "attr-defined"
+
+[tool.ruff]
+select = [
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "C", # flake8-comprehensions
+    "B", # flake8-bugbear
+]
+ignore = [
+    "E501", # line too long, handled by black
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+]
 
 [[tool.mypy.overrides]]
 module = "saffier.tests.*"
 ignore_missing_imports = true
 check_untyped_defs = true
 
+[[tool.mypy.overrides]]
+module = ["sqlalchemy.*", "asyncpg", "alembic", "sqlalchemy_utils.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "docs_src.*"
+ignore_errors = true
+
 [tool.pytest.ini_options]
-addopts = [
-  "--strict-config",
-  "--strict-markers",
-]
+addopts = ["--strict-config", "--strict-markers"]
 xfail_strict = true
 junit_family = "xunit2"
 
+
 [tool.hatch.build.targets.sdist]
-include = [
-    "/saffier",
-]
+include = ["/saffier"]

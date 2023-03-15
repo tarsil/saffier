@@ -1,7 +1,7 @@
 import argparse
 import os
 import typing
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -10,21 +10,20 @@ from alembic.config import Config as AlembicConfig
 from saffier import Registry
 from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME
 from saffier.migrations.decorators import catch_errors
-from saffier.types import DictAny
 
 alembic_version = tuple([int(v) for v in __alembic_version__.split(".")[0:3]])
 object_setattr = object.__setattr__
 
 
 class MigrateConfig:
-    def __init__(self, migrate: typing.Any, registry: Registry, **kwargs):
+    def __init__(self, migrate: typing.Any, registry: Registry, **kwargs: Any) -> None:
         self.migrate = migrate
         self.registry = registry
         self.directory = migrate.directory
         self.kwargs = kwargs
 
     @property
-    def metadata(self):
+    def metadata(self) -> typing.Any:
         return self.registry.metadata
 
 
@@ -33,11 +32,11 @@ class Config(AlembicConfig):
     Base configuration connecting Saffier with Alembic.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.template_directory = kwargs.pop("template_directory", None)
         super().__init__(*args, **kwargs)
 
-    def get_template_directory(self) -> str:
+    def get_template_directory(self) -> Any:
         if self.template_directory:
             return self.template_directory
         package_dir = os.path.abspath(os.path.dirname(__file__))
@@ -59,12 +58,12 @@ class Migrate:
         registry: Registry,
         compare_type: bool = True,
         render_as_batch: bool = True,
-        **kwargs: DictAny,
+        **kwargs: Any,
     ):
         assert isinstance(registry, Registry), "Registry must be an instance of saffier.Registry"
 
         self.app = app
-        self.configure_callbacks = []
+        self.configure_callbacks: typing.List[Callable] = []
         self.registry = registry
         self.directory = str("migrations")
         self.alembic_ctx_kwargs = kwargs
@@ -73,7 +72,7 @@ class Migrate:
 
         self.set_saffier_extension(app)
 
-    def set_saffier_extension(self, app):
+    def set_saffier_extension(self, app: Any) -> None:
         """
         Sets a saffier dictionary for the app object.
         """
@@ -81,11 +80,11 @@ class Migrate:
         object_setattr(app, "_saffier_db", {})
         app._saffier_db["migrate"] = migrate
 
-    def configure(self, f):
+    def configure(self, f: Callable) -> Any:
         self.configure_callbacks.append(f)
         return f
 
-    def call_configure_callbacks(self, config):
+    def call_configure_callbacks(self, config: Config) -> Config:
         for f in self.configure_callbacks:
             config = f(config)
         return config
@@ -95,7 +94,7 @@ class Migrate:
         directory: Optional[str] = None,
         arg: Optional[typing.Any] = None,
         options: Optional[typing.Any] = None,
-    ):
+    ) -> Any:
         if directory is None:
             directory = self.directory
         directory = str(directory)
@@ -110,19 +109,19 @@ class Migrate:
 
         if not hasattr(config.cmd_opts, "x"):
             if arg is not None:
-                setattr(config.cmd_opts, "x", [])
+                config.cmd_opts.x = []
                 if isinstance(arg, list) or isinstance(arg, tuple):
                     for x in arg:
                         config.cmd_opts.x.append(x)
                 else:
                     config.cmd_opts.x.append(arg)
             else:
-                setattr(config.cmd_opts, "x", None)
+                config.cmd_opts.x = None
         return self.call_configure_callbacks(config)
 
 
 @catch_errors
-def list_templates():
+def list_templates() -> None:
     """Lists the available templates"""
     config = Config()
     config.print_stdout("Available templates:\n")
@@ -139,7 +138,7 @@ def init(
     directory: Optional[str] = None,
     template: Optional[str] = None,
     package: bool = False,
-):
+) -> None:
     """Creates a new migration folder"""
     if directory is None:
         directory = "migrations"
@@ -152,7 +151,7 @@ def init(
     config = Config(template_directory=template_directory)
     config.set_main_option("script_location", directory)
     config.config_file_name = os.path.join(directory, "alembic.ini")
-    config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)
+    config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)  # type: ignore
 
     if template is None:
         template = DEFAULT_TEMPLATE_NAME
@@ -166,17 +165,17 @@ def revision(
     message: Optional[str] = None,
     autogenerate: bool = False,
     sql: bool = False,
-    head: Optional[str] = "head",
+    head: str = "head",
     splice: bool = False,
     branch_label: Optional[str] = None,
     version_path: Optional[str] = None,
     revision_id: Optional[typing.Any] = None,
-):
+) -> None:
     """
     Creates a new revision file
     """
     options = ["autogenerate"] if autogenerate else None
-    config = app._saffier_db["migrate"].migrate.get_config(directory, options)
+    config = app._saffier_db["migrate"].migrate.get_config(directory, options)  # type: ignore
 
     command.revision(
         config,
@@ -197,15 +196,15 @@ def migrate(
     directory: Optional[str] = None,
     message: Optional[str] = None,
     sql: bool = False,
-    head: Optional[str] = "head",
+    head: str = "head",
     splice: bool = False,
     branch_label: Optional[str] = None,
     version_path: Optional[str] = None,
     revision_id: Optional[typing.Any] = None,
     arg: Optional[typing.Any] = None,
-):
+) -> None:
     """Alias for 'revision --autogenerate'"""
-    config = app._saffier_db["migrate"].migrate.get_config(
+    config = app._saffier_db["migrate"].migrate.get_config(  # type: ignore
         directory, options=["autogenerate"], arg=arg
     )
 
@@ -224,11 +223,11 @@ def migrate(
 
 @catch_errors
 def edit(
-    app: Optional[typing.Any], directory: Optional[str] = None, revision: Optional[str] = "current"
-):
+    app: Optional[typing.Any], directory: Optional[str] = None, revision: str = "current"
+) -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
-        config = app._saffier_db["migrate"].migrate.get_config(directory)
+        config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
         command.edit(config, revision)
     else:
         raise RuntimeError("Alembic 1.9.4 or greater is required")
@@ -238,13 +237,13 @@ def edit(
 def merge(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-    revisions: Optional[str] = "",
+    revisions: str = "",
     message: Optional[str] = None,
     branch_label: Optional[str] = None,
     revision_id: Optional[str] = None,
-):
+) -> None:
     """Merge two revisions together.  Creates a new migration file"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.merge(
         config, revisions, message=message, branch_label=branch_label, rev_id=revision_id
     )
@@ -254,13 +253,13 @@ def merge(
 def upgrade(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-    revision: Optional[str] = "head",
+    revision: str = "head",
     sql: bool = False,
-    tag: bool = None,
+    tag: Optional[str] = None,
     arg: Optional[typing.Any] = None,
-):
+) -> None:
     """Upgrade to a later version"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)
+    config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
     command.upgrade(config, revision, sql=sql, tag=tag)
 
 
@@ -268,13 +267,13 @@ def upgrade(
 def downgrade(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-    revision: Optional[str] = "-1",
+    revision: str = "-1",
     sql: bool = False,
-    tag: bool = None,
+    tag: Optional[str] = None,
     arg: Optional[typing.Any] = None,
-):
+) -> None:
     """Revert to a previous version"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)
+    config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
     if sql and revision == "-1":
         revision = "head:-1"
     command.downgrade(config, revision, sql=sql, tag=tag)
@@ -284,11 +283,11 @@ def downgrade(
 def show(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-    revision: Optional[str] = "head",
-):
+    revision: str = "head",
+) -> None:
     """Show the revision denoted by the given symbol."""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
-    command.show(config, revision)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    command.show(config, revision)  # type: ignore
 
 
 @catch_errors
@@ -298,9 +297,9 @@ def history(
     rev_range: Optional[typing.Any] = None,
     verbose: bool = False,
     indicate_current: bool = False,
-):
+) -> None:
     """List changeset scripts in chronological order."""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.history(config, rev_range, verbose=verbose, indicate_current=indicate_current)
 
 
@@ -310,23 +309,27 @@ def heads(
     directory: Optional[str] = None,
     verbose: bool = False,
     resolve_dependencies: bool = False,
-):
+) -> None:
     """Show current available heads in the script directory"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
-    command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)  # type: ignore
 
 
 @catch_errors
-def branches(app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False):
+def branches(
+    app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
+) -> None:
     """Show current branch points"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
-    command.branches(config, verbose=verbose)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    command.branches(config, verbose=verbose)  # type: ignore
 
 
 @catch_errors
-def current(app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False):
+def current(
+    app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
+) -> None:
     """Display the current revision for each database."""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.current(config, verbose=verbose)
 
 
@@ -334,13 +337,13 @@ def current(app: Optional[typing.Any], directory: Optional[str] = None, verbose:
 def stamp(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-    revision: Optional[str] = "head",
+    revision: str = "head",
     sql: bool = False,
     tag: Optional[typing.Any] = None,
-):
+) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.stamp(config, revision, sql=sql, tag=tag)
 
 
@@ -348,7 +351,7 @@ def stamp(
 def check(
     app: Optional[typing.Any],
     directory: Optional[str] = None,
-):
+) -> None:
     """Check if there are any new operations to migrate"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)
+    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.check(config)

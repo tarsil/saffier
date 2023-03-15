@@ -2,6 +2,8 @@
 Client to interact with Saffier models and migrations.
 """
 
+from typing import Any
+
 import click
 
 from saffier.migrations.base import downgrade as _downgrade
@@ -25,6 +27,6 @@ from saffier.migrations.base import downgrade as _downgrade
 @click.command()
 @click.argument("revision", default="-1")
 @click.pass_context
-def downgrade(ctx, directory, sql, tag, arg, revision):
+def downgrade(ctx: Any, directory: str, sql: bool, tag: str, arg: Any, revision: str) -> None:
     """Revert to a previous version"""
     _downgrade(ctx.obj, directory, revision, sql, tag, arg)

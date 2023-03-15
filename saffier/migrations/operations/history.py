@@ -2,6 +2,8 @@
 Client to interact with Saffier models and migrations.
 """
 
+from typing import Any
+
 import click
 
 from saffier.migrations.base import history as _history
@@ -25,6 +27,8 @@ from saffier.migrations.base import history as _history
 )
 @click.command()
 @click.pass_context
-def history(ctx, directory, rev_range, verbose, indicate_current):
+def history(
+    ctx: Any, directory: str, rev_range: str, verbose: bool, indicate_current: bool
+) -> None:
     """List changeset scripts in chronological order."""
     _history(ctx.obj, directory, rev_range, verbose, indicate_current)

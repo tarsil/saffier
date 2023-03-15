@@ -1,8 +1,12 @@
+from typing import Any
+
 import sqlalchemy
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio.engine import AsyncEngine
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.db.connection import Database
+from saffier.types import DictAny
 
 
 class Registry(ArbitraryHashableBaseModel):
@@ -10,18 +14,18 @@ class Registry(ArbitraryHashableBaseModel):
     Registers a database connection object
     """
 
-    def __init__(self, database: Database, **kwargs) -> None:
+    def __init__(self, database: Database, **kwargs: DictAny) -> None:
         assert isinstance(
             database, Database
         ), "database must be an instance of saffier.core.db.Database"
 
         super().__init__(**kwargs)
         self.database = database
-        self.models = {}
+        self.models: DictAny = {}
         self._metadata = sqlalchemy.MetaData()
 
     @property
-    def metadata(self):
+    def metadata(self) -> Any:
         for model_class in self.models.values():
             model_class.build_table()
         return self._metadata
@@ -37,12 +41,12 @@ class Registry(ArbitraryHashableBaseModel):
                 url = url.replace(driver="aiosqlite")
         return str(url)
 
-    def _get_engine(self):
+    def _get_engine(self) -> AsyncEngine:
         url = self._get_database_url()
         engine = create_async_engine(url)
         return engine
 
-    async def create_all(self):
+    async def create_all(self) -> None:
         engine = self._get_engine()
 
         async with self.database:
@@ -51,7 +55,7 @@ class Registry(ArbitraryHashableBaseModel):
 
         await engine.dispose()
 
-    async def drop_all(self):
+    async def drop_all(self) -> None:
         engine = self._get_engine()
 
         async with self.database:

@@ -7,11 +7,11 @@ from logging.config import fileConfig
 from alembic import context
 from rich.console import Console
 from sqlalchemy.ext.asyncio import create_async_engine
-from tests.settings import TEST_DATABASE
 
 from saffier.exceptions import SaffierException
 from saffier.migrations.constants import APP_PARAMETER
 from saffier.migrations.env import MigrationEnv
+from tests.settings import TEST_DATABASE
 
 # The console used for the outputs
 console = Console()
@@ -34,7 +34,7 @@ def get_app_location(argv):
         try:
             return argv[argv.index(APP_PARAMETER) + 1]
         except IndexError as e:
-            raise SaffierException(detail=str(e))
+            raise SaffierException(detail=str(e))  # noqa
     return None
 
 

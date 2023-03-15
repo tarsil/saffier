@@ -9,7 +9,6 @@ from saffier.db.manager import Manager
 
 # from saffier.db.manager import Manager
 from saffier.metaclass import MetaInfo, ModelMeta
-from saffier.types import DictAny
 
 
 class Model(ModelMeta, ModelUtil):
@@ -21,9 +20,9 @@ class Model(ModelMeta, ModelUtil):
     query = Manager()
     _meta = MetaInfo(None)
     _db_model: bool = False
-    _raw_query: str = None
+    _raw_query: typing.Optional[str] = None
 
-    def __init__(self, **kwargs: DictAny) -> None:
+    def __init__(self, **kwargs: typing.Any) -> None:
         if "pk" in kwargs:
             kwargs[self.pkname] = kwargs.pop("pk")
 
@@ -52,31 +51,31 @@ class Model(ModelMeta, ModelUtil):
         """
 
     @property
-    def pk(self):
+    def pk(self) -> typing.Any:
         return getattr(self, self.pkname)
 
     @pk.setter
-    def pk(self, value):
+    def pk(self, value: typing.Any) -> typing.Any:
         setattr(self, self.pkname, value)
 
     @property
-    def raw_query(self):
-        return getattr(self, self._raw_query)
+    def raw_query(self) -> typing.Any:
+        return getattr(self, self._raw_query)  # type: ignore
 
     @raw_query.setter
-    def raw_query(self, value):
+    def raw_query(self, value: typing.Any) -> typing.Any:
         setattr(self, self.raw_query, value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}({self.pkname}={self.pk})"
 
     @classmethod
-    def build_table(cls):
+    def build_table(cls) -> typing.Any:
         tablename = cls._meta.tablename
-        metadata = cls._meta.registry._metadata
+        metadata = cls._meta.registry._metadata  # type: ignore
         unique_together = cls._meta.unique_together
         index_constraints = cls._meta.indexes
 
@@ -122,10 +121,10 @@ class Model(ModelMeta, ModelUtil):
     def table(self) -> sqlalchemy.Table:
         return self.__class__.table
 
-    async def update(self, **kwargs):
+    async def update(self, **kwargs: typing.Any) -> typing.Any:
         fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
         validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.fields)
+        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
@@ -140,7 +139,7 @@ class Model(ModelMeta, ModelUtil):
 
         await self.database.execute(expression)
 
-    async def load(self):
+    async def load(self) -> None:
         # Build the select expression.
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.select().where(pk_column == self.pk)
@@ -153,11 +152,14 @@ class Model(ModelMeta, ModelUtil):
             setattr(self, key, value)
 
     @classmethod
-    def _from_row(cls, row, select_related=[]):
+    def _from_row(cls, row: typing.Any, select_related: typing.Any = None) -> "Model":
         """
         Instantiate a model instance, given a database row.
         """
         item = {}
+
+        if not select_related:
+            select_related = []
 
         # Instantiate any child instances first.
         for related in select_related:
@@ -176,14 +178,14 @@ class Model(ModelMeta, ModelUtil):
 
         return cls(**item)
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: typing.Any, value: typing.Any) -> typing.Any:
         if key in self.fields:
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.
             value = self.fields[key].expand_relationship(value)
         super().__setattr__(key, value)
 
-    def __eq__(self, other):
+    def __eq__(self, other: typing.Any) -> bool:
         if self.__class__ != other.__class__:
             return False
         for key in self.fields.keys():

@@ -22,10 +22,10 @@ class User(saffier.Model):
 # Create the db and tables
 # Don't use this in production! Use Alembic or any tool to manage
 # The migrations for you
-await models.create_all()
+await models.create_all()  # noqa
 
-await User.query.create(is_active=False)
+await User.query.create(is_active=False)  # noqa
 
-user = await User.query.get(id=1)
+user = await User.query.get(id=1)  # noqa
 print(user)
 # User(id=1)

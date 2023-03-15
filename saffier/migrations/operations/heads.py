@@ -2,6 +2,8 @@
 Client to interact with Saffier models and migrations.
 """
 
+from typing import Any
+
 import click
 
 from saffier.migrations.base import heads as _heads
@@ -19,6 +21,6 @@ from saffier.migrations.base import heads as _heads
 )
 @click.command()
 @click.pass_context
-def heads(ctx, directory, verbose, resolve_dependencies):
+def heads(ctx: Any, directory: str, verbose: bool, resolve_dependencies: bool) -> None:
     """Show current available heads in the script directory"""
     _heads(ctx.obj, directory, verbose, resolve_dependencies)

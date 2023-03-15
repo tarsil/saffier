@@ -9,10 +9,8 @@ from saffier.db.constants import FILTER_OPERATORS
 from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
-from saffier.types import DictAny
 
 if typing.TYPE_CHECKING:  # pragma: no cover
-    from saffier.db.connection import Database
     from saffier.models import Model
 
 
@@ -26,37 +24,68 @@ class QuerySetProps:
     """
 
     @property
-    def database(self) -> "Database":
-        return self.model_class._meta.registry.database
+    def database(self) -> typing.Any:
+        return self.model_class._meta.registry.database  # type: ignore
 
     @property
     def table(self) -> sqlalchemy.Table:
-        return self.model_class.table
+        return self.model_class.table  # type: ignore
 
     @property
-    def schema(self):
-        fields = {key: field.validator for key, field in self.model_class.fields.items()}
+    def schema(self) -> Schema:
+        fields = {key: field.validator for key, field in self.model_class.fields.items()}  # type: ignore
         return Schema(fields=fields)
 
     @property
-    def pkname(self):
-        return self.model_class.pkname
+    def pkname(self) -> typing.Any:
+        return self.model_class.pkname  # type: ignore
 
 
-class BaseQuerySet(QuerySetProps, ModelUtil):
-    def _build_order_by_expression(self, order_by, expression):
+class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
+    ESCAPE_CHARACTERS = ["%", "_"]
+
+    def __init__(
+        self,
+        model_class: typing.Any = None,
+        filter_clauses: typing.Any = None,
+        select_related: typing.Any = None,
+        limit_count: typing.Any = None,
+        limit_offset: typing.Any = None,
+        order_by: typing.Any = None,
+        group_by: typing.Any = None,
+        distinct_on: typing.Any = None,
+    ) -> None:
+        super().__init__(model_class=model_class)
+        self.model_class = model_class
+        self.filter_clauses = [] if filter_clauses is None else filter_clauses
+        self.limit_count = limit_count
+        self._select_related = [] if select_related is None else select_related
+        self._offset = limit_offset
+        self._order_by = [] if order_by is None else order_by
+        self._group_by = [] if group_by is None else group_by
+        self.distinct_on = [] if distinct_on is None else distinct_on
+        self._expression = None
+        self._cache = None
+
+    def _build_order_by_expression(
+        self, order_by: typing.Any, expression: typing.Any
+    ) -> typing.Any:
         """Builds the order by expression"""
         order_by = list(map(self._prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
-    def _build_group_by_expression(self, group_by, expression):
+    def _build_group_by_expression(
+        self, group_by: typing.Any, expression: typing.Any
+    ) -> typing.Any:
         """Builds the group by expression"""
         group_by = list(map(self._prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
-    def _build_filter_clauses_expression(self, filter_clauses, expression):
+    def _build_filter_clauses_expression(
+        self, filter_clauses: typing.Any, expression: typing.Any
+    ) -> typing.Any:
         """Builds the filter clauses expression"""
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
@@ -65,13 +94,15 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         expression = expression.where(clause)
         return expression
 
-    def _build_select_distinct(self, distinct_on, expression):
+    def _build_select_distinct(
+        self, distinct_on: typing.Any, expression: typing.Any
+    ) -> typing.Any:
         """Filters selects only specific fields"""
         distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
         expression = expression.distinct(*distinct_on)
         return expression
 
-    def _build_tables_select_from_relationship(self):
+    def _build_tables_select_from_relationship(self) -> typing.Any:
         """
         Builds the tables relationships
         """
@@ -90,7 +121,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
 
         return tables, select_from
 
-    def _build_select(self):
+    def _build_select(self) -> typing.Any:
         """
         Builds the query select based on the given parameters and filters.
         """
@@ -118,10 +149,10 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         if self.distinct_on:
             expression = self._build_select_distinct(self.distinct_on, expression=expression)
 
-        setattr(self, "_expression", expression)
+        self._expression = expression
         return expression
 
-    def _filter_query(self, exclude: bool = False, **kwargs):
+    def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
         from saffier.models import Model
 
         clauses = []
@@ -200,31 +231,31 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
             order_by=self._order_by,
         )
 
-    def _validate_kwargs(self, **kwargs):
+    def _validate_kwargs(self, **kwargs: typing.Any) -> typing.Any:
         fields = self.model_class.fields
         validator = Schema(fields={key: value.validator for key, value in fields.items()})
-        kwargs = validator.validate(kwargs)
+        kwargs = validator.check(kwargs)
         for key, value in fields.items():
             if value.validator.read_only and value.validator.has_default():
                 kwargs[key] = value.validator.get_default_value()
         return kwargs
 
-    def _prepare_order_by(self, order_by: str):
+    def _prepare_order_by(self, order_by: str) -> typing.Any:
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
-    def _prepare_group_by(self, group_by: str):
+    def _prepare_group_by(self, group_by: str) -> typing.Any:
         group_by = group_by.lstrip("-")
         group_col = self.table.columns[group_by]
         return group_col
 
-    def _prepare_fields_for_distinct(self, distinct_on: str):
+    def _prepare_fields_for_distinct(self, distinct_on: str) -> typing.Any:
         distinct_on = self.table.columns[distinct_on]
         return distinct_on
 
-    def _clone(self) -> "QuerySet[SaffierModel]":
+    def _clone(self) -> typing.Any:
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -242,54 +273,29 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         queryset._cache = self._cache
         return queryset
 
-    def _fetch_all(self):
+    def _fetch_all(self) -> None:
         if self._cache is None:
             self._cache = self._make_query()
 
 
-class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
+class QuerySet(BaseQuerySet):
     """
     QuerySet object used for query retrieving.
     """
 
-    ESCAPE_CHARACTERS = ["%", "_"]
-
-    def __init__(
-        self,
-        model_class=None,
-        filter_clauses=None,
-        select_related=None,
-        limit_count=None,
-        limit_offset=None,
-        order_by=None,
-        group_by=None,
-        distinct_on=None,
-    ):
-        super().__init__(model_class=model_class)
-        self.model_class = model_class
-        self.filter_clauses = [] if filter_clauses is None else filter_clauses
-        self.limit_count = limit_count
-        self._select_related = [] if select_related is None else select_related
-        self._offset = limit_offset
-        self._order_by = [] if order_by is None else order_by
-        self._group_by = [] if group_by is None else group_by
-        self.distinct_on = [] if distinct_on is None else distinct_on
-        self._expression = None
-        self._cache = None
-
-    def __get__(self, instance, owner):
+    def __get__(self, instance: typing.Any, owner: typing.Any) -> typing.Any:
         return self.__class__(model_class=owner)
 
     @property
-    def sql(self):
+    def sql(self) -> str:
         return str(self._expression)
 
     @sql.setter
-    def sql(self, value):
-        setattr(self, "_expression", value)
+    def sql(self, value: typing.Any) -> None:
+        self._expression = value
 
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
-        for value in await self:
+        for value in await self:  # type: ignore
             yield value
 
     def _set_query_expression(self, expression: typing.Any) -> None:
@@ -303,8 +309,8 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         exclude: bool = False,
-        **kwargs: DictAny,
-    ):
+        **kwargs: typing.Any,
+    ) -> typing.Any:
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
@@ -321,7 +327,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
-    ):
+    ) -> typing.Any:
         """
         Filters the QuerySet by the given kwargs and clause.
         """
@@ -331,13 +337,13 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
-    ):
+    ) -> typing.Any:
         """
         Exactly the same as the filter but for the exclude.
         """
         return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
-    def lookup(self, term: typing.Any):
+    def lookup(self, term: typing.Any) -> typing.Any:
         """
         Broader way of searching for a given term
         """
@@ -362,7 +368,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
         return queryset
 
-    def order_by(self, *order_by: str):
+    def order_by(self, *order_by: str) -> typing.Any:
         """
         Returns a QuerySet ordered by the given fields.
         """
@@ -370,7 +376,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset._order_by = order_by
         return queryset
 
-    def limit(self, limit_count: int):
+    def limit(self, limit_count: int) -> typing.Any:
         """
         Returns a QuerySet limited by.
         """
@@ -378,7 +384,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset.limit_count = limit_count
         return queryset
 
-    def offset(self, offset: int):
+    def offset(self, offset: int) -> typing.Any:
         """
         Returns a Queryset limited by the offset.
         """
@@ -386,7 +392,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str):
+    def group_by(self, *group_by: str) -> typing.Any:
         """
         Returns the values grouped by the given fields.
         """
@@ -394,7 +400,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str):
+    def distinct(self, *distinct_on: str) -> typing.Any:
         """
         Returns a queryset with distinct results.
         """
@@ -402,7 +408,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset.distinct_on = distinct_on
         return queryset
 
-    def select_related(self, related):
+    def select_related(self, related: typing.Any) -> typing.Any:
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -419,7 +425,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         queryset._select_related = related
         return queryset
 
-    async def exists(self) -> bool:
+    async def exists(self) -> typing.Any:
         """
         Returns a boolean indicating if a record exists or not.
         """
@@ -428,7 +434,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
-    async def count(self) -> int:
+    async def count(self) -> typing.Any:
         """
         Returns an indicating the total records.
         """
@@ -437,11 +443,11 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
-    async def get_or_none(self, **kwargs):
+    async def get_or_none(self, **kwargs: typing.Any) -> typing.Any:
         """
         Fetch one object matching the parameters or returns None.
         """
-        queryset = self.filter(**kwargs)
+        queryset: "QuerySet" = self.filter(**kwargs)
         expression = queryset._build_select().limit(2)
         self._set_query_expression(expression)
         rows = await self.database.fetch_all(expression)
@@ -452,7 +458,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             raise MultipleObjectsReturned()
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
-    async def all(self, **kwargs):
+    async def all(self, **kwargs: typing.Any) -> typing.Any:
         """
         Returns the queryset records based on specific filters
         """
@@ -472,7 +478,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             for row in rows
         ]
 
-    async def get(self, **kwargs):
+    async def get(self, **kwargs: typing.Any) -> typing.Any:
         """
         Returns a single record based on the given kwargs.
         """
@@ -489,7 +495,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             raise MultipleObjectsReturned()
         return self.model_class._from_row(rows[0], select_related=self._select_related)
 
-    async def first(self, **kwargs):
+    async def first(self, **kwargs: typing.Any) -> typing.Any:
         """
         Returns the first record of a given queryset.
         """
@@ -501,7 +507,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         if rows:
             return rows[0]
 
-    async def last(self, **kwargs):
+    async def last(self, **kwargs: typing.Any) -> typing.Any:
         """
         Returns the last record of a given queryset.
         """
@@ -513,7 +519,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         if rows:
             return rows[0]
 
-    async def create(self, **kwargs):
+    async def create(self, **kwargs: typing.Any) -> typing.Any:
         """
         Creates a record in a specific table.
         """
@@ -563,7 +569,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             new_objs.append(new_obj)
 
         new_objs = [
-            self._update_auto_now_fields(validator.validate(obj), self.model_class.fields)
+            self._update_auto_now_fields(validator.check(obj), self.model_class.fields)
             for obj in new_objs
         ]
 
@@ -588,7 +594,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         self._set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def update(self, **kwargs) -> None:
+    async def update(self, **kwargs: typing.Any) -> None:
         """
         Updates a record in a specific table with the given kwargs.
         """
@@ -597,7 +603,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         }
 
         validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.validate(kwargs), self.model_class.fields)
+        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:
@@ -607,7 +613,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
         await self.database.execute(expression)
 
     async def get_or_create(
-        self, defaults: typing.Dict[str, typing.Any], **kwargs
+        self, defaults: typing.Dict[str, typing.Any], **kwargs: typing.Any
     ) -> typing.Tuple[typing.Any, bool]:
         """
         Creates a record in a specific table or updates if already exists.
@@ -621,7 +627,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             return instance, True
 
     async def update_or_create(
-        self, defaults: typing.Dict[str, typing.Any], **kwargs
+        self, defaults: typing.Dict[str, typing.Any], **kwargs: typing.Any
     ) -> typing.Tuple[typing.Any, bool]:
         """
         Updates a record in a specific table or creates a new one.
@@ -635,7 +641,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
             instance = await self.create(**kwargs)
             return instance, True
 
-    async def _execute(self) -> typing.List[SaffierModel]:
+    async def _execute(self) -> typing.Any:
         return await self.all()
 
     def __await__(
@@ -643,14 +649,10 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
     ) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
         return self._execute().__await__()
 
-    def __class_getitem__(cls, *args, **kwargs):
+    def __class_getitem__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
         return cls
 
-    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
-        for val in await self:
-            yield val
-
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: typing.Any) -> typing.Any:
         """Don't populate the QuerySet's cache."""
         obj = self.__class__()
         for k, v in self.__dict__.items():

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
 DictStr = Dict[str, str]
 DictStrInt = Dict[str, int]
@@ -10,6 +10,3 @@ class Empty:
     """
     A placeholder class object.
     """
-
-
-HashableType = Union[int, bool, str, float, list, dict]

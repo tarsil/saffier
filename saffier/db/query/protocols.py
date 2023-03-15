@@ -13,8 +13,8 @@ class AwaitableQuery(typing.Generic[SaffierModel]):
     def __init__(self, model_class: typing.Type[SaffierModel]) -> None:
         self.model_class: typing.Type[SaffierModel] = model_class
 
-    def _make_query(self):
-        raise NotImplementedError()  # pragma: no cover
+    def _make_query(self) -> typing.Any:
+        raise NotImplementedError()
 
     async def _execute(self) -> typing.Any:
         raise NotImplementedError()
