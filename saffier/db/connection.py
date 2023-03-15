@@ -88,6 +88,6 @@ class Database(EncodeDatabase):
         database = credentials["database"]
         port = credentials["port"]
 
-        if not "password" in credentials:
+        if "password" not in credentials:
             return f"{scheme}://{user}@{host}:{port}/{database}"
         return f"{scheme}://{user}:{password}@{host}:{port}/{database}"

@@ -18,9 +18,9 @@ class User(saffier.Model):
 # Using ipython that supports await
 # Don't use this in production! Use Alembic or any tool to manage
 # The migrations for you
-await models.create_all()
+await models.create_all()  # noqa
 
-await User.query.create(name="Saffier", email="foo@bar.com")
+await User.query.create(name="Saffier", email="foo@bar.com")  # noqa
 
-user = await User.query.get(id=1)
+user = await User.query.get(id=1)  # noqa
 # User(id=1)

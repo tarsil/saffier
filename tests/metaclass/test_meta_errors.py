@@ -1,9 +1,9 @@
 import pytest
-from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Database, Manager, QuerySet
 from saffier.exceptions import ImproperlyConfigured
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -70,7 +70,7 @@ async def test_improperly_configured_for_multiple_primary_keys():
     assert raised.value.args[0] == "Cannot create model BaseModel with multiple primary keys."
 
 
-@pytest.mark.parametrize("_type,value", [("int", 1), ("dict", dict(name="test")), ("set", set())])
+@pytest.mark.parametrize("_type,value", [("int", 1), ("dict", {"name": "test"}), ("set", set())])
 async def test_improperly_configured_for_unique_together(_type, value):
     with pytest.raises(ImproperlyConfigured) as raised:
 

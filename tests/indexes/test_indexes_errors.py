@@ -2,11 +2,11 @@ import random
 import string
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import saffier
-from saffier.testclient import DatabaseTestClient
 from saffier.db.datastructures import Index
+from saffier.testclient import DatabaseTestClient
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -21,7 +21,7 @@ def get_random_string(length):
 
 
 def test_raises_value_error_on_wrong_max_length():
-    with pytest.raises(ValueError) as raised:
+    with pytest.raises(ValueError):
 
         class User(saffier.Model):
             name = saffier.CharField(max_length=255)
@@ -33,7 +33,7 @@ def test_raises_value_error_on_wrong_max_length():
 
 
 def test_raises_value_error_on_wrong_type_passed_fields():
-    with pytest.raises(ValueError) as raised:
+    with pytest.raises(ValueError):
 
         class User(saffier.Model):
             name = saffier.CharField(max_length=255)

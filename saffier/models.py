@@ -153,11 +153,14 @@ class Model(ModelMeta, ModelUtil):
             setattr(self, key, value)
 
     @classmethod
-    def _from_row(cls, row, select_related=[]):
+    def _from_row(cls, row, select_related=None):
         """
         Instantiate a model instance, given a database row.
         """
         item = {}
+
+        if not select_related:
+            select_related = []
 
         # Instantiate any child instances first.
         for related in select_related:

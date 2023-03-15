@@ -68,7 +68,7 @@ class Field:
         return SaffierField(**kwargs)  # pragma: no cover
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
-        raise NotImplemented()  # pragma: no cover
+        raise NotImplementedError()  # pragma: no cover
 
     def get_constraints(self):
         return []

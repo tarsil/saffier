@@ -4,7 +4,6 @@ import shutil
 import subprocess
 
 import pytest
-
 from esmerald import Esmerald
 
 app = Esmerald(routes=[])

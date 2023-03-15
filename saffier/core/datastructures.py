@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-
 object_setattr = object.__setattr__
 
 

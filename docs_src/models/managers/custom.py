@@ -31,28 +31,28 @@ class User(saffier.Model):
 # Using ipython that supports await
 # Don't use this in production! Use Alembic or any tool to manage
 # The migrations for you
-await models.create_all()
+await models.create_all()  # noqa
 
 # Create an inactive user
-await User.query.create(name="Saffier", email="foo@bar.com", is_active=False)
+await User.query.create(name="Saffier", email="foo@bar.com", is_active=False)  # noqa
 
 # You can also create a user using the new manager
-await User.inactives.create(name="Another Saffier", email="bar@foo.com", is_active=False)
+await User.inactives.create(name="Another Saffier", email="bar@foo.com", is_active=False)  # noqa
 
 # Querying using the new manager
-user = await User.inactives.get(email="foo@bar.com")
+user = await User.inactives.get(email="foo@bar.com")  # noqa
 # User(id=1)
 
-user = await User.inactives.get(email="bar@foo.com")
+user = await User.inactives.get(email="bar@foo.com")  # noqa
 # User(id=2)
 
 # Create a user using the default manager
-await User.query.create(name="Saffier", email="user@saffier.com")
+await User.query.create(name="Saffier", email="user@saffier.com")  # noqa
 
 # Querying all inactives only
-users = await User.inactives.all()
+users = await User.inactives.all()  # noqa
 # [User(id=1), User(id=2)]
 
 # Querying them all
-user = await User.query.all()
+user = await User.query.all()  # noqa
 # [User(id=1), User(id=2), User(id=3)]

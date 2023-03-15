@@ -33,7 +33,7 @@ def get_app_location(argv):
         try:
             return argv[argv.index(APP_PARAMETER) + 1]
         except IndexError as e:
-            raise SaffierException(detail=str(e))
+            raise SaffierException(detail=str(e))  # noqa
     return None
 
 

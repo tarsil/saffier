@@ -110,14 +110,14 @@ class Migrate:
 
         if not hasattr(config.cmd_opts, "x"):
             if arg is not None:
-                setattr(config.cmd_opts, "x", [])
+                config.cmd_opts.x = []
                 if isinstance(arg, list) or isinstance(arg, tuple):
                     for x in arg:
                         config.cmd_opts.x.append(x)
                 else:
                     config.cmd_opts.x.append(arg)
             else:
-                setattr(config.cmd_opts, "x", None)
+                config.cmd_opts.x = None
         return self.call_configure_callbacks(config)
 
 

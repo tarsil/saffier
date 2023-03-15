@@ -118,7 +118,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil):
         if self.distinct_on:
             expression = self._build_select_distinct(self.distinct_on, expression=expression)
 
-        setattr(self, "_expression", expression)
+        self._expression = expression
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs):
@@ -286,7 +286,7 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
     @sql.setter
     def sql(self, value):
-        setattr(self, "_expression", value)
+        self._expression = value
 
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:
@@ -645,10 +645,6 @@ class QuerySet(BaseQuerySet, AwaitableQuery[SaffierModel]):
 
     def __class_getitem__(cls, *args, **kwargs):
         return cls
-
-    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
-        for val in await self:
-            yield val
 
     def __deepcopy__(self, memo):
         """Don't populate the QuerySet's cache."""

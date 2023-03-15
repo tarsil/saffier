@@ -1,12 +1,12 @@
 import os
 
 import pytest
-from tests.settings import DATABASE_URL
+from esmerald import Esmerald
 
 import saffier
-from esmerald import Esmerald
 from saffier import Migrate
 from saffier.testclient import DatabaseTestClient
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 database = DatabaseTestClient(DATABASE_URL, drop_database=True)

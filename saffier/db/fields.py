@@ -3,7 +3,6 @@ import re
 import typing
 from math import isfinite
 
-
 from saffier.core import formats
 from saffier.core.base import ValidationResult
 from saffier.core.datastructures import ArbitraryHashableBaseModel
@@ -55,7 +54,7 @@ class SaffierField(ArbitraryHashableBaseModel):
         self.help_text = help_text
 
     def validate(self, value: typing.Any) -> typing.Any:
-        raise NotImplemented()  # pragma: no cover
+        raise NotImplementedError()  # pragma: no cover
 
     def validate_or_error(self, value: typing.Any) -> ValidationResult:
         try:
@@ -239,7 +238,7 @@ class Number(SaffierField):
             if self.field_type is not None:
                 value = self.field_type(value)
         except (TypeError, ValueError, decimal.InvalidOperation):
-            raise self.validation_error("type")
+            raise self.validation_error("type")  # noqa
 
         if not isfinite(value):
             raise self.validation_error("finite")
@@ -320,7 +319,7 @@ class Boolean(SaffierField):
             try:
                 value = self.coerse_values[value]
             except (KeyError, TypeError):
-                raise self.validation_error("type")
+                raise self.validation_error("type")  # noqa
         return value
 
 

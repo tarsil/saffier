@@ -69,7 +69,7 @@ class DateFormat(BaseFormat):
         try:
             return datetime.date(**kwargs)
         except ValueError:
-            raise self.validation_error("invalid")
+            raise self.validation_error("invalid")  # noqa
 
 
 class TimeFormat(BaseFormat):
@@ -94,7 +94,7 @@ class TimeFormat(BaseFormat):
         try:
             return datetime.time(tzinfo=None, **kwargs)
         except ValueError:
-            raise self.validation_error("invalid")
+            raise self.validation_error("invalid")  # noqa
 
 
 class DateTimeFormat(BaseFormat):
@@ -132,7 +132,7 @@ class DateTimeFormat(BaseFormat):
         try:
             return datetime.datetime(**kwargs, tzinfo=tzinfo)  # type: ignore
         except ValueError:
-            raise self.validation_error("invalid")
+            raise self.validation_error("invalid")  # noqa
 
 
 class UUIDFormat(BaseFormat):
@@ -183,7 +183,7 @@ class IPAddressFormat(BaseFormat):
         try:
             return ipaddress.ip_address(value)
         except ValueError:
-            raise self.validation_error("invalid")
+            raise self.validation_error("invalid")  # noqa
 
 
 class URLFormat(BaseFormat):

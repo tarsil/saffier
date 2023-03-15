@@ -67,7 +67,7 @@ def _check_model_inherited_registry(bases: typing.Tuple[typing.Type, ...]) -> Re
             continue
 
         if getattr(meta, "registry", None) is not None:
-            found_registry = getattr(meta, "registry")
+            found_registry = meta.registry
             break
 
     if not found_registry:
@@ -263,17 +263,17 @@ class BaseModelMeta(type):
             registry.models[name] = new_class
 
         for name, field in meta.fields_mapping.items():
-            setattr(field, "registry", registry)
+            field.registry = registry
             if field.primary_key:
                 new_class.pkname = name
 
         new_class._db_model = True
-        setattr(new_class, "fields", meta.fields_mapping)
+        new_class.fields = meta.fields_mapping
 
         meta._model = new_class
         meta.manager.model_class = new_class
 
-        for key, value in attrs.items():
+        for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
 

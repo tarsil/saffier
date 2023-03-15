@@ -35,7 +35,7 @@ from saffier.migrations.operations import (
 @click.pass_context
 def saffier_cli(ctx: click.Context, path: typing.Optional[str]):
     """Performs database migrations"""
-    if not HELP_PARAMETER in sys.argv:
+    if HELP_PARAMETER not in sys.argv:
         migration = MigrationEnv()
         app_env = migration.load_from_env(path=path)
         ctx.obj = app_env.app
