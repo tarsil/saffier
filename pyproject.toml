@@ -140,6 +140,7 @@ known_third_party = ["esmerald", "pydantic", "starlette"]
 [tool.mypy]
 strict = true
 disallow_any_generics = false
+disallow_untyped_decorators = true
 implicit_reexport = true
 
 [tool.ruff]
