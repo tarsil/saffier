@@ -251,11 +251,11 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         group_col = self.table.columns[group_by]
         return group_col
 
-    def _prepare_fields_for_distinct(self, distinct_on: str):
+    def _prepare_fields_for_distinct(self, distinct_on: str) -> typing.Any:
         distinct_on = self.table.columns[distinct_on]
         return distinct_on
 
-    def _clone(self) -> "QuerySet[SaffierModel]":
+    def _clone(self) -> typing.Any:
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -291,11 +291,11 @@ class QuerySet(BaseQuerySet):
         return str(self._expression)
 
     @sql.setter
-    def sql(self, value) -> None:
+    def sql(self, value: typing.Any) -> None:
         self._expression = value
 
     async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
-        for value in await self:
+        for value in await self:  # type: ignore
             yield value
 
     def _set_query_expression(self, expression: typing.Any) -> None:
@@ -310,7 +310,7 @@ class QuerySet(BaseQuerySet):
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         exclude: bool = False,
         **kwargs: typing.Any,
-    ) -> "QuerySet":
+    ) -> typing.Any:
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
@@ -327,7 +327,7 @@ class QuerySet(BaseQuerySet):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
-    ) -> "QuerySet":
+    ) -> typing.Any:
         """
         Filters the QuerySet by the given kwargs and clause.
         """
@@ -337,13 +337,13 @@ class QuerySet(BaseQuerySet):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
-    ) -> "QuerySet":
+    ) -> typing.Any:
         """
         Exactly the same as the filter but for the exclude.
         """
         return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
-    def lookup(self, term: typing.Any) -> "QuerySet":
+    def lookup(self, term: typing.Any) -> typing.Any:
         """
         Broader way of searching for a given term
         """
@@ -368,7 +368,7 @@ class QuerySet(BaseQuerySet):
 
         return queryset
 
-    def order_by(self, *order_by: str) -> "QuerySet":
+    def order_by(self, *order_by: str) -> typing.Any:
         """
         Returns a QuerySet ordered by the given fields.
         """
@@ -376,7 +376,7 @@ class QuerySet(BaseQuerySet):
         queryset._order_by = order_by
         return queryset
 
-    def limit(self, limit_count: int) -> "QuerySet":
+    def limit(self, limit_count: int) -> typing.Any:
         """
         Returns a QuerySet limited by.
         """
@@ -384,7 +384,7 @@ class QuerySet(BaseQuerySet):
         queryset.limit_count = limit_count
         return queryset
 
-    def offset(self, offset: int) -> "QuerySet":
+    def offset(self, offset: int) -> typing.Any:
         """
         Returns a Queryset limited by the offset.
         """
@@ -392,7 +392,7 @@ class QuerySet(BaseQuerySet):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str) -> "QuerySet":
+    def group_by(self, *group_by: str) -> typing.Any:
         """
         Returns the values grouped by the given fields.
         """
@@ -400,7 +400,7 @@ class QuerySet(BaseQuerySet):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str) -> "QuerySet":
+    def distinct(self, *distinct_on: str) -> typing.Any:
         """
         Returns a queryset with distinct results.
         """
@@ -408,7 +408,7 @@ class QuerySet(BaseQuerySet):
         queryset.distinct_on = distinct_on
         return queryset
 
-    def select_related(self, related: typing.Any) -> "QuerySet":
+    def select_related(self, related: typing.Any) -> typing.Any:
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -425,7 +425,7 @@ class QuerySet(BaseQuerySet):
         queryset._select_related = related
         return queryset
 
-    async def exists(self) -> bool:
+    async def exists(self) -> typing.Any:
         """
         Returns a boolean indicating if a record exists or not.
         """
@@ -434,7 +434,7 @@ class QuerySet(BaseQuerySet):
         self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
-    async def count(self) -> int:
+    async def count(self) -> typing.Any:
         """
         Returns an indicating the total records.
         """
@@ -447,7 +447,7 @@ class QuerySet(BaseQuerySet):
         """
         Fetch one object matching the parameters or returns None.
         """
-        queryset = self.filter(**kwargs)
+        queryset: "QuerySet" = self.filter(**kwargs)
         expression = queryset._build_select().limit(2)
         self._set_query_expression(expression)
         rows = await self.database.fetch_all(expression)
@@ -641,7 +641,7 @@ class QuerySet(BaseQuerySet):
             instance = await self.create(**kwargs)
             return instance, True
 
-    async def _execute(self) -> typing.List[SaffierModel]:
+    async def _execute(self) -> typing.Any:
         return await self.all()
 
     def __await__(
