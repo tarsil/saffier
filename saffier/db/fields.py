@@ -8,7 +8,6 @@ from saffier.core.base import ValidationResult
 from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.core.unique import Uniqueness
 from saffier.exceptions import ValidationError
-from saffier.types import DictAny
 
 FORMATS = {
     "date": formats.DateFormat(),
@@ -101,12 +100,12 @@ class String(SaffierField):
         *,
         blank: bool = False,
         trim_whitespace: bool = False,
-        max_length: int = None,
-        min_length: int = None,
-        pattern: typing.Union[str, typing.Pattern] = None,
-        format: str = None,
+        max_length: typing.Optional[int] = None,
+        min_length: typing.Optional[int] = None,
+        pattern: typing.Optional[typing.Union[str, typing.Pattern]] = None,
+        format: typing.Optional[str] = None,
         coerse_types: bool = True,
-        **kwargs: DictAny,
+        **kwargs: typing.Any,
     ):
         assert min_length is None or isinstance(min_length, int)
         assert max_length is None or isinstance(max_length, int)
@@ -190,14 +189,14 @@ class Number(SaffierField):
     def __init__(
         self,
         *,
-        minimum: typing.Union[int, float, decimal.Decimal] = None,
-        maximum: typing.Union[int, float, decimal.Decimal] = None,
-        exclusive_minimum: typing.Union[int, float, decimal.Decimal] = None,
-        exclusive_maximum: typing.Union[int, float, decimal.Decimal] = None,
-        precision: str = None,
-        multiple_of: typing.Union[int, float, decimal.Decimal] = None,
+        minimum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
+        maximum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
+        exclusive_minimum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
+        exclusive_maximum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
+        precision: typing.Optional[str] = None,
+        multiple_of: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
         coerce_types: bool = True,
-        **kwargs: DictAny,
+        **kwargs: typing.Any,
     ) -> None:
         super().__init__(**kwargs)
         assert minimum is None or isinstance(minimum, (int, float, decimal.Decimal))
@@ -302,7 +301,7 @@ class Boolean(SaffierField):
     }
     coerce_null_values = {"", "null", "none"}
 
-    def __init__(self, *, coerce_types: bool = True, **kwargs: DictAny) -> None:
+    def __init__(self, *, coerce_types: bool = True, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)
         self.coerce_types = coerce_types
 
@@ -336,9 +335,11 @@ class Choice(SaffierField):
     def __init__(
         self,
         *,
-        choices: typing.Sequence[typing.Union[str, typing.Tuple[str, str]]] = None,
+        choices: typing.Optional[
+            typing.Sequence[typing.Union[str, typing.Tuple[str, str]]]
+        ] = None,
         coerce_types: bool = True,
-        **kwargs: DictAny,
+        **kwargs: typing.Any,
     ) -> None:
         super().__init__(**kwargs)
         self.choices = [
@@ -388,11 +389,11 @@ class Union(SaffierField):
         "union": "Did not match any valid type.",
     }
 
-    def __init__(self, any_of: typing.List[SaffierField], **kwargs: DictAny):
+    def __init__(self, any_of: typing.List[SaffierField], **kwargs: typing.Any):
         super().__init__(**kwargs)
 
         self.any_of = any_of
-        if any([child.allow_null for child in any_of]):
+        if any([child.null for child in any_of]):
             self.allow_null = True
 
     def check(self, value: typing.Any) -> typing.Any:

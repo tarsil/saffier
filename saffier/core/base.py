@@ -1,8 +1,6 @@
 import typing
 from collections.abc import Mapping
-from typing import Any, Generator, List, Optional
-
-from pydantic import ValidationError
+from typing import Any, Generator, List, Optional, TypeVar
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel as SaffierBaseModel
 from saffier.types import DictAny
@@ -89,33 +87,6 @@ class Message(SaffierBaseModel):
         return f"{class_name}(text={self.text!r}," f" code={self.code!r}{index_str}{position_str})"
 
 
-class ValidationResult(SaffierBaseModel):
-    def __init__(
-        self,
-        *,
-        value: Optional[Any] = None,
-        error: Optional[ValidationError] = None,
-        **kwargs: DictAny,
-    ) -> None:
-        super().__init__(**kwargs)
-        assert value is None or error is None
-        self.value = value
-        self.error = error
-
-    def __iter__(self) -> Generator:
-        yield self.value
-        yield self.error
-
-    def __bool__(self) -> bool:
-        return self.error is None
-
-    def __repr__(self) -> str:
-        class_name = self.__class__.__name__
-        if self.error is not None:
-            return f"{class_name}(error={self.error!r})"
-        return f"{class_name}(value={self.value!r})"
-
-
 class BaseError(Mapping, Exception):
     def __init__(
         self,
@@ -127,11 +98,9 @@ class BaseError(Mapping, Exception):
         messages: Optional[typing.List[Message]] = None,
     ):
         if messages is None:
-            # Instantiated as a ValidationError with a single error message.
             assert text is not None
             messages = [Message(text=text, code=code, key=key, position=position)]
         else:
-            # Instantiated as a ValidationError with multiple error messages.
             assert text is None
             assert code is None
             assert key is None
@@ -178,7 +147,9 @@ class BaseError(Mapping, Exception):
         return self._message_dict[key]
 
     def __eq__(self, other: typing.Any) -> bool:
-        return bool(isinstance(other, ValidationError) and self._messages == other._messages)  # type: ignore
+        from saffier.exceptions import ValidationError
+
+        return bool(isinstance(other, ValidationError) and self._messages == other._messages)
 
     def __hash__(self) -> int:
         ident = tuple(hash(m) for m in self._messages)
@@ -195,3 +166,33 @@ class BaseError(Mapping, Exception):
         if len(self._messages) == 1 and not self._messages[0].index:
             return self._messages[0].text
         return str(dict(self))
+
+
+BaseErrorType = TypeVar("BaseErrorType", bound=BaseError)
+
+
+class ValidationResult(SaffierBaseModel):
+    def __init__(
+        self,
+        *,
+        value: Optional[Any] = None,
+        error: Optional[BaseErrorType] = None,
+        **kwargs: DictAny,
+    ) -> None:
+        super().__init__(**kwargs)
+        assert value is None or error is None
+        self.value = value
+        self.error = error
+
+    def __iter__(self) -> Generator:
+        yield self.value
+        yield self.error
+
+    def __bool__(self) -> bool:
+        return self.error is None
+
+    def __repr__(self) -> str:
+        class_name = self.__class__.__name__
+        if self.error is not None:
+            return f"{class_name}(error={self.error!r})"
+        return f"{class_name}(value={self.value!r})"
