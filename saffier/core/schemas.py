@@ -5,7 +5,6 @@ from pydantic.fields import Undefined
 from saffier.core.base import Message
 from saffier.db.fields import SaffierField
 from saffier.exceptions import ValidationError
-from saffier.types import DictAny
 
 
 class Schema(SaffierField):
@@ -17,19 +16,19 @@ class Schema(SaffierField):
     }
 
     def __init__(
-        self, default: Any = Undefined, *, fields: Dict[str, Type[SaffierField]], **kwargs: DictAny
-    ) -> Any:
+        self, default: Any = Undefined, *, fields: Dict[str, Type[SaffierField]], **kwargs: Any
+    ) -> None:
         super().__init__(default=default, **kwargs)
         self.fields = fields
         self.required = [
-            key for key, field in fields.items() if not (field.read_only or field.has_default())
+            key for key, field in fields.items() if not (field.read_only or field.has_default())  # type: ignore
         ]
 
     def check(self, value: Any) -> Any:
         """
         General function used for validation of the generated schema.
         """
-        if value is None and self.allow_null:
+        if value is None and self.null:
             return None
         elif value is None:
             raise self.validation_error("null")
@@ -56,12 +55,12 @@ class Schema(SaffierField):
                 continue
 
             if key not in value:
-                if child_schema.has_default():
-                    validated[key] = child_schema.get_default_value()
+                if child_schema.has_default():  # type: ignore
+                    validated[key] = child_schema.get_default_value()  # type: ignore
                 continue
 
             item = value[key]
-            child_value, error = child_schema.validate_or_error(item)
+            child_value, error = child_schema.validate_or_error(value=item)  # type: ignore
             if not error:
                 validated[key] = child_value
             else:
