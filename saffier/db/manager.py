@@ -1,3 +1,5 @@
+from typing import Any
+
 from saffier.db.queryset import QuerySet
 
 
@@ -26,7 +28,7 @@ class Manager:
             ...
     """
 
-    def __init__(self, model_class=None):
+    def __init__(self, model_class: Any = None):
         self.model_class = model_class
 
     def get_queryset(self) -> "QuerySet":
@@ -35,7 +37,7 @@ class Manager:
         """
         return QuerySet(self.model_class)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: Any) -> Any:
         """
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
