@@ -21,15 +21,15 @@ jobs:
 
     services:
       mysql:
-          image: mysql:5.7
-          env:
-            MYSQL_USER: mysql
-            MYSQL_PASSWORD: mysql
-            MYSQL_ROOT_PASSWORD: mysql
-            MYSQL_DATABASE: saffier
-          ports:
-            - 3306:3306
-          options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        image: mysql:5.7
+        env:
+          MYSQL_USER: mysql
+          MYSQL_PASSWORD: mysql
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: saffier
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
       postgres:
         image: postgres:10.8
@@ -58,6 +58,8 @@ jobs:
       - name: "Install dependencies"
         if: steps.cache.outputs.cache-hit != 'true'
         run: "scripts/install"
+      - name: "Run lint checks"
+        run: "scripts/check"
       - name: "Run tests"
         run: "scripts/test"
       - name: "Run tests with PostgreSQL"
