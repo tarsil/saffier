@@ -10,6 +10,3 @@ class Empty:
     """
     A placeholder class object.
     """
-
-
-HashableType = Union[int, bool, str, float, list, dict]

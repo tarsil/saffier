@@ -1,6 +1,6 @@
 import typing
 from collections.abc import Mapping
-from typing import Any, Iterator, List, Union
+from typing import Any, Generator, Iterator, List, Optional
 
 from pydantic import ValidationError
 
@@ -36,12 +36,12 @@ class Message(SaffierBaseModel):
         self,
         *,
         text: str,
-        code: str = None,
-        key: Union[int, str] = None,
-        index: List[Union[int, str]] = None,
-        position: Position = None,
-        start_position: Position = None,
-        end_position: Position = None,
+        code: Optional[str] = None,
+        key: Optional[typing.Union[int, str]] = None,
+        index: Optional[List[typing.Union[int, str]]] = None,
+        position: Optional[Position] = None,
+        start_position: Optional[Position] = None,
+        end_position: Optional[Position] = None,
         **kwargs: DictAny,
     ):
         super().__init__(**kwargs)
@@ -91,14 +91,18 @@ class Message(SaffierBaseModel):
 
 class ValidationResult(SaffierBaseModel):
     def __init__(
-        self, *, value: Any = None, error: ValidationError = None, **kwargs: DictAny
+        self,
+        *,
+        value: Optional[Any] = None,
+        error: Optional[ValidationError] = None,
+        **kwargs: DictAny,
     ) -> None:
         super().__init__(**kwargs)
         assert value is None or error is None
         self.value = value
         self.error = error
 
-    def __iter__(self) -> Iterator:
+    def __iter__(self) -> Generator:
         yield self.value
         yield self.error
 
@@ -116,11 +120,11 @@ class BaseError(Mapping, Exception):
     def __init__(
         self,
         *,
-        text: str = None,
-        code: str = None,
-        key: typing.Union[int, str] = None,
-        position: Position = None,
-        messages: typing.List[Message] = None,
+        text: Optional[str] = None,
+        code: Optional[str] = None,
+        key: Optional[typing.Union[int, str]] = None,
+        position: Optional[Position] = None,
+        messages: Optional[typing.List[Message]] = None,
     ):
         if messages is None:
             # Instantiated as a ValidationError with a single error message.
@@ -145,7 +149,7 @@ class BaseError(Mapping, Exception):
             insert_key = message.index[-1] if message.index else ""
             insert_into[insert_key] = message.text
 
-    def messages(self, *, prefix: typing.Union[str, int] = None) -> typing.List[Message]:
+    def messages(self, *, prefix: Optional[typing.Union[str, int]] = None) -> typing.List[Message]:
         """
         Return a list of all the messages.
 
@@ -174,7 +178,7 @@ class BaseError(Mapping, Exception):
         return self._message_dict[key]
 
     def __eq__(self, other: typing.Any) -> bool:
-        return isinstance(other, ValidationError) and self._messages == other._messages
+        return bool(isinstance(other, ValidationError) and self._messages == other._messages)  # type: ignore
 
     def __hash__(self) -> int:
         ident = tuple(hash(m) for m in self._messages)

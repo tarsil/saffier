@@ -36,7 +36,7 @@ class MigrationEnv:
     app: typing.Optional[typing.Any] = None
 
     def load_from_env(
-        self, path: typing.Optional[str], enable_logging: bool = True
+        self, path: typing.Optional[str] = None, enable_logging: bool = True
     ) -> "MigrationEnv":
         """
         Loads the environment variables into the scaffold.
@@ -58,7 +58,7 @@ class MigrationEnv:
 
         return MigrationEnv(path=_app.path, app=_app.app)
 
-    def import_app_from_string(cls, path: str):
+    def import_app_from_string(cls, path: typing.Optional[str] = None) -> Scaffold:
         if path is None:
             raise EnvironmentError(
                 detail="Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
@@ -68,7 +68,7 @@ class MigrationEnv:
         app = getattr(module, app_name)
         return Scaffold(path=path, app=app)
 
-    def find_app(self, path: str, enable_logging: bool = True) -> Scaffold:
+    def find_app(self, path: typing.Optional[str], enable_logging: bool = True) -> Scaffold:
         """
         Loads the application based on the path provided via env var.
         """

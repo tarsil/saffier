@@ -139,6 +139,8 @@ known_third_party = ["esmerald", "pydantic", "starlette"]
 
 [tool.mypy]
 strict = true
+disallow_any_generics = false
+implicit_reexport = true
 
 [tool.ruff]
 select = [
@@ -158,6 +160,10 @@ ignore = [
 module = "saffier.tests.*"
 ignore_missing_imports = true
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["sqlalchemy.*", "asyncpg", "alembic"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = ["--strict-config", "--strict-markers"]

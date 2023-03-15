@@ -1,6 +1,6 @@
 import typing
 
-from saffier.types import Empty, HashableType
+from saffier.types import Empty
 
 
 class Uniqueness:
@@ -8,7 +8,7 @@ class Uniqueness:
     FALSE = Empty()
     HASHABLE_TYPES = (int, bool, str, float, list, dict)
 
-    def __init__(self, items: list = None) -> None:
+    def __init__(self, items: typing.Optional[typing.List[typing.Any]] = None) -> None:
         self._set: set = set()
         for item in items or []:
             self.add(item)
@@ -25,7 +25,7 @@ class Uniqueness:
         """
         Coerce a primitive into a uniquely hashable type, for uniqueness checks.
         """
-        assert (element is None) or isinstance(element, HashableType)
+        assert (element is None) or isinstance(element, (int, bool, str, float, list, dict))
 
         if element is True:
             return self.TRUE

@@ -43,16 +43,19 @@ class Database(EncodeDatabase):
             url is not None and config is None
         ), "Use either 'url' or 'config', not both."
 
+        _url: Optional[Union[str, "DatabaseURL"]] = None
         if not config:
             _url = url
         else:
             _url = self._build_url(config)
-        super().__init__(url=_url, force_rollback=force_rollback, **options)
+        super().__init__(url=_url, force_rollback=force_rollback, **options)  # type: ignore
 
     @property
-    def allowed_url_schemes(self):
+    def allowed_url_schemes(self) -> typing.Set[str]:
         schemes = {
-            value for value in self.SUPPORTED_BACKENDS.keys() if value != self.DIRECT_URL_SCHEME
+            value
+            for value in self.SUPPORTED_BACKENDS.keys()
+            if value not in self.DIRECT_URL_SCHEME
         }
         return schemes
 

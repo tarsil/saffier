@@ -3,6 +3,8 @@ import typing
 from pydantic import root_validator
 from pydantic.dataclasses import dataclass
 
+from saffier.types import DictAny
+
 
 @dataclass
 class Index:
@@ -16,7 +18,7 @@ class Index:
     fields: typing.Optional[typing.List[str]] = None
 
     @root_validator
-    def validate_data(cls, values):
+    def validate_data(cls, values) -> typing.Any:  # type: ignore
         name = values.get("name")
 
         if name is not None and len(name) > cls.max_name_length:

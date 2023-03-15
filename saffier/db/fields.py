@@ -28,7 +28,7 @@ class SaffierField(ArbitraryHashableBaseModel):
     The base of all fields used by Saffier
     """
 
-    error_messages = {}
+    error_messages: DictAny = {}
 
     def __init__(
         self,

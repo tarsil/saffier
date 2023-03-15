@@ -130,7 +130,7 @@ class DateTimeFormat(BaseFormat):
 
         kwargs = {k: int(v) for k, v in groups.items() if v is not None}
         try:
-            return datetime.datetime(**kwargs, tzinfo=tzinfo)  # type: ignore
+            return datetime.datetime(**kwargs, tzinfo=tzinfo)
         except ValueError:
             raise self.validation_error("invalid")  # noqa
 
