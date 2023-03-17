@@ -3,7 +3,7 @@ __version__ = "0.3.0"
 from .core.registry import Registry
 from .db.connection import Database
 from .db.constants import CASCADE, RESTRICT, SET_NULL
-from .db.datastructures import Index
+from .db.datastructures import Index, UniqueConstraint
 from .db.manager import Manager
 from .db.queryset import QuerySet
 from .exceptions import DoesNotFound, MultipleObjectsReturned
@@ -61,6 +61,7 @@ __all__ = [
     "SET_NULL",
     "TextField",
     "TimeField",
+    "UniqueConstraint",
     "URLField",
     "UUIDField",
 ]

@@ -298,6 +298,7 @@ The `unique_together` expects one of the following:
 * **List of tuple of strings**.
 * **List of tuples of strings**.
 * **List of tuples of strings as well as strings**
+* **A List of UniqueConstraint instances**.
 
 If none of these values are provided, it will raise a `ValueError`.
 
@@ -360,6 +361,21 @@ This will make sure that `is_active` is also unique
 (although in general, for this case would not make too much sense).
 
 For this we used a **list of tuples of strings as well as strings**.
+
+##### When you use UniqueConstraint instances
+
+This is another clean way of adding the unique together constrainst. This can be used also with
+the other ways of adding unique together shown in the above examples.
+
+```python hl_lines="2 17-22"
+{!> ../docs_src/models/unique_together/constraints/complex.py !}
+```
+
+**Or mixing both**
+
+```python hl_lines="2 17-22"
+{!> ../docs_src/models/unique_together/constraints/mixing.py !}
+```
 
 ### Indexes
 
