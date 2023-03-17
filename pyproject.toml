@@ -127,15 +127,13 @@ all = [
     "pydantic>=1.10.4,<2.0.0",
 ]
 
-# [project.scripts]
-# saffier-migrate = "esmerald.core.management:run_from_command_line"
-
 [tool.hatch.version]
 path = "saffier/__init__.py"
 
 [tool.isort]
 profile = "black"
 known_third_party = ["esmerald", "pydantic", "starlette"]
+src_paths = ["saffier"]
 
 [tool.mypy]
 strict = true

@@ -4,7 +4,6 @@ import typing
 from typing import TYPE_CHECKING
 
 import sqlalchemy
-
 from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
 from saffier.db.datastructures import Index

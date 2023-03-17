@@ -1,9 +1,9 @@
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Database
 from saffier.exceptions import DoesNotFound
-from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)

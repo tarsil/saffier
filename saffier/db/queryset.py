@@ -2,7 +2,6 @@ import copy
 import typing
 
 import sqlalchemy
-
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.constants import FILTER_OPERATORS

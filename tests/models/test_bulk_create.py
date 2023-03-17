@@ -2,10 +2,10 @@ import datetime
 from enum import Enum
 
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Database, fields
-from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
