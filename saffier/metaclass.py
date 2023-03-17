@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy
 from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
-from saffier.db.datastructures import Index
+from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
@@ -240,9 +240,9 @@ class BaseModelMeta(type):
                 )
             else:
                 for value in unique_together:
-                    if not isinstance(value, (str, tuple)):
+                    if not isinstance(value, (str, tuple, UniqueConstraint)):
                         raise ValueError(
-                            "The values inside the unique_together must be a string or a tuple of strings."
+                            "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
                         )
 
         # Handle indexes

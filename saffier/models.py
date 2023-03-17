@@ -3,7 +3,7 @@ import typing
 import sqlalchemy
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.datastructures import Index
+from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.metaclass import MetaInfo, ModelMeta
 
@@ -108,10 +108,12 @@ class Model(ModelMeta, ModelUtil):
         """
         Returns the unique constraints for the model.
 
-        The columns must be a a list or tuple of strings.
+        The columns must be a a list, tuple of strings or a UniqueConstraint object.
         """
         if isinstance(columns, str):
             return sqlalchemy.UniqueConstraint(columns)
+        elif isinstance(columns, UniqueConstraint):
+            return sqlalchemy.UniqueConstraint(*columns.fields)
         return sqlalchemy.UniqueConstraint(*columns)
 
     @property
