@@ -13,7 +13,7 @@ class User(saffier.Model):
 
     class Meta:
         registry = models
-        unique_together = [
+        indexes = [
             Index(fields=["name", "email"]),
             Index(fields=["is_active", "statux"], name="active_status_idx"),
         ]
