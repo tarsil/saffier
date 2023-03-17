@@ -1,7 +1,6 @@
 import typing
 
 import sqlalchemy
-
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.datastructures import Index

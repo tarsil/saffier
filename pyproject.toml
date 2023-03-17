@@ -136,6 +136,7 @@ path = "saffier/__init__.py"
 [tool.isort]
 profile = "black"
 known_third_party = ["esmerald", "pydantic", "starlette"]
+src_paths = ["saffier"]
 
 [tool.mypy]
 strict = true

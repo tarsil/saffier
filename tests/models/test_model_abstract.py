@@ -1,8 +1,8 @@
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Database, Registry
-from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = Registry(database=database)

@@ -1,7 +1,7 @@
 from esmerald import Request, post
-from models import Profile, User
 from pydantic import BaseModel, EmailStr
 
+from models import Profile, User
 from saffier import Database, Registry
 
 # These settings should be placed somewhere

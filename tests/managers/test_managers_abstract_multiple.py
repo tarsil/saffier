@@ -1,10 +1,10 @@
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Database, Manager
 from saffier.db.queryset import QuerySet
 from saffier.exceptions import ImproperlyConfigured
-from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)

@@ -6,12 +6,12 @@ from logging.config import fileConfig
 
 from alembic import context
 from rich.console import Console
-from sqlalchemy.ext.asyncio import create_async_engine
+from tests.settings import TEST_DATABASE
 
 from saffier.exceptions import SaffierException
 from saffier.migrations.constants import APP_PARAMETER
 from saffier.migrations.env import MigrationEnv
-from tests.settings import TEST_DATABASE
+from sqlalchemy.ext.asyncio import create_async_engine
 
 # The console used for the outputs
 console = Console()

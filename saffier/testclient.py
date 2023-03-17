@@ -3,14 +3,14 @@ import os
 import typing
 from typing import Any
 
-import sqlalchemy as sa
 from databases import DatabaseURL
-from sqlalchemy.exc import OperationalError, ProgrammingError
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy_utils.functions.database import _set_url_database, _sqlite_file_exists, make_url
 from sqlalchemy_utils.functions.orm import quote
 
+import sqlalchemy as sa
 from saffier import Database
+from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.ext.asyncio import create_async_engine
 
 
 async def _get_scalar_result(engine: typing.Any, sql: typing.Any) -> Any:

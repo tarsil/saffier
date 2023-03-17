@@ -1,12 +1,11 @@
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.ext.asyncio.engine import AsyncEngine
-
 from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.db.connection import Database
 from saffier.types import DictAny
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio.engine import AsyncEngine
 
 
 class Registry(ArbitraryHashableBaseModel):
