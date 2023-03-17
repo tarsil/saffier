@@ -112,7 +112,7 @@ async def test_value_error_for_unique_together(value):
 
     assert (
         raised.value.args[0]
-        == "The values inside the unique_together must be a string or a tuple of strings."
+        == "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
     )
 
 

@@ -34,3 +34,23 @@ class Index:
             values["name"] = f"{'_'.join(fields)}_{suffix}"
 
         return values
+
+
+@dataclass
+class UniqueConstraint:
+    """
+    Class responsible for handling and declaring the database unique_together.
+    """
+
+    fields: typing.List[str]
+
+    @root_validator
+    def validate_data(cls, values) -> typing.Any:  # type: ignore
+        fields = values.get("fields")
+        if not isinstance(fields, (tuple, list)):
+            raise ValueError("UniqueConstraint.fields must be a list or a tuple.")
+
+        if fields and not all(isinstance(field, str) for field in fields):
+            raise ValueError("UniqueConstraint.fields must contain only strings with field names.")
+
+        return values

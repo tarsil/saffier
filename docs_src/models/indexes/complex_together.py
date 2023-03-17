@@ -15,5 +15,5 @@ class User(saffier.Model):
         registry = models
         indexes = [
             Index(fields=["name", "email"]),
-            Index(fields=["is_active", "statux"], name="active_status_idx"),
+            Index(fields=["is_active", "status"], name="active_status_idx"),
         ]
