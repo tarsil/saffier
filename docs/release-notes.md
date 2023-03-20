@@ -1,5 +1,17 @@
 # Release Notes
 
+## 0.4.0
+
+### Changed
+
+- Fixed mypy typing in the codebase [#26](https://github.com/tarsil/saffier/pull/26)
+- Updated pyproject.toml requirements [#26](https://github.com/tarsil/saffier/pull/26)
+
+### Added
+
+- UniqueConstraint object for the unique_together [#29](https://github.com/tarsil/saffier/pull/29)
+- UniqueConstraint documentation  [#29](https://github.com/tarsil/saffier/pull/29)
+
 ## 0.3.0
 
 ### Added
