@@ -243,7 +243,7 @@ You can update model instances by calling this operator.
 
 
 ```python
-await User.query.filter(email="foo@bar.com").upadte(email="bar@foo.com")
+await User.query.filter(email="foo@bar.com").update(email="bar@foo.com")
 ```
 
 Or directly in the instance.
