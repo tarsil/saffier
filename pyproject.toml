@@ -45,7 +45,7 @@ dependencies = [
     "orjson >=3.8.5,<4.0.0",
     "pydantic>=1.10.5,<2.0.0",
     "rich>=13.3.1,<14.0.0",
-    "sqlalchemy==1.4.46",
+    "sqlalchemy==2.0.8",
     "toml>=0.10.2,<0.20.0",
 ]
 keywords = [
