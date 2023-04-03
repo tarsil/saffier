@@ -1,5 +1,21 @@
 # Release Notes
 
+## 0.5.0
+
+### Changed
+
+- Updated requirements to support Esmerald >= 1.1.0 for testing.
+- Updated testing and docs requirements.
+
+### Added
+
+- Metaclass option to support database tables reflection. Allowing reading tables from existing database. [35](https://github.com/tarsil/saffier/pull/35)
+- Documentation regarding the reflection of tables. [#37](https://github.com/tarsil/saffier/pull/37)
+
+### Fixed
+
+- Typos in documentation
+
 ## 0.4.0
 
 ### Changed
