@@ -6,7 +6,7 @@ if [ "$VIRTUAL_ENV" != '' ]; then
 elif [ -d 'venv' ] ; then
     export PREFIX="venv/bin/"
 fi
-export SOURCE_FILES="saffier tests docs_src"
+export SOURCE_FILES="saffier tests"
 export EXCLUDE=__init__.py
 export MAIN="saffier"
 

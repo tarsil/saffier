@@ -21,6 +21,7 @@ class Registry(ArbitraryHashableBaseModel):
         super().__init__(**kwargs)
         self.database = database
         self.models: DictAny = {}
+        self.views: DictAny = {}
         self._metadata = sqlalchemy.MetaData()
 
     @property
@@ -45,20 +46,20 @@ class Registry(ArbitraryHashableBaseModel):
         engine = create_async_engine(url)
         return engine
 
-    async def create_all(self) -> None:
-        engine = self._get_engine()
+    @property
+    def engine(self):  # type: ignore
+        return self._get_engine()
 
+    async def create_all(self) -> None:
         async with self.database:
-            async with engine.begin() as connection:
+            async with self.engine.begin() as connection:
                 await connection.run_sync(self.metadata.create_all)
 
-        await engine.dispose()
+        await self.engine.dispose()
 
     async def drop_all(self) -> None:
-        engine = self._get_engine()
-
         async with self.database:
-            async with engine.begin() as conn:
+            async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)
 
-        await engine.dispose()
+        await self.engine.dispose()

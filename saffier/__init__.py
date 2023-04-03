@@ -29,7 +29,7 @@ from .fields import (
     UUIDField,
 )
 from .migrations import Migrate
-from .models import Model
+from .models import Model, ReflectModel
 
 __all__ = [
     "BigIntegerField",
@@ -57,6 +57,7 @@ __all__ = [
     "PasswordField",
     "QuerySet",
     "RESTRICT",
+    "ReflectModel",
     "Registry",
     "SET_NULL",
     "TextField",

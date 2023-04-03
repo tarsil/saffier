@@ -5,7 +5,8 @@ from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
-from saffier.metaclass import MetaInfo, ModelMeta
+from saffier.exceptions import ImproperlyConfigured
+from saffier.metaclass import MetaInfo, ModelMeta, ReflectMeta
 
 
 class Model(ModelMeta, ModelUtil):
@@ -191,3 +192,26 @@ class Model(ModelMeta, ModelUtil):
             if getattr(self, key, None) != getattr(other, key, None):
                 return False
         return True
+
+
+class ReflectModel(ReflectMeta, Model):
+    """
+    Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
+    call.
+    """
+
+    @classmethod
+    def build_table(cls) -> typing.Any:
+        metadata = cls._meta.registry._metadata  # type: ignore
+        tablename = cls._meta.tablename
+
+        try:
+            return sqlalchemy.Table(
+                tablename,
+                metadata,
+                autoload_with=cls._meta.registry.engine.sync_engine,  # type: ignore
+            )
+        except Exception as e:
+            raise ImproperlyConfigured(
+                detail=f"Table with the name {tablename} does not exist."
+            ) from e

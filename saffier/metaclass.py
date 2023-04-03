@@ -32,6 +32,7 @@ class MetaInfo:
         "pk_attribute",
         "manager",
         "_model",
+        "reflect",
     )
 
     def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
@@ -49,6 +50,7 @@ class MetaInfo:
         self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: typing.Any = getattr(meta, "unique_together", None)
         self.indexes: typing.Any = getattr(meta, "indexes", None)
+        self.reflect: bool = getattr(meta, "reflect", False)
 
 
 def _check_model_inherited_registry(
@@ -301,5 +303,13 @@ class BaseModelMeta(type):
         return cls._table.columns
 
 
+class BaseModelReflectMeta(BaseModelMeta):
+    ...
+
+
 class ModelMeta(metaclass=BaseModelMeta):
+    ...
+
+
+class ReflectMeta(metaclass=BaseModelReflectMeta):
     ...
