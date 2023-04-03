@@ -6,6 +6,9 @@ with SQLAlchemy where sometimes it can also be combersome?
 What about the Django interface type for tables? Cleaner right? Well, **Saffier** although is on
 the top of SQLAlchemy core, it provides a Django like experience when it comes to create models.
 
+Do you already have a database with tables and views you would simply would like to reflect them
+back instead of the opposite? [Check the reflection section](./reflection.md) for more details.
+
 ## What is a model
 
 A model in Saffier is a python class with attributes that represents a database table.

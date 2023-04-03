@@ -304,7 +304,21 @@ class BaseModelMeta(type):
 
 
 class BaseModelReflectMeta(BaseModelMeta):
-    ...
+    def __new__(
+        cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: DictAny
+    ) -> typing.Any:
+        new_model = super().__new__(cls, name, bases, attrs)
+
+        registry = new_model._meta.registry
+
+        # Remove the reflected models from the registry
+        if registry:
+            try:
+                registry.models.pop(new_model.__name__)
+            except KeyError:
+                ...
+
+        return new_model
 
 
 class ModelMeta(metaclass=BaseModelMeta):
