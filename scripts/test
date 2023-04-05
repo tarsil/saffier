@@ -9,8 +9,8 @@ fi
 
 set -ex
 
-if [ -z $GITHUB_ACTIONS ]; then
-    scripts/check
-fi
+# if [ -z $GITHUB_ACTIONS ]; then
+#     scripts/check
+# fi
 
 ${PREFIX}coverage run -m pytest $@

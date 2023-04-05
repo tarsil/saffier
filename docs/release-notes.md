@@ -1,5 +1,20 @@
 # Release Notes
 
+## 0.6.0
+
+### Added
+
+- Support for SQLAlchemy 2.
+
+### Changed
+
+- Moved from `databases` to its fork `databasez` and updated internal references.
+- `DatabaseClient` is now being directly used from [Databasez test client](https://databasez.tarsild.io/test-client/).
+
+### Fixed
+
+- Updated requirements.
+
 ## 0.5.0
 
 ### Changed

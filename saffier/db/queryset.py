@@ -125,7 +125,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         Builds the query select based on the given parameters and filters.
         """
         tables, select_from = self._build_tables_select_from_relationship()
-        expression = sqlalchemy.sql.select(tables)
+        expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
 
         if self.filter_clauses:
