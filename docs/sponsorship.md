@@ -42,11 +42,3 @@ He can afterwards go for a coffee☕, on him, to say thanks🙏.
 You can become a [**Special One**](https://github.com/sponsors/tarsil/sponsorships?sponsor=tarsil&tier_id=230059&preview=false)
 or a [**Legend**](https://github.com/sponsors/tarsil/sponsorships?sponsor=tarsil&tier_id=230042&preview=false)
 sponsor for Saffier.
-
-## ⚙️ Sponsor the tools that made Saffier possible
-
-As you have seen in the documentation, Saffier stands on the shoulders of giants, Starlette and Pydantic.
-
-You can also sponsor:
-
-* <a href="https://github.com/sponsors/samuelcolvin" class="external-link" target="_blank">Samuel Colvin (Pydantic)</a>
