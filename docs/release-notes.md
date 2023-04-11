@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.6.1
+
+### Fixed
+
+- `UUIField` generations with Alembic.
+
 ## 0.6.0
 
 ### Added
