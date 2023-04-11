@@ -17,7 +17,7 @@ from saffier.db.fields import (
 )
 from saffier.db.fields import IPAddress as CoreIPAddress
 from saffier.db.fields import Password, SaffierField, String, Time
-from saffier.sqlalchemy.fields import GUID, IPAddress
+from saffier.sqlalchemy.fields import IPAddress
 
 
 class Field:
@@ -347,8 +347,8 @@ class UUIDField(Field):
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return UUID(**kwargs)
 
-    def get_column_type(self) -> GUID:
-        return GUID()
+    def get_column_type(self) -> sqlalchemy.UUID:
+        return sqlalchemy.UUID()
 
 
 class PasswordField(CharField):
