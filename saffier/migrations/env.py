@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 
-from saffier.exceptions import EnvironmentError
+from saffier.exceptions import CommandEnvironmentError
 from saffier.migrations.constants import (
     DISCOVERY_FILES,
     DISCOVERY_FUNCTIONS,
@@ -63,7 +63,7 @@ class MigrationEnv:
 
     def import_app_from_string(cls, path: typing.Optional[str] = None) -> Scaffold:
         if path is None:
-            raise EnvironmentError(
+            raise CommandEnvironmentError(
                 detail="Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
             )
         module_str_path, app_name = path.split(":")
@@ -138,6 +138,6 @@ class MigrationEnv:
             break
 
         if not scaffold:
-            raise EnvironmentError(detail="Could not find Saffier in any application.")
+            raise CommandEnvironmentError(detail="Could not find Saffier in any application.")
 
         return scaffold

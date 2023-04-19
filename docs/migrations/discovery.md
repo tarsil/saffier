@@ -64,7 +64,7 @@ When no `--app` or no `SAFFIER_DEFAULT_APP` environment variable is provided, Sa
 
     !!! Warning
         **If none of these files are found**, Saffier will look **at the first children nodes, only**,
-        and repeats the same process. If no files are found then throws an `EnvironmentError`
+        and repeats the same process. If no files are found then throws an `CommandEnvironmentError`
         exception.
 
 * Once one of those files is found, Saffier will analised the type of objects contained in the

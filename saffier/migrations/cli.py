@@ -9,7 +9,7 @@ from functools import wraps
 import click
 
 from saffier.core.terminal import Print
-from saffier.exceptions import EnvironmentError  # noqa
+from saffier.exceptions import CommandEnvironmentError
 from saffier.migrations.constants import (
     APP_PARAMETER,
     EXCLUDED_COMMANDS,
@@ -73,7 +73,7 @@ class SaffierGroup(click.Group):
                 migration = MigrationEnv()
                 app_env = migration.load_from_env(path=path)
                 ctx.obj = app_env
-            except OSError as e:
+            except CommandEnvironmentError as e:
                 if not any(value in sys.argv for value in IGNORE_COMMANDS):
                     printer.write_error(str(e))
                     sys.exit(1)
