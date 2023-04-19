@@ -113,7 +113,7 @@ doc = [
 ]
 
 testing = ["sqlalchemy_utils>=0.40.0"]
-postgres = ["postgresql"]
+postgres = ["databasez[postgres]"]
 mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
 
