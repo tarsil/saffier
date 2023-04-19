@@ -1,11 +1,14 @@
 """
 Client to interact with Saffier models and migrations.
 """
+import inspect
 import sys
 import typing
+from functools import wraps
 
 import click
 
+from saffier.core.terminal import Print
 from saffier.migrations.constants import APP_PARAMETER, HELP_PARAMETER
 from saffier.migrations.env import MigrationEnv
 from saffier.migrations.operations import (
@@ -21,12 +24,54 @@ from saffier.migrations.operations import (
     merge,
     migrate,
     revision,
+    shell,
     show,
     stamp,
 )
 
+printer = Print()
 
-@click.group()
+
+class SaffierGroup(click.Group):
+    """Saffier command group with extras for the commands"""
+
+    def add_command(self, cmd: click.Command, name: typing.Optional[str] = None) -> None:
+        if cmd.callback:
+            cmd.callback = self.wrap_args(cmd.callback)
+        return super().add_command(cmd, name)
+
+    def wrap_args(self, func: typing.Any) -> typing.Any:
+        params = inspect.signature(func).parameters
+
+        @wraps(func)
+        def wrapped(ctx: click.Context, /, *args: typing, **kwargs: typing) -> typing:
+            scaffold = ctx.ensure_object(MigrationEnv)
+            if "env" in params:
+                kwargs["env"] = scaffold
+            return func(*args, **kwargs)
+
+        return click.pass_context(wrapped)
+
+    def invoke(self, ctx: click.Context) -> typing.Any:
+        """
+        Migrations can be ignored depending of the functionality from what is being
+        called.
+        """
+        path = ctx.params.get("path", None)
+
+        # Process any settings
+        if HELP_PARAMETER not in sys.argv:
+            try:
+                migration = MigrationEnv()
+                app_env = migration.load_from_env(path=path)
+                ctx.obj = app_env
+            except EnvironmentError as e:
+                printer.write_error(str(e))
+                sys.exit(1)
+        return super().invoke(ctx)
+
+
+@click.group(cls=SaffierGroup)
 @click.option(
     APP_PARAMETER,
     "path",
@@ -35,10 +80,7 @@ from saffier.migrations.operations import (
 @click.pass_context
 def saffier_cli(ctx: click.Context, path: typing.Optional[str]) -> None:
     """Performs database migrations"""
-    if HELP_PARAMETER not in sys.argv:
-        migration = MigrationEnv()
-        app_env = migration.load_from_env(path=path)
-        ctx.obj = app_env.app
+    ...
 
 
 saffier_cli.add_command(list_templates)
@@ -55,3 +97,4 @@ saffier_cli.add_command(heads, name="heads")
 saffier_cli.add_command(current, name="current")
 saffier_cli.add_command(stamp, name="stamp")
 saffier_cli.add_command(check, name="check")
+saffier_cli.add_command(shell, name="shell")

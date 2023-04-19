@@ -1,12 +1,7 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
-from typing import Any
-
 import click
 
 from saffier.migrations.base import stamp as _stamp
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -23,8 +18,7 @@ from saffier.migrations.base import stamp as _stamp
 )
 @click.argument("revision", default="head")
 @click.command()
-@click.pass_context
-def stamp(ctx: Any, directory: str, sql: bool, tag: str, revision: str) -> None:
+def stamp(env: MigrationEnv, directory: str, sql: bool, tag: str, revision: str) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    _stamp(ctx.obj, directory, revision, sql, tag)
+    _stamp(env.app, directory, revision, sql, tag)

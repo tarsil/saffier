@@ -1,12 +1,9 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
 from typing import Any
 
 import click
 
 from saffier.migrations.base import merge as _merge
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -24,9 +21,8 @@ from saffier.migrations.base import merge as _merge
 )
 @click.command()
 @click.argument("revisions", nargs=-1)
-@click.pass_context
 def merge(
-    ctx: Any, directory: str, message: str, branch_label: str, rev_id: str, revisions: Any
+    env: MigrationEnv, directory: str, message: str, branch_label: str, rev_id: str, revisions: Any
 ) -> None:
     """Merge two revisions together, creating a new revision file"""
-    _merge(ctx.obj, directory, revisions, message, branch_label, rev_id)
+    _merge(env.app, directory, revisions, message, branch_label, rev_id)

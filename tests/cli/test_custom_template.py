@@ -61,13 +61,13 @@ def test_alembic_version():
 
 
 def test_migrate_upgrade(create_folders):
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin init -t ./custom")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier init -t ./custom")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin makemigrations")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier makemigrations")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin migrate")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier migrate")
     assert ss == 0
 
     with open("migrations/README", "rt") as f:

@@ -153,7 +153,7 @@ suggestions.
 This will depend heavily on this and **everything works around the registry**.
 
 Saffier has the internal client that manages and handles the migration process for you in a clean
-fashion and it called `saffier-admin`.
+fashion and it called `saffier`.
 
 Remember the initial structure at the top of this document? No worries, let us have a look again.
 
@@ -235,10 +235,10 @@ It is now time to generate the migrations folder. As mentioned before in the
 our `migrations`.
 
 ```shell
-saffier-admin --app myproject.main:app init
+saffier --app myproject.main:app init
 ```
 
-What is happenening here? Well, `saffier-admin` is always expecting an `--app` parameter to be
+What is happenening here? Well, `saffier` is always expecting an `--app` parameter to be
 provided.
 
 This `--app` is the location of your application in `module:app` format and this is because of
@@ -354,7 +354,7 @@ There are many ways of exposing your models of course, so feel free to use any a
 Now it is time to generate the migration.
 
 ```shell
-$ saffier-admin --app my_project.main:app makemigrations
+$ saffier --app my_project.main:app makemigrations
 ```
 
 Yes, it is this simple 😁
@@ -379,7 +379,7 @@ Your new migration should now be inside `migrations/versions/`. Something like t
 Or you can attach a message your migration that will then added to the file name as well.
 
 ```shell
-$ saffier-admin --app my_project.main:app makemigrations -m "Initial migrations"
+$ saffier --app my_project.main:app makemigrations -m "Initial migrations"
 ```
 
 ```shell hl_lines="10"
@@ -404,7 +404,7 @@ Now comes the easiest part where you need to apply the migrations.
 Simply run:
 
 ```shell
-$ saffier-admin --app my_project.main:app migrate
+$ saffier --app my_project.main:app migrate
 ```
 
 And that is about it 🎉🎉
@@ -419,13 +419,13 @@ for any other ORM and when you are happy run the migrations and apply them again
 **Generate new migrations**
 
 ```shell
-$ saffier-admin --app my_project.main:app makemigrations
+$ saffier --app my_project.main:app makemigrations
 ```
 
 **Apply them to your database**
 
 ```shell
-$ saffier-admin --app my_project.main:app migrate
+$ saffier --app my_project.main:app migrate
 ```
 
 ### More migration commands
@@ -438,23 +438,23 @@ via `--help` command.
 To access the available options of saffier:
 
 ```shell
-$ saffier-admin --help
+$ saffier --help
 ```
 
-This will list all the commands available within `saffier-admin`.
+This will list all the commands available within `saffier`.
 
 **What if you need to also know the available options available to each command?**
 
 Let us imagine you want to see the available options for the `merge`
 
 ```shell
-$ saffier-admin merge --help
+$ saffier merge --help
 ```
 
 You should see something like this:
 
 ```shell
-Usage: saffier-admin merge [OPTIONS] [REVISIONS]...
+Usage: saffier merge [OPTIONS] [REVISIONS]...
 
   Merge two revisions together, creating a new revision file
 
@@ -467,12 +467,12 @@ Options:
   --help                Show this message and exit.
 ```
 
-This is applied to any other available command via `saffier-admin`.
+This is applied to any other available command via `saffier`.
 
 ### References
 
 Since Saffier has a very friendly and familiar interface to interact with so does the
-`saffier-admin`.
+`saffier`.
 
 Saffier migrations as mentioned before uses Alembic and therefore the commands are exactly the
 same as the ones for alembic except two, which are masked with different more intuitive names.
