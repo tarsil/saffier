@@ -48,7 +48,9 @@ nav:
   - Connection: "connection.md"
   - Registry: "registry.md"
   - Exceptions: "exceptions.md"
-  - Migrations: "migrations.md"
+  - Migrations:
+      - Discovery: "migrations/discovery.md"
+      - Migrations: "migrations/migrations.md"
   - Tips and Tricks: "tips-and-tricks.md"
   - Test Client: "test-client.md"
   - Saffier People: "saffier-people.md"

@@ -9,7 +9,13 @@ from functools import wraps
 import click
 
 from saffier.core.terminal import Print
-from saffier.migrations.constants import APP_PARAMETER, HELP_PARAMETER
+from saffier.exceptions import EnvironmentError  # noqa
+from saffier.migrations.constants import (
+    APP_PARAMETER,
+    EXCLUDED_COMMANDS,
+    HELP_PARAMETER,
+    IGNORE_COMMANDS,
+)
 from saffier.migrations.env import MigrationEnv
 from saffier.migrations.operations import (
     check,
@@ -60,14 +66,17 @@ class SaffierGroup(click.Group):
         path = ctx.params.get("path", None)
 
         # Process any settings
-        if HELP_PARAMETER not in sys.argv:
+        if HELP_PARAMETER not in sys.argv and not any(
+            value in sys.argv for value in EXCLUDED_COMMANDS
+        ):
             try:
                 migration = MigrationEnv()
                 app_env = migration.load_from_env(path=path)
                 ctx.obj = app_env
-            except EnvironmentError as e:
-                printer.write_error(str(e))
-                sys.exit(1)
+            except OSError as e:
+                if not any(value in sys.argv for value in IGNORE_COMMANDS):
+                    printer.write_error(str(e))
+                    sys.exit(1)
         return super().invoke(ctx)
 
 

@@ -35,15 +35,15 @@ repos:
     hooks:
       - id: isort
         name: isort (python)
-        args: ["--project=esmerald", "--line-length=99"]
+        args: ["--project=saffier", "--line-length=99"]
       - id: isort
         name: isort (cython)
         types: [cython]
-        args: ["--project=esmerald", "--line-length=99"]
+        args: ["--project=saffier", "--line-length=99"]
       - id: isort
         name: isort (pyi)
         types: [pyi]
-        args: ["--project=esmerald", "--line-length=99"]
+        args: ["--project=saffier", "--line-length=99"]
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
   autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate

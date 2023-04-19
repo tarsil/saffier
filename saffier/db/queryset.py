@@ -2,6 +2,7 @@ import copy
 import typing
 
 import sqlalchemy
+
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.constants import FILTER_OPERATORS
@@ -578,7 +579,7 @@ class QuerySet(BaseQuerySet):
         pks = [{self.pkname: getattr(obj, self.pkname)} for obj in objs]
 
         query_list = []
-        for pk, value in zip(pks, new_objs):
+        for pk, value in zip(pks, new_objs):  # noqa
             query_list.append({**pk, **value})
 
         expression = expression.values(kwargs)

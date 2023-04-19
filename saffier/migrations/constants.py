@@ -5,3 +5,5 @@ HELP_PARAMETER = "--help"
 DISCOVERY_FILES = ["application.py", "app.py", "main.py"]
 DISCOVERY_FUNCTIONS = ["get_application", "get_app"]
 SAFFIER_DB = "_saffier_db"
+EXCLUDED_COMMANDS = ["list-templates"]
+IGNORE_COMMANDS = ["list-templates"]

@@ -48,10 +48,10 @@ When investigating for a project different types of ORMs and compared them to ea
 for a lot of use cases, SQLAlchemy always took the win but had an issue, the async support
 (which now there are a few solutions). While doing the research I came across Encode ORM.
 
-The team is the same behind of Databases, Django Rest Framework, Starlette, 
+The team is the same behind of Databases, Django Rest Framework, Starlette,
 httpx and a lot more tools used by millions.
 
-There was one issue thou, although ORM was doing a great familiar interface with SQLAlchemy and 
+There was one issue thou, although ORM was doing a great familiar interface with SQLAlchemy and
 providing the async solution needed, it was, by the time of this writting,
 incomplete and they even stated that in the documentation and that is how Saffier was born.
 
@@ -60,7 +60,7 @@ Saffier uses some of the same concepts of ORM from Encode but rewritten in Pydan
 ## Saffier
 
 Saffier is some sort of a fork from [Encode ORM](https://www.encode.io/orm/) but rewritten at its
-core and with a complete set of tools with a familiar interface to work with. 
+core and with a complete set of tools with a familiar interface to work with.
 If you are familiar with Django, then you came for a treat 😄.
 
 This was necessary because the team behind [Encode ORM](https://www.encode.io/orm/) is extremely
@@ -101,12 +101,12 @@ And a lot more you can do here.
 
 ## Migrations
 
-Since **Saffier**, like [Encode ORM](https://www.encode.io/orm/), is built on the top of 
+Since **Saffier**, like [Encode ORM](https://www.encode.io/orm/), is built on the top of
 [SQLAlchemy core](https://docs.sqlalchemy.org/en/20/core/), it brings its own native migration
 system running on the top of [Alembic](https://alembic.sqlalchemy.org/en/latest/) but making it a
 lot easier to use and more pleasant for you.
 
-Have a look at the [migrations](./migrations.md) for more details.
+Have a look at the [migrations](./migrations/migrations.md) for more details.
 
 ## Installation
 
@@ -156,6 +156,6 @@ Do you want to have more complex structures and connect to your favourite framew
 at [connections](./connection.md) to understand how to do it properly.
 
 
-**Exciting!** 
+**Exciting!**
 
 In the documentation we go deeper in explanations and examples, this was just to warm up. 😁

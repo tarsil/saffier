@@ -131,16 +131,21 @@ path = "saffier/__init__.py"
 
 [tool.isort]
 profile = "black"
-known_third_party = ["esmerald", "pydantic", "starlette"]
-src_paths = ["saffier"]
+known_third_party = ["esmerald", "pydantic", "starlette", "saffier"]
 
 [tool.mypy]
+warn_unused_configs = true
+warn_unreachable = true
+warn_return_any = true
 strict = true
-disallow_any_generics = false
 disallow_untyped_decorators = true
-implicit_reexport = true
+disallow_any_generics = false
+implicit_reexport = false
+show_error_codes = true
 disallow_incomplete_defs = true
 disable_error_code = "attr-defined"
+warn_unused_ignores = true
+warn_redundant_casts = true
 
 [tool.ruff]
 select = [

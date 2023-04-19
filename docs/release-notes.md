@@ -53,13 +53,13 @@
 
 ### Added
 
-- Integrated the support for [native migrations](./migrations.md) with Saffier.
-  
+- Integrated the support for [native migrations](./migrations/migrations.md) with Saffier.
+
     * This brings native generated migrations within Saffier under Alembic's package, allowing
 a seemless integration and cross-compatibility with any framework using Saffier.
 
 - Added new [DatabaseTestClient](./test-client.md) delegating the creating of the `test` database
-for each connection string provided. 
+for each connection string provided.
 
     * No more needed to manually create two separate databases thanks to the client that does the
 automatic management for you.
@@ -77,7 +77,7 @@ for functions allowing accesing the model functions from the manager directly.
 ### Added
 
 - New [Index](./models.md#indexes) object allowing the creation of internal SQLAlchemy indexes.
-  
+
 ### Changed
 
 - Updated metaclass to validate the fields being added to `indexes`.

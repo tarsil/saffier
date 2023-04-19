@@ -67,7 +67,7 @@ your appliction by importing the `get_db_connection()` anywhere is needed.
 Let us now assemble everything and generate an application that will have:
 
 * **User model**
-* **Ready to generate** [migrations](./migrations.md)
+* **Ready to generate** [migrations](./migrations/migrations.md)
 * **Starts the database connections**
 
 For this example we will have the following structure (we won't be use using all of the files).
@@ -143,7 +143,7 @@ now what we will be using everywhere.
 ### Prepare the application to allow migrations
 
 Now it is time to tell the application that your models and migrations are managed by Saffier.
-More information on [migrations](./migrations.md) where explains how to use it.
+More information on [migrations](./migrations/migrations.md) where explains how to use it.
 
 
 ```python title="myproject/main.py" hl_lines="9 12 32 38"

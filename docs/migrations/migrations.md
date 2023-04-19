@@ -12,6 +12,15 @@ models and corresponding migrations.
 Heavily inspired by the way Flask-Migration approached the problem, Saffier took it to the next
 level and makes it framework agnostic, which means you can use it **anywhere**.
 
+## Important
+
+Before reading this section, you should get familiar with the ways Saffier handles the discovery
+of the applications.
+
+The following examples and explanations will be using the
+[--app and environment variables](./discovery.md##environment-variables) approach but the
+[auto discovery](./discovery.md#auto-discovery) is equally valid and works in the same way.
+
 ## Structure being used for this document
 
 For the sake of this document examples and explanations we will be using the following structure to
@@ -73,7 +82,7 @@ The parameters availabe when using instantiating a [Migrate](#migration) object 
 * **app** - The application instance. Any application you want your migrations to be attached to.
 * **registry** - The registry being used for your models. The registry **must be** an instance
 of `saffier.Registry` or an `AssertationError` is raised.
-* **compare_type** - Flag option that configures the automatic migration generation subsystem 
+* **compare_type** - Flag option that configures the automatic migration generation subsystem
 to detect column type changes.
 
     <sup>Default: `True`</sup>
@@ -92,14 +101,14 @@ databases.
 ### How to use it
 
 Using the [Migration](#migration) class is very simple in terms of requirements. In the
-[tips and tricks](./tips-and-tricks.md) you can see some examples in terms of using the
-[LRU cache technique](./tips-and-tricks.md#the-lru-cache). If you haven't seen it,
+[tips and tricks](../tips-and-tricks.md) you can see some examples in terms of using the
+[LRU cache technique](../tips-and-tricks.md#the-lru-cache). If you haven't seen it,
 it is recommended you to have a look.
 
 For this examples, we will be using the same approach.
 
 Assuming you have a `utils.py` where you place your information about the database and
-[registry](./registry.md).
+[registry](../registry.md).
 
 Something like this:
 
@@ -202,7 +211,7 @@ migrations.
 
     You can generate the migrations **anywhere** in your codebase but you need to be careful about the
     paths and all of the internal dependencies. It is recommended to have them at the root of your
-    project, but again, up to you. 
+    project, but again, up to you.
 
 Assuming you have your application inside that `my_project/main.py` the next steps will follow
 that same principle.
@@ -242,7 +251,7 @@ What is happenening here? Well, `saffier` is always expecting an `--app` paramet
 provided.
 
 This `--app` is the location of your application in `module:app` format and this is because of
-the fact of being **framework agnostic**. 
+the fact of being **framework agnostic**.
 
 Saffier needs to know where your application object is located in order to hook it to that same
 application.
