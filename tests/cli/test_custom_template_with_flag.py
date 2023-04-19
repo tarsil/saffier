@@ -50,14 +50,20 @@ def test_alembic_version():
         assert isinstance(v, int)
 
 
-def test_migrate_upgrade(create_folders):
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier init -t ./custom")
+def test_migrate_upgrade_with_app_flag(create_folders):
+    (o, e, ss) = run_cmd(
+        "tests.cli.main:app", "saffier --app tests.cli.main:app init -t ./custom", is_app=False
+    )
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier makemigrations")
+    (o, e, ss) = run_cmd(
+        "tests.cli.main:app", "saffier --app tests.cli.main:app makemigrations", is_app=False
+    )
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier migrate")
+    (o, e, ss) = run_cmd(
+        "tests.cli.main:app", "saffier --app tests.cli.main:app migrate", is_app=False
+    )
     assert ss == 0
 
     with open("migrations/README") as f:
