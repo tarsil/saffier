@@ -1,5 +1,7 @@
 __version__ = "0.6.1"
 
+from saffier.conf import settings
+
 from .core.registry import Registry
 from .db.connection import Database
 from .db.constants import CASCADE, RESTRICT, SET_NULL
@@ -65,4 +67,5 @@ __all__ = [
     "UniqueConstraint",
     "URLField",
     "UUIDField",
+    "settings",
 ]
