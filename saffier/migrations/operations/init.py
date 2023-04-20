@@ -1,12 +1,7 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
-from typing import Any
-
 import click
 
 from saffier.migrations.base import init as _init
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -24,7 +19,6 @@ from saffier.migrations.base import init as _init
     help=("Write empty __init__.py files to the environment and " "version locations"),
 )
 @click.command(name="init")
-@click.pass_context
-def init(ctx: Any, directory: str, template: str, package: bool) -> None:
+def init(env: MigrationEnv, directory: str, template: str, package: bool) -> None:
     """Creates a new migration repository."""
-    _init(ctx.obj, directory, template, package)
+    _init(env.app, directory, template, package)

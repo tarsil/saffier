@@ -1,12 +1,9 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
 from typing import Any
 
 import click
 
 from saffier.migrations.base import upgrade as _upgrade
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -26,10 +23,11 @@ from saffier.migrations.base import upgrade as _upgrade
 )
 @click.command()
 @click.argument("revision", default="head")
-@click.pass_context
-def migrate(ctx: Any, directory: str, sql: bool, tag: str, arg: Any, revision: str) -> None:
+def migrate(
+    env: MigrationEnv, directory: str, sql: bool, tag: str, arg: Any, revision: str
+) -> None:
     """
     Upgrades to the latest version or to a specific version
     provided by the --tag.
     """
-    _upgrade(ctx.obj, directory, revision, sql, tag, arg)
+    _upgrade(env.app, directory, revision, sql, tag, arg)

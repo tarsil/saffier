@@ -1,12 +1,7 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
-from typing import Any
-
 import click
 
 from saffier.migrations.base import edit as _edit
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -17,7 +12,6 @@ from saffier.migrations.base import edit as _edit
 )
 @click.command()
 @click.argument("revision", default="head")
-@click.pass_context
-def edit(ctx: Any, directory: str, revision: str) -> None:
+def edit(env: MigrationEnv, directory: str, revision: str) -> None:
     """Edit a revision file"""
-    _edit(ctx.obj, directory, revision)
+    _edit(env.app, directory, revision)

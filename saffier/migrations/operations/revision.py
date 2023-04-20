@@ -1,12 +1,7 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
-from typing import Any
-
 import click
 
 from saffier.migrations.base import revision as _revision
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -45,9 +40,8 @@ from saffier.migrations.base import revision as _revision
     "--rev-id", default=None, help=("Specify a hardcoded revision id instead of generating " "one")
 )
 @click.command()
-@click.pass_context
 def revision(
-    ctx: Any,
+    env: MigrationEnv,
     directory: str,
     message: str,
     autogenerate: bool,
@@ -60,7 +54,7 @@ def revision(
 ) -> None:
     """Create a new revision file."""
     _revision(
-        ctx.obj,
+        env.app,
         directory,
         message,
         autogenerate,

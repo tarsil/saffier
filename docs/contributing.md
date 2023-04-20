@@ -52,6 +52,14 @@ $ cd saffier
 $ scripts/install
 ```
 
+### Enable pre-commit
+
+The project comes with a pre-commit hook configuration. To enable it, just run inside the clone:
+
+```shell
+$ pre-commit
+```
+
 ### Run the tests
 
 To run the tests, use:

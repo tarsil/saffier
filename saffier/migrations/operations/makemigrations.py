@@ -7,6 +7,7 @@ from typing import Any
 import click
 
 from saffier.migrations.base import migrate as _migrate
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -40,9 +41,8 @@ from saffier.migrations.base import migrate as _migrate
     "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
 )
 @click.command()
-@click.pass_context
 def makemigrations(
-    ctx: Any,
+    env: MigrationEnv,
     directory: str,
     message: str,
     sql: bool,
@@ -56,5 +56,5 @@ def makemigrations(
     """Autogenerate a new revision file (Alias for
     'revision --autogenerate')"""
     _migrate(
-        ctx.obj, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg
+        env.app, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg
     )

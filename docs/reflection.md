@@ -82,3 +82,56 @@ Example:
 ```python hl_lines="9 10"
 {!> ../docs_src/reflection/reflect.py !}
 ```
+
+### The difference from the models
+
+When reflecting a model or a view from an existing database, usually you want to reflect the
+existing fields from it but sometimes in your code, you simply want **only a few fields** reflected
+and not all of them for your own reasons.
+
+Saffier `ReflectModel` does this for you.
+
+Let us see an example:
+
+Consider this table as already been created in a database somewhere with the following structure.
+
+```python
+{!> ../docs_src/reflection/reflect/model.py !}
+```
+
+!!! Check
+    For this example, we use a pythonic representation of a table in a database instead of a SQL as
+    it looks easier to understand what is what in this context.
+
+Now imagine somewhere in another application you want to reflect the existing `users` table
+(above) but you only want a few fields and not all of them.
+
+Your reflect model would look like this:
+
+```python hl_lines="9-11"
+{!> ../docs_src/reflection/reflect/reflect.py !}
+```
+
+Meaning, although you migh have legacy tables you still want to use you might also want to use
+only a few necessary fields for your operations and this is what `ReflectModel` allows you to
+achieve.
+
+## Operations
+
+What about the database operations like the CRUD? Are they still possible with `ReflectModel`?
+
+The answer is **yes**.
+
+With `ReflectModel` you can still perform the normal operations as you would do with
+[models](./models.md) anyway.
+
+Remember the [difference from the models](#the-difference-from-the-models)? Well here is another
+thing. The `ReflectModel` will only perform operations on the declared fields of the
+same `ReflectModel`.
+
+In other words, if you want to update a field that is the table being reflected but **not in**
+the `ReflectModel` declaration, **the operation on that field will not happen**.
+
+!!! Warning
+    If you are reflecting SQL views, you probably will not be able to write (create, update...) as
+    the SQL view has that same limitation.

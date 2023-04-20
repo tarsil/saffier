@@ -2,6 +2,7 @@ import typing
 from datetime import date, datetime
 
 import sqlalchemy
+
 from saffier.db.constants import SET_NULL
 from saffier.db.fields import (
     URL,

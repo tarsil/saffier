@@ -5,11 +5,11 @@ import uuid
 from enum import Enum
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import fields
 from saffier.testclient import DatabaseTestClient
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

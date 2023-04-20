@@ -1,12 +1,30 @@
+import asyncio
+import functools
 import typing
 
+import nest_asyncio
 import sqlalchemy
+
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.metaclass import MetaInfo, ModelMeta, ReflectMeta
+
+nest_asyncio.apply()
+
+
+def async_adapter(wrapped_func):
+    """Adapter to run async functions inside the blocking"""
+
+    @functools.wraps(wrapped_func)
+    def run_sync(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        task = wrapped_func(*args, **kwargs)
+        return loop.run_until_complete(task)
+
+    return run_sync
 
 
 class Model(ModelMeta, ModelUtil):
@@ -173,7 +191,11 @@ class Model(ModelMeta, ModelUtil):
 
         # Pull out the regular column values.
         for column in cls.table.columns:
-            if column.name not in item:
+            # Making sure when a table is reflected, maps the right fields of the ReflectModel
+            if column.name not in cls.fields.keys():
+                continue
+
+            elif column.name not in item:
                 item[column.name] = row[column]
 
         return cls(**item)
@@ -200,18 +222,53 @@ class ReflectModel(ReflectMeta, Model):
     call.
     """
 
+    @property
+    def pk(self) -> typing.Any:
+        return getattr(self, self.pkname, None)
+
+    @pk.setter
+    def pk(self, value: typing.Any) -> typing.Any:
+        setattr(self, self.pkname, value)
+
     @classmethod
     def build_table(cls) -> typing.Any:
+        """
+        The inspect is done in an async manner and reflects the objects from the database.
+        """
+
         metadata = cls._meta.registry._metadata  # type: ignore
         tablename = cls._meta.tablename
+        return cls.reflect(tablename, metadata, cls._meta.registry.engine)
 
+    @classmethod
+    async def run_task(cls, loop, tablename, metadata, engine):
+        table = loop.create_task(cls.reflect(tablename, metadata, engine))
+        return await table
+
+    @classmethod
+    def inspect(cls, connection, tablename, metadata):
         try:
             return sqlalchemy.Table(
                 tablename,
                 metadata,
-                autoload_with=cls._meta.registry.engine.sync_engine,  # type: ignore
+                autoload_with=connection,  # type: ignore
             )
         except Exception as e:
             raise ImproperlyConfigured(
                 detail=f"Table with the name {tablename} does not exist."
             ) from e
+
+    @classmethod
+    @async_adapter
+    async def reflect(
+        cls,
+        tablename: str,
+        metadata: sqlalchemy.MetaData,
+        engine: typing.Any,
+    ) -> sqlalchemy.Table:
+        """SQLAlchemy doesn't support, yet, async reflection and therefore we must run
+        the event loop.
+        """
+        async with engine.connect() as connection:
+            table = await connection.run_sync(cls.inspect, tablename, metadata)
+            return table

@@ -1,22 +1,12 @@
 import os
-import shlex
 import shutil
-import subprocess
 
 import pytest
 from esmerald import Esmerald
 
+from tests.cli.utils import run_cmd
+
 app = Esmerald(routes=[])
-
-
-def run_cmd(app, cmd):
-    os.environ["SAFFIER_DEFAULT_APP"] = app
-    process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (stdout, stderr) = process.communicate()
-    print("\n$ " + cmd)
-    print(stdout.decode("utf-8"))
-    print(stderr.decode("utf-8"))
-    return stdout, stderr, process.wait()
 
 
 @pytest.fixture(scope="module")
@@ -61,20 +51,20 @@ def test_alembic_version():
 
 
 def test_migrate_upgrade(create_folders):
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin init -t ./custom")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier init -t ./custom")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin makemigrations")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier makemigrations")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier-admin migrate")
+    (o, e, ss) = run_cmd("tests.cli.main:app", "saffier migrate")
     assert ss == 0
 
-    with open("migrations/README", "rt") as f:
+    with open("migrations/README") as f:
         assert f.readline().strip() == "Custom template"
-    with open("migrations/alembic.ini", "rt") as f:
+    with open("migrations/alembic.ini") as f:
         assert f.readline().strip() == "# A generic, single database configuration"
-    with open("migrations/env.py", "rt") as f:
+    with open("migrations/env.py") as f:
         assert f.readline().strip() == "# Custom env template"
-    with open("migrations/script.py.mako", "rt") as f:
+    with open("migrations/script.py.mako") as f:
         assert f.readline().strip() == "# Custom mako template"

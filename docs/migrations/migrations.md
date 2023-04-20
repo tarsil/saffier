@@ -12,6 +12,15 @@ models and corresponding migrations.
 Heavily inspired by the way Flask-Migration approached the problem, Saffier took it to the next
 level and makes it framework agnostic, which means you can use it **anywhere**.
 
+## Important
+
+Before reading this section, you should get familiar with the ways Saffier handles the discovery
+of the applications.
+
+The following examples and explanations will be using the
+[--app and environment variables](./discovery.md##environment-variables) approach but the
+[auto discovery](./discovery.md#auto-discovery) is equally valid and works in the same way.
+
 ## Structure being used for this document
 
 For the sake of this document examples and explanations we will be using the following structure to
@@ -73,7 +82,7 @@ The parameters availabe when using instantiating a [Migrate](#migration) object 
 * **app** - The application instance. Any application you want your migrations to be attached to.
 * **registry** - The registry being used for your models. The registry **must be** an instance
 of `saffier.Registry` or an `AssertationError` is raised.
-* **compare_type** - Flag option that configures the automatic migration generation subsystem 
+* **compare_type** - Flag option that configures the automatic migration generation subsystem
 to detect column type changes.
 
     <sup>Default: `True`</sup>
@@ -92,14 +101,14 @@ databases.
 ### How to use it
 
 Using the [Migration](#migration) class is very simple in terms of requirements. In the
-[tips and tricks](./tips-and-tricks.md) you can see some examples in terms of using the
-[LRU cache technique](./tips-and-tricks.md#the-lru-cache). If you haven't seen it,
+[tips and tricks](../tips-and-tricks.md) you can see some examples in terms of using the
+[LRU cache technique](../tips-and-tricks.md#the-lru-cache). If you haven't seen it,
 it is recommended you to have a look.
 
 For this examples, we will be using the same approach.
 
 Assuming you have a `utils.py` where you place your information about the database and
-[registry](./registry.md).
+[registry](../registry.md).
 
 Something like this:
 
@@ -153,7 +162,7 @@ suggestions.
 This will depend heavily on this and **everything works around the registry**.
 
 Saffier has the internal client that manages and handles the migration process for you in a clean
-fashion and it called `saffier-admin`.
+fashion and it called `saffier`.
 
 Remember the initial structure at the top of this document? No worries, let us have a look again.
 
@@ -202,7 +211,7 @@ migrations.
 
     You can generate the migrations **anywhere** in your codebase but you need to be careful about the
     paths and all of the internal dependencies. It is recommended to have them at the root of your
-    project, but again, up to you. 
+    project, but again, up to you.
 
 Assuming you have your application inside that `my_project/main.py` the next steps will follow
 that same principle.
@@ -235,14 +244,14 @@ It is now time to generate the migrations folder. As mentioned before in the
 our `migrations`.
 
 ```shell
-saffier-admin --app myproject.main:app init
+saffier --app myproject.main:app init
 ```
 
-What is happenening here? Well, `saffier-admin` is always expecting an `--app` parameter to be
+What is happenening here? Well, `saffier` is always expecting an `--app` parameter to be
 provided.
 
 This `--app` is the location of your application in `module:app` format and this is because of
-the fact of being **framework agnostic**. 
+the fact of being **framework agnostic**.
 
 Saffier needs to know where your application object is located in order to hook it to that same
 application.
@@ -354,7 +363,7 @@ There are many ways of exposing your models of course, so feel free to use any a
 Now it is time to generate the migration.
 
 ```shell
-$ saffier-admin --app my_project.main:app makemigrations
+$ saffier --app my_project.main:app makemigrations
 ```
 
 Yes, it is this simple 😁
@@ -379,7 +388,7 @@ Your new migration should now be inside `migrations/versions/`. Something like t
 Or you can attach a message your migration that will then added to the file name as well.
 
 ```shell
-$ saffier-admin --app my_project.main:app makemigrations -m "Initial migrations"
+$ saffier --app my_project.main:app makemigrations -m "Initial migrations"
 ```
 
 ```shell hl_lines="10"
@@ -404,7 +413,7 @@ Now comes the easiest part where you need to apply the migrations.
 Simply run:
 
 ```shell
-$ saffier-admin --app my_project.main:app migrate
+$ saffier --app my_project.main:app migrate
 ```
 
 And that is about it 🎉🎉
@@ -419,13 +428,13 @@ for any other ORM and when you are happy run the migrations and apply them again
 **Generate new migrations**
 
 ```shell
-$ saffier-admin --app my_project.main:app makemigrations
+$ saffier --app my_project.main:app makemigrations
 ```
 
 **Apply them to your database**
 
 ```shell
-$ saffier-admin --app my_project.main:app migrate
+$ saffier --app my_project.main:app migrate
 ```
 
 ### More migration commands
@@ -438,23 +447,23 @@ via `--help` command.
 To access the available options of saffier:
 
 ```shell
-$ saffier-admin --help
+$ saffier --help
 ```
 
-This will list all the commands available within `saffier-admin`.
+This will list all the commands available within `saffier`.
 
 **What if you need to also know the available options available to each command?**
 
 Let us imagine you want to see the available options for the `merge`
 
 ```shell
-$ saffier-admin merge --help
+$ saffier merge --help
 ```
 
 You should see something like this:
 
 ```shell
-Usage: saffier-admin merge [OPTIONS] [REVISIONS]...
+Usage: saffier merge [OPTIONS] [REVISIONS]...
 
   Merge two revisions together, creating a new revision file
 
@@ -467,12 +476,12 @@ Options:
   --help                Show this message and exit.
 ```
 
-This is applied to any other available command via `saffier-admin`.
+This is applied to any other available command via `saffier`.
 
 ### References
 
 Since Saffier has a very friendly and familiar interface to interact with so does the
-`saffier-admin`.
+`saffier`.
 
 Saffier migrations as mentioned before uses Alembic and therefore the commands are exactly the
 same as the ones for alembic except two, which are masked with different more intuitive names.

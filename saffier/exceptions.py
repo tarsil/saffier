@@ -37,5 +37,5 @@ class ImproperlyConfigured(SaffierException):
     ...
 
 
-class EnvironmentError(SaffierException):
+class CommandEnvironmentError(SaffierException):
     ...

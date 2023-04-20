@@ -2,11 +2,11 @@ import random
 import string
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import saffier
 from saffier import Database
 from saffier.db.datastructures import Index
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

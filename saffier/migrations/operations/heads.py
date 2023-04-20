@@ -1,12 +1,7 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
-from typing import Any
-
 import click
 
 from saffier.migrations.base import heads as _heads
+from saffier.migrations.env import MigrationEnv
 
 
 @click.option(
@@ -20,7 +15,6 @@ from saffier.migrations.base import heads as _heads
     "--resolve-dependencies", is_flag=True, help="Treat dependency versions as down revisions"
 )
 @click.command()
-@click.pass_context
-def heads(ctx: Any, directory: str, verbose: bool, resolve_dependencies: bool) -> None:
+def heads(env: MigrationEnv, directory: str, verbose: bool, resolve_dependencies: bool) -> None:
     """Show current available heads in the script directory"""
-    _heads(ctx.obj, directory, verbose, resolve_dependencies)
+    _heads(env.app, directory, verbose, resolve_dependencies)

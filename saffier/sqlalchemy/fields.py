@@ -2,9 +2,9 @@ import ipaddress
 import uuid
 from typing import Any
 
+import sqlalchemy
 from orjson import loads
 
-import sqlalchemy
 from saffier.sqlalchemy.protocols import BaseFieldProtocol
 from saffier.sqlalchemy.types import SubList
 from saffier.types import DictAny
