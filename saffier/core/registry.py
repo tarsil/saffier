@@ -4,8 +4,10 @@ import sqlalchemy
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 
+from saffier.conf import settings
 from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.db.connection import Database
+from saffier.exceptions import ImproperlyConfigured
 from saffier.types import DictAny
 
 
@@ -29,17 +31,25 @@ class Registry(ArbitraryHashableBaseModel):
     def metadata(self) -> Any:
         for model_class in self.models.values():
             model_class.build_table()
+
+        for reflected_class in self.reflected.values():
+            reflected_class.build_table()
+
         return self._metadata
 
     def _get_database_url(self) -> str:
         url = self.database.url
         if not url.driver:
-            if url.dialect == "postgressql":
+            if url.dialect in settings.postgres_dialects:
                 url = url.replace(driver="asyncpg")
-            elif url.dialect == "mysql":
+            elif url.dialect in settings.mysql_dialects:
                 url = url.replace(driver="aiomysql")
-            elif url.dialect == "sqlite":
+            elif url.dialect in settings.sqlite_dialects:
                 url = url.replace(driver="aiosqlite")
+            elif url.dialect in settings.mssql_dialects:
+                raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
+        elif url.dialect in settings.mssql_dialects:
+            raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         return str(url)
 
     def _get_engine(self) -> AsyncEngine:

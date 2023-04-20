@@ -14,7 +14,7 @@ from saffier.migrations.operations.shell.enums import ShellOption
 
 @click.option(
     "--kernel",
-    default="ptpython",
+    default="ipython",
     type=click.Choice(["ipython", "ptpython"]),
     help="Which shell should start.",
     show_default=True,

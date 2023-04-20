@@ -1,3 +1,4 @@
+import asyncio
 import typing
 
 import sqlalchemy
@@ -207,16 +208,39 @@ class ReflectModel(ReflectMeta, Model):
 
     @classmethod
     def build_table(cls) -> typing.Any:
+        """
+        The inspect is done in an async manner and reflects the objects from the database.
+        """
+
         metadata = cls._meta.registry._metadata  # type: ignore
         tablename = cls._meta.tablename
 
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(cls.reflect(tablename, metadata, cls._meta.registry.engine))
+
+    @classmethod
+    def inspect(cls, connection, tablename, metadata):
         try:
             return sqlalchemy.Table(
                 tablename,
                 metadata,
-                autoload_with=cls._meta.registry.engine.sync_engine,  # type: ignore
+                autoload_with=connection,  # type: ignore
             )
         except Exception as e:
             raise ImproperlyConfigured(
                 detail=f"Table with the name {tablename} does not exist."
             ) from e
+
+    @classmethod
+    async def reflect(
+        cls,
+        tablename: str,
+        metadata: sqlalchemy.MetaData,
+        engine: typing.Any,
+    ) -> sqlalchemy.Table:
+        """SQLAlchemy doesn't support, yet, async reflection and therefore we must run
+        the event loop.
+        """
+        async with engine.connect() as connection:
+            table = await connection.run_sync(cls.inspect, tablename, metadata)
+            return table
