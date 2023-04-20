@@ -21,13 +21,17 @@ def get_ipython_arguments(options: typing.Any = None) -> typing.Any:
     return arguments
 
 
-def get_ipython(registry: Registry, options: typing.Any = None) -> typing.Any:
-    """Gets the IPython shell"""
+def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None) -> typing.Any:
+    """Gets the IPython shell.
+
+    Loads the initial configurations from the main Saffier settings
+    and boots up the kernel.
+    """
     try:
         from IPython import start_ipython
 
         def run_ipython():
-            imported_objects = import_objects(registry)
+            imported_objects = import_objects(app, registry)
             ipython_arguments = get_ipython_arguments(options)
             start_ipython(argv=ipython_arguments, user_ns=imported_objects)
 

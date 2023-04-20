@@ -22,7 +22,7 @@ class Registry(ArbitraryHashableBaseModel):
         super().__init__(**kwargs)
         self.database = database
         self.models: DictAny = {}
-        self.views: DictAny = {}
+        self.reflected: DictAny = {}
         self._metadata = sqlalchemy.MetaData()
 
     @property

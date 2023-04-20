@@ -139,5 +139,4 @@ class MigrationEnv:
 
         if not scaffold:
             raise CommandEnvironmentError(detail="Could not find Saffier in any application.")
-
         return scaffold

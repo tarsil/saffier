@@ -174,7 +174,11 @@ class Model(ModelMeta, ModelUtil):
 
         # Pull out the regular column values.
         for column in cls.table.columns:
-            if column.name not in item:
+            # Making sure when a table is reflected, maps the right fields of the ReflectModel
+            if column.name not in cls.fields.keys():
+                continue
+
+            elif column.name not in item:
                 item[column.name] = row[column]
 
         return cls(**item)

@@ -52,6 +52,15 @@ class ReflectedUser(saffier.ReflectModel):
         registry = models
 
 
+class NewReflectedUser(saffier.ReflectModel):
+    name = saffier.CharField(max_length=255)
+    title = saffier.CharField(max_length=255, null=True)
+
+    class Meta:
+        tablename = "hubusers"
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -72,6 +81,43 @@ async def test_can_reflect_existing_table():
     users = await ReflectedUser.query.all()
 
     assert len(users) == 1
+
+
+async def test_can_reflect_existing_table_with_not_all_fields():
+    await HubUser.query.create(name="Test", title="a title", description="desc")
+
+    users = await NewReflectedUser.query.all()
+
+    assert len(users) == 1
+
+
+async def test_can_reflect_existing_table_with_not_all_fields_and_create_record():
+    """When a user is created via Reflected model, only the Reflected model fields are passed"""
+    await HubUser.query.create(name="Test", title="a title", description="desc")
+
+    users = await NewReflectedUser.query.all()
+
+    assert len(users) == 1
+
+    await NewReflectedUser.query.create(name="Test2", title="A new title", description="lol")
+
+    users = await HubUser.query.all()
+
+    assert len(users) == 2
+
+    user = users[1]
+
+    assert user.name == "Test2"
+    assert user.description is None
+
+    users = await NewReflectedUser.query.all()
+
+    assert len(users) == 2
+
+    user = users[1]
+
+    assert user.name == "Test2"
+    assert not hasattr(user, "description")
 
 
 async def test_can_reflect_and_edit_existing_table():

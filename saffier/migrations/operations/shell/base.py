@@ -13,14 +13,14 @@ from saffier.migrations.operations.shell.enums import ShellOption
 
 
 @click.option(
-    "--name",
-    default="ipython",
+    "--kernel",
+    default="ptpython",
     type=click.Choice(["ipython", "ptpython"]),
     help="Which shell should start.",
     show_default=True,
 )
 @click.command()
-def shell(env: MigrationEnv, name: bool) -> None:
+def shell(env: MigrationEnv, kernel: bool) -> None:
     """
     Starts an interactive ipython shell with all the models
     and important python libraries.
@@ -41,24 +41,24 @@ def shell(env: MigrationEnv, name: bool) -> None:
     lifespan = handle_lifespan_events(
         on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
     )
-    execsync(run_shell)(env.app, lifespan, registry, name)
+    execsync(run_shell)(env.app, lifespan, registry, kernel)
     return None
 
 
-async def run_shell(app: Any, lifespan: Any, registry: Registry, name: str) -> None:
+async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) -> None:
     """Executes the database shell connection"""
 
     async with lifespan(app):
-        if name == ShellOption.IPYTHON:
+        if kernel == ShellOption.IPYTHON:
             from saffier.migrations.operations.shell.ipython import get_ipython
 
-            ipython_shell = get_ipython(registry=registry)
+            ipython_shell = get_ipython(app=app, registry=registry)
             nest_asyncio.apply()
             ipython_shell()
-        elif name == ShellOption.PTPYTHON:
+        else:
             from saffier.migrations.operations.shell.ptpython import get_ptpython
 
-            ptpython = get_ptpython(registry=registry)
+            ptpython = get_ptpython(app=app, registry=registry)
             nest_asyncio.apply()
             ptpython()
 

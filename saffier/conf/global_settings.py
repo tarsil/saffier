@@ -10,7 +10,7 @@ class SaffierSettings(BaseSettings):
     debug: bool = False
     environment: Optional[str] = EnvironmentType.PRODUCTION
     ipython_args: List[str] = ["--no-banner"]
-    notebook_args: List[str] = []
+    ptpython_config_file: str = "~/.config/ptpython/config.py"
 
     class Config(BaseConfig):
         extra = "allow"

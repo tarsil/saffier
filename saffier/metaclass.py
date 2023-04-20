@@ -313,9 +313,11 @@ class BaseModelReflectMeta(BaseModelMeta):
         registry = new_model._meta.registry
 
         # Remove the reflected models from the registry
+        # Add the reflecte model to the views section of the refected
         if registry:
             try:
                 registry.models.pop(new_model.__name__)
+                registry.reflected[new_model.__name__] = new_model
             except KeyError:
                 ...
 
