@@ -9,7 +9,7 @@ from saffier.conf.enums import EnvironmentType
 class SaffierSettings(BaseSettings):
     debug: bool = False
     environment: Optional[str] = EnvironmentType.PRODUCTION
-    ipython_args: List[str] = []
+    ipython_args: List[str] = ["--no-banner"]
     notebook_args: List[str] = []
 
     class Config(BaseConfig):
