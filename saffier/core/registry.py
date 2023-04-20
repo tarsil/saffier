@@ -31,10 +31,6 @@ class Registry(ArbitraryHashableBaseModel):
     def metadata(self) -> Any:
         for model_class in self.models.values():
             model_class.build_table()
-
-        for reflected_class in self.reflected.values():
-            reflected_class.build_table()
-
         return self._metadata
 
     def _get_database_url(self) -> str:

@@ -1,6 +1,8 @@
 import asyncio
+import functools
 import typing
 
+import nest_asyncio
 import sqlalchemy
 
 from saffier.core.schemas import Schema
@@ -9,6 +11,20 @@ from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.metaclass import MetaInfo, ModelMeta, ReflectMeta
+
+nest_asyncio.apply()
+
+
+def async_adapter(wrapped_func):
+    """Adapter to run async functions inside the blocking"""
+
+    @functools.wraps(wrapped_func)
+    def run_sync(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        task = wrapped_func(*args, **kwargs)
+        return loop.run_until_complete(task)
+
+    return run_sync
 
 
 class Model(ModelMeta, ModelUtil):
@@ -206,6 +222,14 @@ class ReflectModel(ReflectMeta, Model):
     call.
     """
 
+    @property
+    def pk(self) -> typing.Any:
+        return getattr(self, self.pkname, None)
+
+    @pk.setter
+    def pk(self, value: typing.Any) -> typing.Any:
+        setattr(self, self.pkname, value)
+
     @classmethod
     def build_table(cls) -> typing.Any:
         """
@@ -214,9 +238,12 @@ class ReflectModel(ReflectMeta, Model):
 
         metadata = cls._meta.registry._metadata  # type: ignore
         tablename = cls._meta.tablename
+        return cls.reflect(tablename, metadata, cls._meta.registry.engine)
 
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(cls.reflect(tablename, metadata, cls._meta.registry.engine))
+    @classmethod
+    async def run_task(cls, loop, tablename, metadata, engine):
+        table = loop.create_task(cls.reflect(tablename, metadata, engine))
+        return await table
 
     @classmethod
     def inspect(cls, connection, tablename, metadata):
@@ -232,6 +259,7 @@ class ReflectModel(ReflectMeta, Model):
             ) from e
 
     @classmethod
+    @async_adapter
     async def reflect(
         cls,
         tablename: str,
