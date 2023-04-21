@@ -1,9 +1,9 @@
 import pytest
 
 import saffier
-from saffier import Database
 from saffier.db import fields
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
+from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
