@@ -122,7 +122,7 @@ async def run_migrations_online():
     and associate a connection with the context.
 
     """
-    connectable = create_async_engine(get_engine_url(), echo=True)
+    connectable = create_async_engine(get_engine_url())
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

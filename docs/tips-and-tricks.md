@@ -21,7 +21,7 @@ it comes with a simple and easy way of accesing the settings anywhere in the cod
 
 Something simple like this:
 
-```python hl_lines="17-19"
+```python hl_lines="17-24"
 {!> ../docs_src/tips/settings.py !}
 ```
 

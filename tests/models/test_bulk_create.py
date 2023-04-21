@@ -4,7 +4,8 @@ from enum import Enum
 import pytest
 
 import saffier
-from saffier import Database, fields
+from saffier import fields
+from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio

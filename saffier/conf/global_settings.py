@@ -1,36 +1,30 @@
 from functools import cached_property
-from typing import List, Optional
+from typing import List, Set
 
 from pydantic import BaseConfig, BaseSettings
 
-from saffier.conf.enums import EnvironmentType
-
 
 class SaffierSettings(BaseSettings):
-    debug: bool = False
-    environment: Optional[str] = EnvironmentType.PRODUCTION
     ipython_args: List[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 
-    @property
-    def postgres_dialects(self):
-        """A list of postgres dialect representations"""
-        return {"postgres", "postgresql"}
+    # Dialects
+    postgres_dialects: Set[str] = {"postgres", "postgresql"}
+    mysql_dialects: Set[str] = {"mysql"}
+    sqlite_dialects: Set[str] = {"sqlite"}
+    mssql_dialects: Set[str] = {"mssql"}
+
+    # Drivers
+    postgres_drivers = {"aiopg", "asyncpg"}
+    mysql_drivers = {"aiomysql", "asyncmy"}
+    sqlite_drivers = {"aiosqlite"}
 
     @property
-    def mysql_dialects(self):
-        """A list of mysql dialect representations"""
-        return {"mysql"}
-
-    @property
-    def sqlite_dialects(self):
-        """A list of sqlite dialect representations"""
-        return {"sqlite"}
-
-    @property
-    def mssql_dialects(self):
-        """A list of mssql dialect representations"""
-        return {"mssql"}
+    def mssql_drivers(self) -> Set[str]:
+        """
+        Do not override this one as SQLAlchemy doesn't support async for MSSQL.
+        """
+        return {"aioodbc"}
 
     class Config(BaseConfig):
         extra = "allow"

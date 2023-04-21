@@ -6,9 +6,12 @@ from logging.config import fileConfig
 from typing import Any, Union
 
 from alembic import context
+from databasez import DatabaseURL
 from rich.console import Console
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from saffier import settings
 from saffier.exceptions import SaffierException
 from saffier.migrations.constants import APP_PARAMETER
 from saffier.migrations.env import MigrationEnv
@@ -115,6 +118,25 @@ def do_run_migrations(connection: Any) -> Any:
         context.run_migrations()
 
 
+def is_async_connection(url: DatabaseURL) -> bool:
+    """
+    Verifies if is an async connection string.
+
+    Validates the type of driver against the ones supported by Saffier.
+    """
+    if not url.driver:
+        return False
+
+    if (
+        (url.driver in settings.postgres_drivers)
+        or (url.driver in settings.mysql_drivers)
+        or (url.driver in settings.sqlite_drivers)
+        or url.driver in settings.mssql_drivers
+    ):
+        return True
+    return False
+
+
 async def run_migrations_online() -> Any:
     """Run migrations in 'online' mode.
 
@@ -122,10 +144,17 @@ async def run_migrations_online() -> Any:
     and associate a connection with the context.
 
     """
-    connectable = create_async_engine(get_engine_url(), echo=True)
+    database_url = DatabaseURL(get_engine_url())
+    is_async = is_async_connection(database_url)
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+    if is_async:
+        connectable = create_async_engine(database_url._url)
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    else:
+        connectable = create_engine(database_url._url)
+        with connectable.connect() as connection:
+            do_run_migrations(connection)
 
 
 if context.is_offline_mode():

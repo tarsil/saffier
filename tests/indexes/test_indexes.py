@@ -4,8 +4,8 @@ import string
 import pytest
 
 import saffier
-from saffier import Database
 from saffier.db.datastructures import Index
+from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
