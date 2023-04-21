@@ -35,8 +35,8 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
         exec(sys.stdin.read(), globals())
         return
 
-    on_startup = getattr(env.app, "on_startup", None)
-    on_shutdown = getattr(env.app, "on_shutdown", None)
+    on_startup = getattr(env.app, "on_startup", [])
+    on_shutdown = getattr(env.app, "on_shutdown", [])
     lifespan = getattr(env.app, "lifespan", None)
     lifespan = handle_lifespan_events(
         on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
@@ -73,8 +73,6 @@ def handle_lifespan_events(
     declaration for legacy and comprehension purposes and build the async context manager
     for the lifespan.
     """
-    if on_startup or on_shutdown:
-        return AyncLifespanContextManager(on_startup=on_startup, on_shutdown=on_shutdown)
-    elif lifespan:
+    if lifespan:
         return lifespan
-    return None
+    return AyncLifespanContextManager(on_startup=on_startup, on_shutdown=on_shutdown)

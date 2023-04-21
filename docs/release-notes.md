@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.7.1
+
+### Fixed
+
+- `Lifespan` event on shell returning async manager.
+
 ## 0.7.0
 
 ### Changed
