@@ -1,14 +1,10 @@
 from functools import cached_property
-from typing import List, Optional, Set
+from typing import List, Set
 
 from pydantic import BaseConfig, BaseSettings
 
-from saffier.conf.enums import EnvironmentType
-
 
 class SaffierSettings(BaseSettings):
-    debug: bool = False
-    environment: Optional[str] = EnvironmentType.PRODUCTION
     ipython_args: List[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 
@@ -22,7 +18,13 @@ class SaffierSettings(BaseSettings):
     postgres_drivers = {"aiopg", "asyncpg"}
     mysql_drivers = {"aiomysql", "asyncmy"}
     sqlite_drivers = {"aiosqlite"}
-    mssql_drivers = {"aioodbc"}
+
+    @property
+    def mssql_drivers(self) -> Set[str]:
+        """
+        Do not override this one as SQLAlchemy doesn't support async for MSSQL.
+        """
+        return {"aioodbc"}
 
     class Config(BaseConfig):
         extra = "allow"

@@ -51,7 +51,7 @@ for a lot of use cases, SQLAlchemy always took the win but had an issue, the asy
 The team is the same behind of Databases, Django Rest Framework, Starlette,
 httpx and a lot more tools used by millions.
 
-There was one issue thou, although ORM was doing a great familiar interface with SQLAlchemy and
+There was one issue though, although ORM was doing a great familiar interface with SQLAlchemy and
 providing the async solution needed, it was, by the time of this writting,
 incomplete and they even stated that in the documentation and that is how Saffier was born.
 

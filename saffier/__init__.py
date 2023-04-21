@@ -1,6 +1,7 @@
 __version__ = "0.6.1"
 
 from saffier.conf import settings
+from saffier.conf.global_settings import SaffierSettings
 
 from .core.registry import Registry
 from .db.connection import Database
@@ -61,6 +62,7 @@ __all__ = [
     "RESTRICT",
     "ReflectModel",
     "Registry",
+    "SaffierSettings",
     "SET_NULL",
     "TextField",
     "TimeField",

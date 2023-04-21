@@ -47,6 +47,8 @@ nav:
   - Relationships: "relationships.md"
   - Connection: "connection.md"
   - Registry: "registry.md"
+  - Shell Support: "shell.md"
+  - Settings: "settings.md"
   - Exceptions: "exceptions.md"
   - Migrations:
       - Discovery: "migrations/discovery.md"
