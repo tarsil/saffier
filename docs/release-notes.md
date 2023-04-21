@@ -1,5 +1,26 @@
 # Release Notes
 
+## 0.7.0
+
+### Changed
+
+- Renamed `saffier-admin` to `saffier`.
+- Deprecate `saffier-admin`. Now you can simply call `saffier` with the same commands
+as before.
+
+### Added
+
+- New `shell` command that allows interactive shell with saffier models.
+- New `SAFFIER_SETTINGS_MODULE` allowing to create and pass specific and unique settings
+to any saffier instance.
+- Added support for `ipython` and `ptpython` for shell access via `saffier`.
+
+### Fixed
+
+- Linting and formatting issues with Ruff.
+- Bug with ReflectModel. A ReflectModel might not need all the fields from the database and the mapping should reflect that.
+- `run_until_complete` issues fixed with `nest_asyncio`.
+
 ## 0.6.1
 
 ### Fixed
