@@ -241,7 +241,6 @@ class ReflectModel(ReflectMeta, Model):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-
         metadata = cls._meta.registry._metadata  # type: ignore
         tablename = cls._meta.tablename
         return cls.reflect(tablename, metadata, cls._meta.registry.database)

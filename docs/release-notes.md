@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.7.2
+
+### Added
+
+- `db_schema` - Added Registry objects of the metadata.
+
 ## 0.7.1
 
 ### Fixed

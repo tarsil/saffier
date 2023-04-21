@@ -27,7 +27,12 @@ class Registry(ArbitraryHashableBaseModel):
         self.database = database
         self.models: DictAny = {}
         self.reflected: DictAny = {}
-        self._metadata = sqlalchemy.MetaData()
+        self.db_schema = kwargs.get("schema", None)
+
+        if self.db_schema:
+            self._metadata = sqlalchemy.MetaData(schema=self.db_schema)
+        else:
+            self._metadata = sqlalchemy.MetaData()
 
     @property
     def metadata(self) -> Any:
