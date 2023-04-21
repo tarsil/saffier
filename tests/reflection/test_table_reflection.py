@@ -6,15 +6,13 @@ import string
 import pytest
 
 import saffier
-
-# from saffier.testclient import DatabaseTestClient
-from saffier import Database
 from saffier.db.datastructures import Index
+from saffier.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL)
 models = saffier.Registry(database=database)
 
 
