@@ -4,6 +4,7 @@ import typing
 
 import nest_asyncio
 import sqlalchemy
+from sqlalchemy.engine import Engine
 
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
@@ -222,6 +223,11 @@ class ReflectModel(ReflectMeta, Model):
     call.
     """
 
+    @classmethod
+    @functools.lru_cache
+    def get_engine(cls, url: str) -> Engine:
+        return sqlalchemy.create_engine(url)
+
     @property
     def pk(self) -> typing.Any:
         return getattr(self, self.pkname, None)
@@ -238,21 +244,13 @@ class ReflectModel(ReflectMeta, Model):
 
         metadata = cls._meta.registry._metadata  # type: ignore
         tablename = cls._meta.tablename
-        return cls.reflect(tablename, metadata, cls._meta.registry.engine)
+        return cls.reflect(tablename, metadata, cls._meta.registry.database)
 
     @classmethod
-    async def run_task(cls, loop, tablename, metadata, engine):
-        table = loop.create_task(cls.reflect(tablename, metadata, engine))
-        return await table
-
-    @classmethod
-    def inspect(cls, connection, tablename, metadata):
+    def inspect(cls, connection, tablename, metadata, database):
+        engine = cls.get_engine(database.url._url)
         try:
-            return sqlalchemy.Table(
-                tablename,
-                metadata,
-                autoload_with=connection,  # type: ignore
-            )
+            return sqlalchemy.Table(tablename, metadata, autoload_with=engine)
         except Exception as e:
             raise ImproperlyConfigured(
                 detail=f"Table with the name {tablename} does not exist."
@@ -264,11 +262,11 @@ class ReflectModel(ReflectMeta, Model):
         cls,
         tablename: str,
         metadata: sqlalchemy.MetaData,
-        engine: typing.Any,
+        database: typing.Any,
     ) -> sqlalchemy.Table:
         """SQLAlchemy doesn't support, yet, async reflection and therefore we must run
         the event loop.
         """
-        async with engine.connect() as connection:
-            table = await connection.run_sync(cls.inspect, tablename, metadata)
+        async with database.connection() as connection:
+            table = await connection.run_sync(cls.inspect, tablename, metadata, database)
             return table
