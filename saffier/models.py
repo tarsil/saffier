@@ -247,10 +247,11 @@ class ReflectModel(ReflectMeta, Model):
         return cls.reflect(tablename, metadata, cls._meta.registry.database)
 
     @classmethod
-    def inspect(cls, connection, tablename, metadata, database):
-        engine = cls.get_engine(database.url._url)
+    def inspect(cls, connection, tablename, metadata):
         try:
-            return sqlalchemy.Table(tablename, metadata, autoload_with=engine)
+            return sqlalchemy.Table(
+                tablename, metadata, autoload_with=cls._meta.registry.sync_engine
+            )
         except Exception as e:
             raise ImproperlyConfigured(
                 detail=f"Table with the name {tablename} does not exist."
@@ -268,5 +269,5 @@ class ReflectModel(ReflectMeta, Model):
         the event loop.
         """
         async with database.connection() as connection:
-            table = await connection.run_sync(cls.inspect, tablename, metadata, database)
+            table = await connection.run_sync(cls.inspect, tablename, metadata)
             return table

@@ -1,6 +1,8 @@
+from functools import cached_property
 from typing import Any
 
 import sqlalchemy
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 
@@ -44,10 +46,11 @@ class Registry(ArbitraryHashableBaseModel):
                 url = url.replace(driver="aiosqlite")
             elif url.dialect in settings.mssql_dialects:
                 raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
-        elif url.dialect in settings.mssql_dialects:
+        elif url.driver in settings.mssql_drivers:
             raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         return str(url)
 
+    @cached_property
     def _get_engine(self) -> AsyncEngine:
         url = self._get_database_url()
         engine = create_async_engine(url)
@@ -55,7 +58,17 @@ class Registry(ArbitraryHashableBaseModel):
 
     @property
     def engine(self):  # type: ignore
-        return self._get_engine()
+        return self._get_engine
+
+    @cached_property
+    def _get_sync_engine(self) -> AsyncEngine:
+        url = self._get_database_url()
+        engine = create_engine(url)
+        return engine
+
+    @property
+    def sync_engine(self):  # type: ignore
+        return self._get_sync_engine
 
     async def create_all(self) -> None:
         async with self.database:
