@@ -68,9 +68,9 @@ When no `--app` or no `SAFFIER_DEFAULT_APP` environment variable is provided, Sa
         exception.
 
 * Once one of those files is found, Saffier will analised the type of objects contained in the
-module and will check if any of them is a valid `Saffier` type and return it.
+module and will check if any of them contains the `Migration` object attached and return it.
 
-* If Saffier understand that none of those objects are type `Saffier` (or subclasses), it will
+* If Saffier understand that none of those objects contain the `Migration`, it will
 do one last attempt and try to find specific function declarations:
     * **get_application()**
     * **get_app()**

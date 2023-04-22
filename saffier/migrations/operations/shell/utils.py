@@ -23,7 +23,7 @@ defaults.update(
 )
 
 
-def welcome_message(app: Any):
+def welcome_message(app: Any) -> None:
     """Displays the welcome message for the user"""
     now = datetime.datetime.now().strftime("%b %d %Y, %H:%M:%S")
     saffier_info_date = f"Saffier {saffier.__version__} (interactive shell, {now})"
@@ -53,24 +53,25 @@ def import_objects(app: Any, registry: Registry) -> Dict[Any, Any]:
             printer.write_success(directive, colour=OutputColour.CYAN3)
             imported_objects[name] = module
 
-    def import_models():
-        # Creates a dict map with module path and model to import
-        printer.write_success("Models".center(79, "-"), colour=OutputColour.CYAN3)
-        for _, model in sorted(registry.models.items()):
+    def _import_objects(lookup_dict: Dict[Any, Any]) -> Any:
+        for _, model in sorted(lookup_dict.items()):
             directive = import_statement.format(module_path=model.__module__, model=model.__name__)
             printer.write_success(directive, colour=OutputColour.CYAN3)
             imported_objects[model.__name__] = model
 
+    def import_models():
+        if not registry.models:
+            return
+
+        printer.write_success("Models".center(79, "-"), colour=OutputColour.CYAN3)
+        _import_objects(registry.models)
+
     def import_reflected_models():
-        # Creates a dict map with module path and model to import
         if not registry.reflected:
             return
 
         printer.write_success("Reflected models".center(79, "-"), colour=OutputColour.CYAN3)
-        for _, model in sorted(registry.reflected.items()):
-            directive = import_statement.format(module_path=model.__module__, model=model.__name__)
-            printer.write_success(directive, colour=OutputColour.CYAN3)
-            imported_objects[model.__name__] = model
+        _import_objects(registry.reflected)
 
     import_defaults()
     import_models()
