@@ -11,8 +11,8 @@ application models.
 Before reading this section, you should get familiar with the ways Saffier handles the discovery
 of the applications.
 
-The following examples and explanations will be using the [auto discovery](./discovery.md#auto-discovery)
-but [--app and environment variables](./discovery.md##environment-variables) approach but the
+The following examples and explanations will be using the [auto discovery](./migrations/discovery.md#auto-discovery)
+but [--app and environment variables](./migrations/discovery.md##environment-variables) approach but the
 is equally valid and works in the same way.
 
 ## How does it work
@@ -54,7 +54,7 @@ $ pip install saffier[ptpyton]
 
 ### How to call it
 
-#### With [auto discovery](./discovery.md#auto-discovery)
+#### With [auto discovery](./migrations/discovery.md#auto-discovery)
 
 **Default shell**
 
@@ -68,7 +68,7 @@ $ saffier shell
 $ saffier shell --kernel ptpython
 ```
 
-#### With [--app and environment variables](./discovery.md##environment-variables)
+#### With [--app and environment variables](./migrations/discovery.md##environment-variables)
 
 **--app**
 
