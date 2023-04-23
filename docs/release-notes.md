@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.7.3
+
+### Added
+
+- `postgresql` Typo in requirement installation.
+
 ## 0.7.2
 
 ### Added
