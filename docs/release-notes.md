@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.7.4
+
+### Fixed
+
+- Removed `nested_asyncio` causing infinite loops.
+
 ## 0.7.3
 
 ### Added
