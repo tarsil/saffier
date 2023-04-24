@@ -310,6 +310,16 @@ Returns an integer with the total of records.
 exists = await User.query.filter(email="foo@bar.com").exists()
 ```
 
+### Contains
+
+Returns true if the QuerySet contains the provided object.
+
+```python
+user = await User.query.create(email="foo@bar.com")
+
+exists = await User.query.contains(instance=user)
+```
+
 ### Get or none
 
 When querying a model and do not want to raise a [DoesNotFound](./exceptions.md#doesnotfound) and

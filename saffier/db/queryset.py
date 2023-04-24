@@ -11,10 +11,13 @@ from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
 
 if typing.TYPE_CHECKING:  # pragma: no cover
-    from saffier.models import Model
+    from saffier.models import Model, ReflectModel
 
 
 SaffierModel = typing.TypeVar("SaffierModel", bound="Model")
+ReflectSaffierModel = typing.TypeVar("ReflectSaffierModel", bound="ReflectModel")
+
+SaffierModels = typing.Union[SaffierModel, ReflectSaffierModel]
 
 
 class QuerySetProps:
@@ -41,7 +44,7 @@ class QuerySetProps:
         return self.model_class.pkname  # type: ignore
 
 
-class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
+class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -294,7 +297,7 @@ class QuerySet(BaseQuerySet):
     def sql(self, value: typing.Any) -> None:
         self._expression = value
 
-    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
+    async def __aiter__(self) -> typing.AsyncIterator[SaffierModels]:
         for value in await self:  # type: ignore
             yield value
 
@@ -544,7 +547,9 @@ class QuerySet(BaseQuerySet):
         self._set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def bulk_update(self, objs: typing.List[SaffierModel], fields: typing.List[str]) -> None:
+    async def bulk_update(
+        self, objs: typing.List[SaffierModels], fields: typing.List[str]
+    ) -> None:
         """
         Bulk updates records in a table.
 
@@ -641,12 +646,20 @@ class QuerySet(BaseQuerySet):
             instance = await self.create(**kwargs)
             return instance, True
 
+    async def contains(self, instance: SaffierModels) -> SaffierModels:
+        """Returns true if the QuerySet contains the provided object.
+        False if otherwise.
+        """
+        if getattr(instance, "pk", None) is None:
+            raise ValueError("'obj' must be a model or reflect model instance.")
+        return await self.filter(pk=instance.pk).exists()
+
     async def _execute(self) -> typing.Any:
         return await self.all()
 
     def __await__(
         self,
-    ) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
+    ) -> typing.Generator[typing.Any, None, typing.List[SaffierModels]]:
         return self._execute().__await__()
 
     def __class_getitem__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:

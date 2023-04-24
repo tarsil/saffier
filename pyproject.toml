@@ -162,6 +162,8 @@ ignore = [
     "C901", # too complex
 ]
 
+exclude = ["docs_src/*"]
+
 [[tool.mypy.overrides]]
 module = "saffier.tests.*"
 ignore_missing_imports = true
