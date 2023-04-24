@@ -2,7 +2,6 @@ import asyncio
 import functools
 import typing
 
-import nest_asyncio
 import sqlalchemy
 from sqlalchemy.engine import Engine
 
@@ -12,8 +11,6 @@ from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.metaclass import MetaInfo, ModelMeta, ReflectMeta
-
-nest_asyncio.apply()
 
 
 def async_adapter(wrapped_func):
