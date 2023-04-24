@@ -86,5 +86,4 @@ class Registry(ArbitraryHashableBaseModel):
         async with self.database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)
-
         await self.engine.dispose()

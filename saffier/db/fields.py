@@ -359,7 +359,7 @@ class Choice(SaffierField):
                 if self.null and self.coerce_types:
                     return None
                 raise self.validation_error("required")
-            raise self.validation_error(("required"))
+            raise self.validation_error("required")
         return value
 
 
@@ -393,7 +393,7 @@ class Union(SaffierField):
         super().__init__(**kwargs)
 
         self.any_of = any_of
-        if any([child.null for child in any_of]):
+        if any(child.null for child in any_of):
             self.allow_null = True
 
     def check(self, value: typing.Any) -> typing.Any:
