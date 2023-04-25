@@ -42,7 +42,8 @@ class Model(ModelMeta, ModelUtil):
 
         for k, v in kwargs.items():
             if k not in self.fields:
-                raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
+                if not hasattr(self, k):
+                    raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
             setattr(self, k, v)
 
     class Meta:
@@ -184,7 +185,10 @@ class Model(ModelMeta, ModelUtil):
                 model_cls = cls.fields[first_part].target
                 item[first_part] = model_cls._from_row(row, select_related=[remainder])
             else:
-                model_cls = cls.fields[related].target
+                try:
+                    model_cls = cls.fields[related].target
+                except KeyError:
+                    model_cls = getattr(cls, related).related_from
                 item[related] = model_cls._from_row(row)
 
         # Pull out the regular column values.
@@ -212,17 +216,6 @@ class Model(ModelMeta, ModelUtil):
             if getattr(self, key, None) != getattr(other, key, None):
                 return False
         return True
-
-    # def __getattr__(self, item: typing.Any) -> typing.Any:
-    #     """
-    #     Gets the attribute from the queryset and if it does not
-    #     exist, then lookup in the model.
-    #     """
-    #     breakpoint()
-    #     try:
-    #         return getattr(self.get_queryset(), item)
-    #     except AttributeError:
-    #         return getattr(self.model_class, item)
 
 
 class ReflectModel(ReflectMeta, Model):

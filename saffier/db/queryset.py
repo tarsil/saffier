@@ -5,7 +5,7 @@ import sqlalchemy
 
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import FILTER_OPERATORS
+from saffier.db.constants import DEFAULT_RELATED_LOOKUP_FIELD, FILTER_OPERATORS
 from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
@@ -117,7 +117,12 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
             select_from = self.table
 
             for part in item.split("__"):
-                model_class = model_class.fields[part].target
+                try:
+                    model_class = model_class.fields[part].target
+                except KeyError:
+                    # Check related fields
+                    model_class = getattr(model_class, part).related_from
+
                 table = model_class.table
                 select_from = sqlalchemy.sql.join(select_from, table)
                 tables.append(table)
@@ -191,13 +196,26 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
                     # Walk the relationships to the actual model class
                     # against which the comparison is being made.
                     for part in related_parts:
-                        model_class = model_class.fields[part].target
+                        try:
+                            model_class = model_class.fields[part].target
+                        except KeyError:
+                            model_class = getattr(model_class, part).related_from
 
                 column = model_class.table.columns[field_name]
 
             else:
                 op = "exact"
-                column = self.table.columns[key]
+                try:
+                    column = self.table.columns[key]
+                except KeyError:
+                    # Check for related fields
+                    # if an Attribute error is raised, we need to make sure
+                    # It raises the KeyError from the previous check
+                    try:
+                        model_class = getattr(self.model_class, key).related_to
+                        column = model_class.table.columns[DEFAULT_RELATED_LOOKUP_FIELD]
+                    except AttributeError:
+                        raise KeyError() from None
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
