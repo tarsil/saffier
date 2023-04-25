@@ -207,7 +207,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
                 op = "exact"
                 try:
                     column = self.table.columns[key]
-                except KeyError:
+                except KeyError as error:
                     # Check for related fields
                     # if an Attribute error is raised, we need to make sure
                     # It raises the KeyError from the previous check
@@ -215,7 +215,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
                         model_class = getattr(self.model_class, key).related_to
                         column = model_class.table.columns[DEFAULT_RELATED_LOOKUP_FIELD]
                     except AttributeError:
-                        raise KeyError() from None
+                        raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement

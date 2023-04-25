@@ -37,5 +37,9 @@ class ImproperlyConfigured(SaffierException):
     ...
 
 
+class ForeignKeyBadConfigured(SaffierException):
+    ...
+
+
 class CommandEnvironmentError(SaffierException):
     ...

@@ -9,7 +9,7 @@ As **Saffier** is a new approach on the top of Encode ORM, the following keyword
 supported in **all field types**.
 
 !!! Check
-    The data types are also very familiar for those with experience with Django model fields. 
+    The data types are also very familiar for those with experience with Django model fields.
 
 * **primary_key** - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Saffier.
@@ -261,7 +261,7 @@ class Profile(saffier.Model):
 
 class MyModel(saffier.Model):
     user = saffier.ForeignKey("User", on_delete=saffier.CASCADE)
-    profile = saffier.ForeignKey(Profile, on_delete=saffier.CASCADE)
+    profile = saffier.ForeignKey(Profile, on_delete=saffier.CASCADE, related_name="my_models")
     ...
 
 ```
@@ -269,6 +269,7 @@ class MyModel(saffier.Model):
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
+* **related_name** - The name to use for the relation from the related object back to this one.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.

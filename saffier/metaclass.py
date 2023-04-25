@@ -10,7 +10,7 @@ from saffier.core.registry import Registry
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.db.related import RelatedField
-from saffier.exceptions import ImproperlyConfigured
+from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
 
@@ -114,8 +114,14 @@ def _set_related_name_for_foreign_keys(
     """
     for foreign_key in foreign_keys:
         default_related_name = getattr(foreign_key, "related_name", None)
+
         if not default_related_name:
             default_related_name = f"{model_class.__name__.lower()}s_set"
+
+        elif hasattr(foreign_key.target, default_related_name):
+            raise ForeignKeyBadConfigured(
+                f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+            )
 
         related_field = RelatedField(
             related_name=default_related_name,
