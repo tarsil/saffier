@@ -50,12 +50,18 @@ class RelatedField:
     def get_foreign_key_field_name(self) -> str:
         """
         Table lookup for the given field containing the related field.
+
+        If there is no field with the related_name declared, find the first field
+        with the FK to the related_to.
         """
         field_name: str = None
 
         for field, value in self.related_from.fields.items():
             if isinstance(value, (fields.ForeignKey, fields.OneToOneField)):
                 if value.related_name == self.related_name:
+                    field_name = field
+                    break
+                elif not value.related_name or value.related_name is None:
                     field_name = field
                     break
         return field_name

@@ -28,21 +28,21 @@ class Track(saffier.Model):
         registry = models
 
 
-# class Organisation(saffier.Model):
-#     id = saffier.IntegerField(primary_key=True)
-#     ident = saffier.CharField(max_length=100)
+class Organisation(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
+    ident = saffier.CharField(max_length=100)
 
-#     class Meta:
-#         registry = models
+    class Meta:
+        registry = models
 
 
-# class Team(saffier.Model):
-#     id = saffier.IntegerField(primary_key=True)
-#     org = saffier.ForeignKey(Organisation, on_delete=saffier.RESTRICT)
-#     name = saffier.CharField(max_length=100)
+class Team(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
+    org = saffier.ForeignKey(Organisation, on_delete=saffier.RESTRICT)
+    name = saffier.CharField(max_length=100)
 
-#     class Meta:
-#         registry = models
+    class Meta:
+        registry = models
 
 
 # class Member(saffier.Model):
@@ -148,204 +148,47 @@ async def test_related_field_with_filter_return_empty():
     assert len(tracks_album_one) == 0
 
 
-# async def test_select_related():
-#     album = await Album.query.create(name="Malibu")
-#     await Track.query.create(album=album, title="The Bird", position=1)
-#     await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
-#     await Track.query.create(album=album, title="The Waters", position=3)
+async def test_related_name_empty():
+    acme = await Organisation.query.create(ident="ACME Ltd")
+    await Team.query.create(org=acme, name="Red Team")
+    await Team.query.create(org=acme, name="Blue Team")
 
-#     fantasies = await Album.query.create(name="Fantasies")
-#     await Track.query.create(album=fantasies, title="Help I'm Alive", position=1)
-#     await Track.query.create(album=fantasies, title="Sick Muse", position=2)
-#     await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
+    teams = await acme.teams_set.all()
 
-#     track = await Track.query.select_related("album").get(title="The Bird")
-#     assert track.album.name == "Malibu"
-
-#     tracks = await Track.query.select_related("album").all()
-#     assert len(tracks) == 6
+    assert len(teams) == 2
 
 
-# async def test_select_related_no_all():
-#     album = await Album.query.create(name="Malibu")
-#     await Track.query.create(album=album, title="The Bird", position=1)
-#     await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
-#     await Track.query.create(album=album, title="The Waters", position=3)
+async def test_related_name_empty_return_one_result():
+    acme = await Organisation.query.create(ident="ACME Ltd")
+    red_team = await Team.query.create(org=acme, name="Red Team")
+    await Team.query.create(org=acme, name="Blue Team")
 
-#     fantasies = await Album.query.create(name="Fantasies")
-#     await Track.query.create(album=fantasies, title="Help I'm Alive", position=1)
-#     await Track.query.create(album=fantasies, title="Sick Muse", position=2)
-#     await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
+    teams = await acme.teams_set.filter(name=red_team.name)
 
-#     track = await Track.query.select_related("album").get(title="The Bird")
-#     assert track.album.name == "Malibu"
-
-#     tracks = await Track.query.select_related("album")
-#     assert len(tracks) == 6
+    assert len(teams) == 1
+    assert teams[0].pk == red_team.pk
 
 
-# async def test_fk_filter():
-#     malibu = await Album.query.create(name="Malibu")
-#     await Track.query.create(album=malibu, title="The Bird", position=1)
-#     await Track.query.create(album=malibu, title="Heart don't stand a chance", position=2)
-#     await Track.query.create(album=malibu, title="The Waters", position=3)
+async def test_related_name_empty_return_one_result_with_limit():
+    acme = await Organisation.query.create(ident="ACME Ltd")
+    red_team = await Team.query.create(org=acme, name="Red Team")
+    await Team.query.create(org=acme, name="Blue Team")
 
-#     fantasies = await Album.query.create(name="Fantasies")
-#     await Track.query.create(album=fantasies, title="Help I'm Alive", position=1)
-#     await Track.query.create(album=fantasies, title="Sick Muse", position=2)
-#     await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
+    teams = await acme.teams_set.filter(name=red_team.name).limit(1)
 
-#     tracks = await Track.query.select_related("album").filter(album__name="Fantasies").all()
-#     assert len(tracks) == 3
-#     for track in tracks:
-#         assert track.album.name == "Fantasies"
-
-#     tracks = await Track.query.select_related("album").filter(album__name__icontains="fan").all()
-#     assert len(tracks) == 3
-#     for track in tracks:
-#         assert track.album.name == "Fantasies"
-
-#     tracks = await Track.query.filter(album__name__icontains="fan").all()
-#     assert len(tracks) == 3
-#     for track in tracks:
-#         assert track.album.name == "Fantasies"
-
-#     tracks = await Track.query.filter(album=malibu).select_related("album").all()
-#     assert len(tracks) == 3
-#     for track in tracks:
-#         assert track.album.name == "Malibu"
+    assert len(teams) == 1
+    assert teams[0].pk == red_team.pk
 
 
-# async def test_multiple_fk():
-#     acme = await Organisation.query.create(ident="ACME Ltd")
-#     red_team = await Team.query.create(org=acme, name="Red Team")
-#     blue_team = await Team.query.create(org=acme, name="Blue Team")
-#     await Member.query.create(team=red_team, email="a@example.org")
-#     await Member.query.create(team=red_team, email="b@example.org")
-#     await Member.query.create(team=blue_team, email="c@example.org")
-#     await Member.query.create(team=blue_team, email="d@example.org")
+async def test_related_name_empty_return_one_result_with_limits():
+    acme = await Organisation.query.create(ident="ACME Ltd")
+    await Team.query.create(org=acme, name="Red Team")
+    await Team.query.create(org=acme, name="Blue Team")
 
-#     other = await Organisation.query.create(ident="Other ltd")
-#     team = await Team.query.create(org=other, name="Green Team")
-#     await Member.query.create(team=team, email="e@example.org")
+    teams = await acme.teams_set.filter().limit(1)
 
-#     members = (
-#         await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
-#     )
-#     assert len(members) == 4
-#     for member in members:
-#         assert member.team.org.ident == "ACME Ltd"
+    assert len(teams) == 1
 
+    teams = await acme.teams_set.filter().limit(2)
 
-# async def test_queryset_delete_with_fk():
-#     malibu = await Album.query.create(name="Malibu")
-#     await Track.query.create(album=malibu, title="The Bird", position=1)
-
-#     wall = await Album.query.create(name="The Wall")
-#     await Track.query.create(album=wall, title="The Wall", position=1)
-
-#     await Track.query.filter(album=malibu).delete()
-#     assert await Track.query.filter(album=malibu).count() == 0
-#     assert await Track.query.filter(album=wall).count() == 1
-
-
-# async def test_queryset_update_with_fk():
-#     malibu = await Album.query.create(name="Malibu")
-#     wall = await Album.query.create(name="The Wall")
-#     await Track.query.create(album=malibu, title="The Bird", position=1)
-
-#     await Track.query.filter(album=malibu).update(album=wall)
-#     assert await Track.query.filter(album=malibu).count() == 0
-#     assert await Track.query.filter(album=wall).count() == 1
-
-
-# @pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
-# async def test_on_delete_cascade():
-#     album = await Album.query.create(name="The Wall")
-#     await Track.query.create(album=album, title="Hey You", position=1)
-#     await Track.query.create(album=album, title="Breathe", position=2)
-
-#     assert await Track.query.count() == 2
-
-#     await album.delete()
-
-#     assert await Track.query.count() == 0
-
-
-# @pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
-# async def test_on_delete_retstrict():
-#     organisation = await Organisation.query.create(ident="Encode")
-#     await Team.query.create(org=organisation, name="Maintainers")
-
-#     exceptions = (
-#         asyncpg.exceptions.ForeignKeyViolationError,
-#         pymysql.err.IntegrityError,
-#     )
-
-#     with pytest.raises(exceptions):
-#         await organisation.delete()
-
-
-# @pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
-# async def test_on_delete_set_null():
-#     organisation = await Organisation.query.create(ident="Encode")
-#     team = await Team.query.create(org=organisation, name="Maintainers")
-#     await Member.query.create(email="member@saffier.com", team=team)
-
-#     await team.delete()
-
-#     member = await Member.query.first()
-#     assert member.team.pk is None
-
-
-# async def test_one_to_one_crud():
-#     profile = await Profile.query.create(website="https://saffier.com")
-#     await Person.query.create(email="info@saffier.com", profile=profile)
-
-#     person = await Person.query.get(email="info@saffier.com")
-#     assert person.profile.pk == profile.pk
-
-#     await person.profile.load()
-#     assert person.profile.website == "https://saffier.com"
-
-#     exceptions = (
-#         asyncpg.exceptions.UniqueViolationError,
-#         pymysql.err.IntegrityError,
-#         sqlite3.IntegrityError,
-#     )
-
-#     with pytest.raises(exceptions):
-#         await Person.query.create(email="contact@saffier.com", profile=profile)
-
-
-# async def test_nullable_foreign_key():
-#     await Member.query.create(email="dev@saffier.com")
-
-#     member = await Member.query.get()
-
-#     assert member.email == "dev@saffier.com"
-#     assert member.team.pk is None
-
-
-# def test_assertation_error_on_set_null():
-#     with pytest.raises(AssertionError) as raised:
-
-#         class MyModel(saffier.Model):
-#             is_active = saffier.BooleanField(default=True)
-
-#         class MyOtherModel(saffier.Model):
-#             model = saffier.ForeignKey(MyModel, on_delete=saffier.SET_NULL)
-
-#     assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
-
-
-# def test_assertation_error_on_missing_on_delete():
-#     with pytest.raises(AssertionError) as raised:
-
-#         class MyModel(saffier.Model):
-#             is_active = saffier.BooleanField(default=True)
-
-#         class MyOtherModel(saffier.Model):
-#             model = saffier.ForeignKey(MyModel)
-
-#     assert raised.value.args[0] == "on_delete must not be null."
+    assert len(teams) == 2

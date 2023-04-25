@@ -115,7 +115,7 @@ def _set_related_name_for_foreign_keys(
     for foreign_key in foreign_keys:
         default_related_name = getattr(foreign_key, "related_name", None)
         if not default_related_name:
-            default_related_name = f"{foreign_key.__name__.lower()}s_set"
+            default_related_name = f"{model_class.__name__.lower()}s_set"
 
         related_field = RelatedField(
             related_name=default_related_name,
