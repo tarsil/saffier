@@ -213,6 +213,17 @@ class Model(ModelMeta, ModelUtil):
                 return False
         return True
 
+    # def __getattr__(self, item: typing.Any) -> typing.Any:
+    #     """
+    #     Gets the attribute from the queryset and if it does not
+    #     exist, then lookup in the model.
+    #     """
+    #     breakpoint()
+    #     try:
+    #         return getattr(self.get_queryset(), item)
+    #     except AttributeError:
+    #         return getattr(self.model_class, item)
+
 
 class ReflectModel(ReflectMeta, Model):
     """

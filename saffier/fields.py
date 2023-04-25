@@ -236,7 +236,13 @@ class ForeignKey(Field):
         def check(self, value: typing.Any) -> typing.Any:
             return value.pk
 
-    def __init__(self, to: typing.Any, null: bool = False, on_delete: typing.Optional[str] = None):
+    def __init__(
+        self,
+        to: typing.Any,
+        null: bool = False,
+        on_delete: typing.Optional[str] = None,
+        related_name: typing.Optional[str] = None,
+    ):
         assert on_delete is not None, "on_delete must not be null."
 
         if on_delete == SET_NULL and not null:
@@ -245,6 +251,7 @@ class ForeignKey(Field):
         super().__init__(null=null)
         self.to = to
         self.on_delete = on_delete
+        self.related_name = related_name
 
     @property
     def target(self) -> typing.Any:
