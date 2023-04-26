@@ -1,5 +1,23 @@
 # Release Notes
 
+## 0.8.0
+
+### Changed
+
+- Updated [relationships](./relationships.md) document with more examples regarding
+multiple foreign key declarations.
+
+### Added
+
+- `contains` method to queryset allowing to query if a given model or reflected model exists in the
+queryset.
+- `related_name` is now supported on `ForeignKey` allowing transverse queries.
+- Allow reverse queries using nested fields.
+- `on_update` for ForeignKey and OneToOne fields
+- Multiple ForeignKeys to the same table is now possible.
+- [Related Name](./queries/related-name.md) document added
+- [Nested queries] using related_name
+
 ## 0.7.4
 
 ### Fixed
