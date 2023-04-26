@@ -353,6 +353,7 @@ async def test_nested_related_query():
     charlie = await Member.query.create(
         team=red_team, email="charlie@redteam.com", second_team=green_team, name="Charlie"
     )
+
     user = await User.query.create(member=charlie, name="Saffier")
 
     teams = await acme.teams_set.filter(
@@ -366,7 +367,7 @@ async def test_nested_related_query():
     monica = await Member.query.create(
         team=green_team, email="monica@greenteam.com", second_team=red_team, name="Monica"
     )
-    user = await User.query.create(member=monica, name="Saffier")
+    user = await User.query.create(member=monica, name="New Saffier")
 
     teams = await acme.teams_set.filter(
         members__email=monica.email, members__users__name=user.name
@@ -376,7 +377,7 @@ async def test_nested_related_query():
     assert teams[0].pk == green_team.pk
 
     # more nested
-    profile = await Profile.query.create(user=monica, profile_type="admin")
+    profile = await Profile.query.create(user=user, profile_type="admin")
 
     teams = await acme.teams_set.filter(
         members__email=monica.email,
