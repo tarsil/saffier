@@ -48,7 +48,7 @@ class Team(saffier.Model):
 class Member(saffier.Model):
     id = saffier.IntegerField(primary_key=True)
     team = saffier.ForeignKey(Team, on_delete=saffier.SET_NULL, null=True, related_name="members")
-    team2 = saffier.ForeignKey(
+    second_team = saffier.ForeignKey(
         Team, on_delete=saffier.SET_NULL, null=True, related_name="team_members"
     )
     email = saffier.CharField(max_length=100)
@@ -203,13 +203,13 @@ async def test_related_name_nested_query():
     assert teams[0].pk == red_team.pk
 
     # blue team
-    teams = await acme.teams_set.filter(members=blue_team)
+    teams = await acme.teams_set.filter(members=blue_team).get()
 
-    assert len(teams) == 1
-    assert teams[0].pk == blue_team.pk
+    assert teams.pk == blue_team.pk
 
     # nested_field by team
-    teams = await acme.teams_set.filter(members__email=charlie.email)
+    breakpoint()
+    teams = await acme.teams_set.filter(members__email__iexact=charlie.email)
 
     assert len(teams) == 1
     assert teams[0].pk == red_team.pk
