@@ -46,6 +46,7 @@ class SaffierField(ArbitraryHashableBaseModel):
 
         if default is not NO_DEFAULT:
             self.default = default
+
         self.null = null
         self.read_only = read_only
         self.title = title

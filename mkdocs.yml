@@ -42,7 +42,9 @@ nav:
   - Reflection: "reflection.md"
   - Managers: "managers.md"
   - Fields: "fields.md"
-  - Queries: "queries.md"
+  - Queries:
+      - Queries: "queries/queries.md"
+      - Related Name: "queries/related-name.md"
   - Transactions: "transactions.md"
   - Relationships: "relationships.md"
   - Connection: "connection.md"

@@ -50,7 +50,7 @@ class SaffierGroup(click.Group):
         params = inspect.signature(func).parameters
 
         @wraps(func)
-        def wrapped(ctx: click.Context, /, *args: typing, **kwargs: typing) -> typing:
+        def wrapped(ctx: click.Context, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
             scaffold = ctx.ensure_object(MigrationEnv)
             if "env" in params:
                 kwargs["env"] = scaffold

@@ -9,12 +9,13 @@ from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
-from saffier.exceptions import ImproperlyConfigured
+from saffier.db.related import RelatedField
+from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
 
 if TYPE_CHECKING:
-    from saffier.models import Model
+    from saffier.models import Model, ReflectModel
 
 
 class MetaInfo:
@@ -34,6 +35,7 @@ class MetaInfo:
         "manager",
         "_model",
         "reflect",
+        "_managers",
     )
 
     def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
@@ -52,6 +54,7 @@ class MetaInfo:
         self.unique_together: typing.Any = getattr(meta, "unique_together", None)
         self.indexes: typing.Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
+        self._managers: bool = getattr(meta, "_managers", None)
 
 
 def _check_model_inherited_registry(
@@ -96,6 +99,40 @@ def _check_manager_for_bases(
             for key, value in inspect.getmembers(base):
                 if isinstance(value, Manager) and key not in attrs:
                     attrs[key] = value.__class__()
+
+
+def _set_related_name_for_foreign_keys(
+    foreign_keys: typing.Set[
+        typing.Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]
+    ],
+    model_class: typing.Union["Model", "ReflectModel"],
+) -> None:
+    """
+    Sets the related name for the foreign keys.
+    When a `related_name` is generated, creates a RelatedField from the table pointed
+    from the ForeignKey declaration and the the table declaring it.
+    """
+    for foreign_key in foreign_keys:
+        default_related_name = getattr(foreign_key, "related_name", None)
+
+        if not default_related_name:
+            default_related_name = f"{model_class.__name__.lower()}s_set"
+
+        elif hasattr(foreign_key.target, default_related_name):
+            raise ForeignKeyBadConfigured(
+                f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+            )
+
+        foreign_key.related_name = default_related_name
+
+        related_field = RelatedField(
+            related_name=default_related_name,
+            related_to=foreign_key.target,
+            related_from=model_class,
+        )
+
+        # Set the related name
+        setattr(foreign_key.target, default_related_name, related_field)
 
 
 class BaseModelMeta(type):
@@ -220,6 +257,8 @@ class BaseModelMeta(type):
 
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
+        else:
+            meta._managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
@@ -279,9 +318,18 @@ class BaseModelMeta(type):
         meta._model = new_class  # type: ignore
         meta.manager.model_class = new_class
 
+        # Sets the foreign key fields
+        if meta.foreign_key_fields:
+            _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+
+        # Set the manager
         for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
+
+        # Set the owner of the field
+        for _, value in new_class.fields.items():
+            value.owner = new_class
 
         return new_class
 

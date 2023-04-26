@@ -10,6 +10,13 @@ When declaring a foreign key, you can pass the value in two ways, as a string or
 object. Internally **Saffier** lookups up inside the [registry](./models.md#registry) and maps
 your fields.
 
+When declaring a model you can have one or more ForeignKey pointing to different tables or
+multiple foreign keys pointing to the same table as well.
+
+!!! Tip
+    Have a look at the [related name](./queries/related-name.md) documentation to understand how
+    you can leverage reverse queries with foreign keys.
+
 ## ForeignKey
 
 Let us define the following models `User` and `Profile`.
@@ -27,6 +34,20 @@ await Profile.query.create(user=user)
 user = await User.query.create(first_name="Bar", email="bar@foo.com")
 await Profile.query.create(user=user)
 ```
+
+### Multiple foreign keys pointing to the same table
+
+What if you want to have multiple foreign keys pointing to the same model? This is also easily
+possible to achieve.
+
+```python hl_lines="20-29"
+{!> ../docs_src/relationships/multiple.py !}
+```
+
+!!! Tip
+    Have a look at the [related name](./queries/related-name.md) documentation to understand how
+    you can leverage reverse queries with foreign keys withe the
+    [related_name](./queries/related-name.md#related_name-attribute).
 
 ### Load an instance without the foreign key relationship on it
 

@@ -2,7 +2,7 @@ import pytest
 
 import saffier
 from saffier import Manager, QuerySet
-from saffier.exceptions import ImproperlyConfigured
+from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -128,3 +128,31 @@ def test_raises_value_error_on_wrong_type():
                 indexes = ["name"]
 
     assert raised.value.args[0] == "Meta.indexes must be a list of Index types."
+
+
+def test_raises_ForeignKeyBadConfigured():
+    name = "profiles"
+
+    with pytest.raises(ForeignKeyBadConfigured) as raised:
+
+        class User(saffier.Model):
+            name = saffier.CharField(max_length=255)
+
+            class Meta:
+                registry = models
+
+        class Profile(saffier.Model):
+            user = saffier.ForeignKey(
+                User, null=False, on_delete=saffier.CASCADE, related_name=name
+            )
+            another_user = saffier.ForeignKey(
+                User, null=False, on_delete=saffier.CASCADE, related_name=name
+            )
+
+            class Meta:
+                registry = models
+
+    assert (
+        raised.value.args[0]
+        == f"Multiple related_name with the same value '{name}' found to the same target. Related names must be different."
+    )

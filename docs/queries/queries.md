@@ -6,10 +6,10 @@ when allowed.
 SQLAlchemy is known for its performance when querying a database and it is very fast. The core
 being part of **Saffier** also means that saffier performs extremely well when doing it.
 
-When making queries in a [model](./models.md), the ORM uses the [managers](./managers.md) to
+When making queries in a [model][model], the ORM uses the [managers][managers] to
 perform those same actions.
 
-If you haven't yet seen the [models](./models.md) and [managers](./managers.md) section, now would
+If you haven't yet seen the [models][model] and [managers][managers] section, now would
 be a great time to have a look and get yourself acquainted .
 
 ## QuerySet
@@ -310,9 +310,19 @@ Returns an integer with the total of records.
 exists = await User.query.filter(email="foo@bar.com").exists()
 ```
 
+### Contains
+
+Returns true if the QuerySet contains the provided object.
+
+```python
+user = await User.query.create(email="foo@bar.com")
+
+exists = await User.query.contains(instance=user)
+```
+
 ### Get or none
 
-When querying a model and do not want to raise a [DoesNotFound](./exceptions.md#doesnotfound) and
+When querying a model and do not want to raise a [DoesNotFound](../exceptions.md#doesnotfound) and
 instead returns a `None`.
 
 ```python
@@ -339,7 +349,7 @@ will use that value with the `defaults` provided to create a new instance.
 
 !!! Warning
     Since the `get_or_create()` is doing a [get](#get) internally, it can also raise a
-    [MultipleObjectsReturned](./exceptions.md#multipleobjectsreturned).
+    [MultipleObjectsReturned](../exceptions.md#multipleobjectsreturned).
 
 
 ### Update or create
@@ -360,7 +370,7 @@ will use that value with the `defaults` provided to create a new instance.
 
 !!! Warning
     Since the `get_or_create()` is doing a [get](#get) internally, it can also raise a
-    [MultipleObjectsReturned](./exceptions.md#multipleobjectsreturned).
+    [MultipleObjectsReturned](../exceptions.md#multipleobjectsreturned).
 
 
 ### Bulk create
@@ -391,3 +401,6 @@ for user in users:
 
 await User.query.bulk_update(users, fields=['is_active'])
 ```
+
+[model]: ../models.md
+[managers]: ../managers.md
