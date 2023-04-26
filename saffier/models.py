@@ -169,7 +169,7 @@ class Model(ModelMeta, ModelUtil):
             setattr(self, key, value)
 
     @classmethod
-    def _from_row(cls, row: typing.Any, select_related: typing.Any = None) -> "Model":
+    def from_query_result(cls, row: typing.Any, select_related: typing.Any = None) -> "Model":
         """
         Instantiate a model instance, given a database row.
         """
@@ -187,13 +187,13 @@ class Model(ModelMeta, ModelUtil):
                 except KeyError:
                     model_cls = getattr(cls, first_part).related_from
 
-                item[first_part] = model_cls._from_row(row, select_related=[remainder])
+                item[first_part] = model_cls.from_query_result(row, select_related=[remainder])
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls._from_row(row)
+                item[related] = model_cls.from_query_result(row)
 
         # Pull out the regular column values.
         for column in cls.table.columns:
