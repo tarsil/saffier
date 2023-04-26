@@ -31,6 +31,7 @@ class MetaInfo:
         "parents",
         "pk",
         "one_to_one_fields",
+        "many_to_many_fields",
         "pk_attribute",
         "manager",
         "_model",
@@ -47,6 +48,7 @@ class MetaInfo:
         self.parents: typing.Any = getattr(meta, "parents", None) or []
         self.pk: typing.Optional[Field] = None
         self.one_to_one_fields: typing.Set[str] = set()
+        self.many_to_many_fields: typing.Set[str] = set()
         self.foreign_key_fields: typing.Set[str] = set()
         self.pk_attribute: typing.Union[Field, str] = getattr(meta, "pk_attribute", "")
         self._model: typing.Optional[typing.Type["Model"]] = None
@@ -144,6 +146,7 @@ class BaseModelMeta(type):
         fields: typing.Dict[str, Field] = {}
         one_to_one_fields: typing.Any = set()
         foreign_key_fields: typing.Any = set()
+        many_to_many_fields: typing.Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: typing.Any = None
@@ -218,6 +221,8 @@ class BaseModelMeta(type):
 
                 if isinstance(value, saffier_fields.OneToOneField):
                     one_to_one_fields.add(value)
+                elif isinstance(value, saffier_fields.ManyToManyField):
+                    many_to_many_fields.add(value)
                 elif isinstance(value, saffier_fields.ForeignKey):
                     foreign_key_fields.add(value)
 
@@ -228,6 +233,7 @@ class BaseModelMeta(type):
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.one_to_one_fields = one_to_one_fields
+        meta.many_to_many_fields = many_to_many_fields
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)
 
@@ -318,19 +324,23 @@ class BaseModelMeta(type):
         meta._model = new_class  # type: ignore
         meta.manager.model_class = new_class
 
+        # Set the owner of the field
+        for _, value in new_class.fields.items():
+            value.owner = new_class
+
         # Sets the foreign key fields
         if meta.foreign_key_fields:
             _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+        elif meta.many_to_many_fields:
+            for field in meta.many_to_many_fields:
+                field.create_through_model()
 
         # Set the manager
         for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
 
-        # Set the owner of the field
-        for _, value in new_class.fields.items():
-            value.owner = new_class
-
+        breakpoint()
         return new_class
 
     @property

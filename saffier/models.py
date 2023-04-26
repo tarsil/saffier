@@ -94,6 +94,7 @@ class Model(ModelMeta, ModelUtil):
         unique_together = cls._meta.unique_together
         index_constraints = cls._meta.indexes
 
+        breakpoint()
         columns = []
         for name, field in cls.fields.items():
             columns.append(field.get_column(name))
