@@ -150,7 +150,7 @@ And the corresponding **related names**:
 
 Let us also add some data into the database.
 
-```python hl_lines="15-16"
+```python hl_lines="16-17"
 {!> ../docs_src/queries/related_name/new_data.py !}
 ```
 
@@ -163,10 +163,10 @@ team = await acme.teams_set.filter(
         members__email=monica.email, members__users__name=user.name
 ).get()
 
-# <Team: Team(id=2)>
+# <Team: Team(id=4)>
 ```
 
-This is great, as expected, `monica` belongs to the `green_team` which is the `id=2`.
+This is great, as expected, `monica` belongs to the `green_team` which is the `id=4`.
 
 * **We want to know what team monica belongs by checking the email, user name and the profile type**
 
@@ -177,7 +177,7 @@ team = await acme.teams_set.filter(
     members__users__profiles__profile_type=profile.profile_type,
 )
 
-# <Team: Team(id=2)>
+# <Team: Team(id=4)>
 ```
 
 Perfect! We have our results as expected.
