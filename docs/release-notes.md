@@ -16,7 +16,7 @@ queryset.
 - `on_update` for ForeignKey and OneToOne fields
 - Multiple ForeignKeys to the same table is now possible.
 - [Related Name](./queries/related-name.md) document added
-- [Nested queries] using related_name
+- Nested queries using related_name
 
 ## 0.7.4
 
