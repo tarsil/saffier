@@ -10,15 +10,16 @@ from saffier.db.constants import DEFAULT_RELATED_LOOKUP_FIELD, FILTER_OPERATORS
 from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
+from saffier.protocols.queryset import QuerySetProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover
     from saffier.models import Model, ReflectModel
 
 
-SaffierModel = typing.TypeVar("SaffierModel", bound="Model")
+_SaffierModel = typing.TypeVar("_SaffierModel", bound="Model")
 ReflectSaffierModel = typing.TypeVar("ReflectSaffierModel", bound="ReflectModel")
 
-SaffierModels = typing.Union[SaffierModel, ReflectSaffierModel]
+SaffierModel = typing.Union[_SaffierModel, ReflectSaffierModel]
 
 
 class QuerySetProps:
@@ -45,7 +46,7 @@ class QuerySetProps:
         return self.model_class.pkname  # type: ignore
 
 
-class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
+class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -358,7 +359,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
             self._cache = self._make_query()
 
 
-class QuerySet(BaseQuerySet):
+class QuerySet(BaseQuerySet, QuerySetProtocol):
     """
     QuerySet object used for query retrieving.
     """
@@ -374,7 +375,7 @@ class QuerySet(BaseQuerySet):
     def sql(self, value: typing.Any) -> None:
         self._expression = value
 
-    async def __aiter__(self) -> typing.AsyncIterator[SaffierModels]:
+    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
         for value in await self:  # type: ignore
             yield value
 
@@ -407,7 +408,7 @@ class QuerySet(BaseQuerySet):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
-    ) -> typing.Any:
+    ) -> "QuerySet":
         """
         Filters the QuerySet by the given kwargs and clause.
         """
@@ -417,13 +418,13 @@ class QuerySet(BaseQuerySet):
         self,
         clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         **kwargs: typing.Any,
-    ) -> typing.Any:
+    ) -> "QuerySet":
         """
         Exactly the same as the filter but for the exclude.
         """
         return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
-    def lookup(self, term: typing.Any) -> typing.Any:
+    def lookup(self, term: typing.Any) -> "QuerySet":
         """
         Broader way of searching for a given term
         """
@@ -448,7 +449,7 @@ class QuerySet(BaseQuerySet):
 
         return queryset
 
-    def order_by(self, *order_by: str) -> typing.Any:
+    def order_by(self, *order_by: str) -> "QuerySet":
         """
         Returns a QuerySet ordered by the given fields.
         """
@@ -456,7 +457,7 @@ class QuerySet(BaseQuerySet):
         queryset._order_by = order_by
         return queryset
 
-    def limit(self, limit_count: int) -> typing.Any:
+    def limit(self, limit_count: int) -> "QuerySet":
         """
         Returns a QuerySet limited by.
         """
@@ -464,7 +465,7 @@ class QuerySet(BaseQuerySet):
         queryset.limit_count = limit_count
         return queryset
 
-    def offset(self, offset: int) -> typing.Any:
+    def offset(self, offset: int) -> "QuerySet":
         """
         Returns a Queryset limited by the offset.
         """
@@ -472,7 +473,7 @@ class QuerySet(BaseQuerySet):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str) -> typing.Any:
+    def group_by(self, *group_by: str) -> "QuerySet":
         """
         Returns the values grouped by the given fields.
         """
@@ -480,7 +481,7 @@ class QuerySet(BaseQuerySet):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str) -> typing.Any:
+    def distinct(self, *distinct_on: str) -> "QuerySet":
         """
         Returns a queryset with distinct results.
         """
@@ -488,7 +489,7 @@ class QuerySet(BaseQuerySet):
         queryset.distinct_on = distinct_on
         return queryset
 
-    def select_related(self, related: typing.Any) -> typing.Any:
+    def select_related(self, related: typing.Any) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -505,7 +506,7 @@ class QuerySet(BaseQuerySet):
         queryset._select_related = related
         return queryset
 
-    async def exists(self) -> typing.Any:
+    async def exists(self) -> bool:
         """
         Returns a boolean indicating if a record exists or not.
         """
@@ -514,7 +515,7 @@ class QuerySet(BaseQuerySet):
         self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
-    async def count(self) -> typing.Any:
+    async def count(self) -> int:
         """
         Returns an indicating the total records.
         """
@@ -523,7 +524,7 @@ class QuerySet(BaseQuerySet):
         self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
-    async def get_or_none(self, **kwargs: typing.Any) -> typing.Any:
+    async def get_or_none(self, **kwargs: typing.Any) -> typing.Union[SaffierModel, None]:
         """
         Fetch one object matching the parameters or returns None.
         """
@@ -536,9 +537,9 @@ class QuerySet(BaseQuerySet):
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.model_class._from_row(rows[0], select_related=self._select_related)
+        return self.model_class.from_query_result(rows[0], select_related=self._select_related)
 
-    async def all(self, **kwargs: typing.Any) -> typing.Any:
+    async def all(self, **kwargs: typing.Any) -> typing.List[SaffierModel]:
         """
         Returns the queryset records based on specific filters
         """
@@ -554,11 +555,11 @@ class QuerySet(BaseQuerySet):
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
         return [
-            queryset.model_class._from_row(row, select_related=self._select_related)
+            queryset.model_class.from_query_result(row, select_related=self._select_related)
             for row in rows
         ]
 
-    async def get(self, **kwargs: typing.Any) -> typing.Any:
+    async def get(self, **kwargs: typing.Any) -> SaffierModel:
         """
         Returns a single record based on the given kwargs.
         """
@@ -573,9 +574,9 @@ class QuerySet(BaseQuerySet):
             raise DoesNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.model_class._from_row(rows[0], select_related=self._select_related)
+        return self.model_class.from_query_result(rows[0], select_related=self._select_related)
 
-    async def first(self, **kwargs: typing.Any) -> typing.Any:
+    async def first(self, **kwargs: typing.Any) -> SaffierModel:
         """
         Returns the first record of a given queryset.
         """
@@ -587,7 +588,7 @@ class QuerySet(BaseQuerySet):
         if rows:
             return rows[0]
 
-    async def last(self, **kwargs: typing.Any) -> typing.Any:
+    async def last(self, **kwargs: typing.Any) -> SaffierModel:
         """
         Returns the last record of a given queryset.
         """
@@ -599,7 +600,7 @@ class QuerySet(BaseQuerySet):
         if rows:
             return rows[0]
 
-    async def create(self, **kwargs: typing.Any) -> typing.Any:
+    async def create(self, **kwargs: typing.Any) -> SaffierModel:
         """
         Creates a record in a specific table.
         """
@@ -624,9 +625,7 @@ class QuerySet(BaseQuerySet):
         self._set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def bulk_update(
-        self, objs: typing.List[SaffierModels], fields: typing.List[str]
-    ) -> None:
+    async def bulk_update(self, objs: typing.List[SaffierModel], fields: typing.List[str]) -> None:
         """
         Bulk updates records in a table.
 
@@ -676,7 +675,7 @@ class QuerySet(BaseQuerySet):
         self._set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def update(self, **kwargs: typing.Any) -> None:
+    async def update(self, **kwargs: typing.Any) -> int:
         """
         Updates a record in a specific table with the given kwargs.
         """
@@ -696,7 +695,7 @@ class QuerySet(BaseQuerySet):
 
     async def get_or_create(
         self, defaults: typing.Dict[str, typing.Any], **kwargs: typing.Any
-    ) -> typing.Tuple[typing.Any, bool]:
+    ) -> typing.Tuple[SaffierModel, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
@@ -710,7 +709,7 @@ class QuerySet(BaseQuerySet):
 
     async def update_or_create(
         self, defaults: typing.Dict[str, typing.Any], **kwargs: typing.Any
-    ) -> typing.Tuple[typing.Any, bool]:
+    ) -> typing.Tuple[SaffierModel, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """
@@ -723,7 +722,7 @@ class QuerySet(BaseQuerySet):
             instance = await self.create(**kwargs)
             return instance, True
 
-    async def contains(self, instance: SaffierModels) -> SaffierModels:
+    async def contains(self, instance: SaffierModel) -> bool:
         """Returns true if the QuerySet contains the provided object.
         False if otherwise.
         """
@@ -736,7 +735,7 @@ class QuerySet(BaseQuerySet):
 
     def __await__(
         self,
-    ) -> typing.Generator[typing.Any, None, typing.List[SaffierModels]]:
+    ) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
         return self._execute().__await__()
 
     def __class_getitem__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
