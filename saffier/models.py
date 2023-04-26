@@ -182,7 +182,11 @@ class Model(ModelMeta, ModelUtil):
         for related in select_related:
             if "__" in related:
                 first_part, remainder = related.split("__", 1)
-                model_cls = cls.fields[first_part].target
+                try:
+                    model_cls = cls.fields[first_part].target
+                except KeyError:
+                    model_cls = getattr(cls, first_part).related_from
+
                 item[first_part] = model_cls._from_row(row, select_related=[remainder])
             else:
                 try:

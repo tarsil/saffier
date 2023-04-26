@@ -58,6 +58,25 @@ class Member(saffier.Model):
         registry = models
 
 
+class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
+    name = saffier.CharField(max_length=255, null=True)
+    member = saffier.ForeignKey(
+        Member, on_delete=saffier.SET_NULL, null=True, related_name="users"
+    )
+
+    class Meta:
+        registry = models
+
+
+class Profile(saffier.Model):
+    user = saffier.ForeignKey(User, on_delete=saffier.CASCADE, null=False, related_name="profiles")
+    profile_type = saffier.CharField(max_length=255, null=False)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -208,7 +227,6 @@ async def test_related_name_nested_query():
     assert teams.pk == blue_team.pk
 
     # nested_field by team
-    breakpoint()
     teams = await acme.teams_set.filter(members__email__iexact=charlie.email)
 
     assert len(teams) == 1
@@ -230,7 +248,7 @@ async def test_related_name_nested_query():
     assert teams[0].pk == blue_team.pk
 
 
-async def test_related_name_nested_query_multiple_foreign_keys():
+async def test_related_name_nested_query_multiple_foreign_keys_and_nested():
     acme = await Organisation.query.create(ident="ACME Ltd")
     red_team = await Team.query.create(org=acme, name="Red Team")
     blue_team = await Team.query.create(org=acme, name="Blue Team")
@@ -238,11 +256,11 @@ async def test_related_name_nested_query_multiple_foreign_keys():
 
     # members
     charlie = await Member.query.create(
-        team=red_team, email="charlie@redteam.com", team2=green_team, name="Charlie"
+        team=red_team, email="charlie@redteam.com", second_team=green_team, name="Charlie"
     )
     brown = await Member.query.create(team=red_team, email="brown@redteam.com", name="Brown")
     monica = await Member.query.create(
-        team=blue_team, email="monica@blueteam.com", team2=green_team, name="Monica"
+        team=blue_team, email="monica@blueteam.com", second_team=green_team, name="Monica"
     )
     snoopy = await Member.query.create(team=blue_team, email="snoopy@blueteam.com", name="Snoopy")
 
@@ -320,6 +338,50 @@ async def test_related_name_nested_query_multiple_foreign_keys():
     # Using distinct
     teams = await acme.teams_set.filter(team_members__id__in=[monica.pk, charlie.pk]).distinct(
         "name"
+    )
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
+
+
+async def test_nested_related_query():
+    acme = await Organisation.query.create(ident="ACME Ltd")
+    red_team = await Team.query.create(org=acme, name="Red Team")
+    green_team = await Team.query.create(org=acme, name="Green Team")
+
+    # members
+    charlie = await Member.query.create(
+        team=red_team, email="charlie@redteam.com", second_team=green_team, name="Charlie"
+    )
+    user = await User.query.create(member=charlie, name="Saffier")
+
+    teams = await acme.teams_set.filter(
+        members__email=charlie.email, members__users__name=user.name
+    )
+
+    assert len(teams) == 1
+    assert teams[0].pk == red_team.pk
+
+    # another member
+    monica = await Member.query.create(
+        team=green_team, email="monica@greenteam.com", second_team=red_team, name="Monica"
+    )
+    user = await User.query.create(member=monica, name="Saffier")
+
+    teams = await acme.teams_set.filter(
+        members__email=monica.email, members__users__name=user.name
+    )
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
+
+    # more nested
+    profile = await Profile.query.create(user=monica, profile_type="admin")
+
+    teams = await acme.teams_set.filter(
+        members__email=monica.email,
+        members__users__name=user.name,
+        members__users__profiles__profile_type=profile.profile_type,
     )
 
     assert len(teams) == 1
