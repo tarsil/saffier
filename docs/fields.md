@@ -273,6 +273,9 @@ class MyModel(saffier.Model):
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.
+* **on_update** - A string indicating the behaviour that should happen on update of a specific
+model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
+from `saffier`.
 
     ```python
     from saffier import CASCADE, SET_NULL, RESTRICT

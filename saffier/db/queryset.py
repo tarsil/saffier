@@ -3,6 +3,7 @@ import typing
 
 import sqlalchemy
 
+import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.constants import DEFAULT_RELATED_LOOKUP_FIELD, FILTER_OPERATORS
@@ -105,12 +106,49 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
         expression = expression.distinct(*distinct_on)
         return expression
 
+    def is_multiple_foreign_key(
+        self, model_class: typing.Union[typing.Type["Model"], typing.Type["ReflectModel"]]
+    ) -> typing.Tuple[bool, typing.List[typing.Tuple[str, str, str]]]:
+        """
+        Checks if the table has multiple foreign keys to the same table.
+        Iterates through all fields of type ForeignKey and OneToOneField and checks if there are
+        multiple FKs to the same destination table.
+
+        Returns a tuple of bool, list of tuples
+        """
+        fields = model_class.fields
+        foreign_keys = []
+        has_many = False
+
+        counter = 0
+
+        for key, value in fields.items():
+            tablename = None
+
+            if counter > 1:
+                has_many = True
+
+            if isinstance(value, (saffier.ForeignKey, saffier.OneToOneField)):
+                tablename = value.to if isinstance(value.to, str) else value.to.__name__
+
+                if tablename not in foreign_keys:
+                    foreign_keys.append((key, tablename, value.related_name))
+                    counter += 1
+                else:
+                    counter += 1
+
+        return has_many, foreign_keys
+
     def _build_tables_select_from_relationship(self) -> typing.Any:
         """
-        Builds the tables relationships
+        Builds the tables relationships and joins.
+        When a table contains more than one foreign key pointing to the same
+        destination table, a lookup for the related field is made to understand
+        from which foreign key the table is looked up from.
         """
         tables = [self.table]
         select_from = self.table
+        has_many_fk_same_table = False
 
         for item in self._select_related:
             model_class = self.model_class
@@ -122,9 +160,30 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModels]):
                 except KeyError:
                     # Check related fields
                     model_class = getattr(model_class, part).related_from
+                    has_many_fk_same_table, keys = self.is_multiple_foreign_key(model_class)
 
                 table = model_class.table
-                select_from = sqlalchemy.sql.join(select_from, table)
+
+                # If there is multiple FKs to the same table
+                if not has_many_fk_same_table:
+                    select_from = sqlalchemy.sql.join(select_from, table)
+                else:
+                    lookup_field = None
+
+                    # Extract the table field from the related
+                    # Assign to a lookup_field
+                    for values in keys:
+                        field, _, related_name = values
+                        if related_name == part:
+                            lookup_field = field
+                            break
+
+                    select_from = sqlalchemy.sql.join(
+                        select_from,
+                        table,
+                        select_from.c.id == getattr(table.c, lookup_field),
+                    )
+
                 tables.append(table)
 
         return tables, select_from

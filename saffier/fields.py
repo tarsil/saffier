@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 import sqlalchemy
 
-from saffier.db.constants import SET_NULL
+from saffier.db.constants import CASCADE, SET_NULL
 from saffier.db.fields import (
     URL,
     UUID,
@@ -46,6 +46,7 @@ class Field:
         self.validator: typing.Union[SaffierField, typing.Type[SaffierField]] = self.get_validator(
             **kwargs
         )
+        self.owner = kwargs.pop("owner", None)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """
@@ -241,6 +242,7 @@ class ForeignKey(Field):
         to: typing.Any,
         null: bool = False,
         on_delete: typing.Optional[str] = None,
+        on_update: typing.Optional[str] = None,
         related_name: typing.Optional[str] = None,
     ):
         assert on_delete is not None, "on_delete must not be null."
@@ -248,9 +250,13 @@ class ForeignKey(Field):
         if on_delete == SET_NULL and not null:
             raise AssertionError("When SET_NULL is enabled, null must be True.")
 
+        if on_update and (on_update == SET_NULL and not null):
+            raise AssertionError("When SET_NULL is enabled, null must be True.")
+
         super().__init__(null=null)
         self.to = to
         self.on_delete = on_delete
+        self.on_update = on_update or CASCADE
         self.related_name = related_name
 
     @property
@@ -272,7 +278,11 @@ class ForeignKey(Field):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target._meta.tablename}.{target.pkname}",
+                ondelete=self.on_delete,
+                onupdate=self.on_update,
+                name=f"fk_{self.owner._meta.tablename}_{target._meta.tablename}"
+                f"_{target.pkname}_{name}",
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)

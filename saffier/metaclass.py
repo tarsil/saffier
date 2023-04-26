@@ -123,6 +123,8 @@ def _set_related_name_for_foreign_keys(
                 f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
             )
 
+        foreign_key.related_name = default_related_name
+
         related_field = RelatedField(
             related_name=default_related_name,
             related_to=foreign_key.target,
@@ -320,9 +322,14 @@ class BaseModelMeta(type):
         if meta.foreign_key_fields:
             _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
 
+        # Set the manager
         for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
+
+        # Set the owner of the field
+        for _, value in new_class.fields.items():
+            value.owner = new_class
 
         return new_class
 

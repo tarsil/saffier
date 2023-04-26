@@ -48,7 +48,11 @@ class Team(saffier.Model):
 class Member(saffier.Model):
     id = saffier.IntegerField(primary_key=True)
     team = saffier.ForeignKey(Team, on_delete=saffier.SET_NULL, null=True, related_name="members")
+    team2 = saffier.ForeignKey(
+        Team, on_delete=saffier.SET_NULL, null=True, related_name="team_members"
+    )
     email = saffier.CharField(max_length=100)
+    name = saffier.CharField(max_length=255, null=True)
 
     class Meta:
         registry = models
@@ -224,3 +228,99 @@ async def test_related_name_nested_query():
 
     assert len(teams) == 1
     assert teams[0].pk == blue_team.pk
+
+
+async def test_related_name_nested_query_multiple_foreign_keys():
+    acme = await Organisation.query.create(ident="ACME Ltd")
+    red_team = await Team.query.create(org=acme, name="Red Team")
+    blue_team = await Team.query.create(org=acme, name="Blue Team")
+    green_team = await Team.query.create(org=acme, name="Green Team")
+
+    # members
+    charlie = await Member.query.create(
+        team=red_team, email="charlie@redteam.com", team2=green_team, name="Charlie"
+    )
+    brown = await Member.query.create(team=red_team, email="brown@redteam.com", name="Brown")
+    monica = await Member.query.create(
+        team=blue_team, email="monica@blueteam.com", team2=green_team, name="Monica"
+    )
+    snoopy = await Member.query.create(team=blue_team, email="snoopy@blueteam.com", name="Snoopy")
+
+    teams = await acme.teams_set.all()
+
+    assert len(teams) == 3
+
+    # red team
+    teams = await acme.teams_set.filter(members=red_team)
+
+    assert len(teams) == 1
+    assert teams[0].pk == red_team.pk
+
+    # blue team
+    teams = await acme.teams_set.filter(members=blue_team)
+
+    assert len(teams) == 1
+    assert teams[0].pk == blue_team.pk
+
+    # blue team
+    teams = await acme.teams_set.filter(members=green_team)
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
+
+    # nested_field by team
+    teams = await acme.teams_set.filter(members__email=charlie.email)
+
+    assert len(teams) == 1
+    assert teams[0].pk == red_team.pk
+
+    teams = await acme.teams_set.filter(members__email=brown.email)
+
+    assert len(teams) == 1
+    assert teams[0].pk == red_team.pk
+
+    teams = await acme.teams_set.filter(members__email=monica.email)
+
+    assert len(teams) == 1
+    assert teams[0].pk == blue_team.pk
+
+    teams = await acme.teams_set.filter(members__email=snoopy.email)
+
+    assert len(teams) == 1
+    assert teams[0].pk == blue_team.pk
+
+    # nested_field by team_members FK
+    teams = await acme.teams_set.filter(team_members__email=brown.email)
+
+    assert len(teams) == 0
+
+    teams = await acme.teams_set.filter(team_members__email=snoopy.email)
+
+    assert len(teams) == 0
+
+    teams = await acme.teams_set.filter(team_members__email=charlie.email)
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
+
+    teams = await acme.teams_set.filter(team_members__email=monica.email)
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
+
+    teams = await acme.teams_set.filter(team_members__name__icontains=monica.name)
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
+
+    teams = await acme.teams_set.filter(team_members__name__icontains=snoopy.name)
+
+    assert len(teams) == 0
+
+    # Using distinct
+    teams = await acme.teams_set.filter(team_members__id__in=[monica.pk, charlie.pk]).distinct(
+        "name"
+    )
+
+    assert len(teams) == 1
+    assert teams[0].pk == green_team.pk
