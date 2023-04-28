@@ -49,5 +49,9 @@ class DuplicateRecordError(SaffierException):
     ...
 
 
+class RelationshipNotFound(SaffierException):
+    ...
+
+
 class CommandEnvironmentError(SaffierException):
     ...

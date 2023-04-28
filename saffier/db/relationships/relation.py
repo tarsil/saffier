@@ -1,14 +1,11 @@
 import functools
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
-from saffier.core.terminal import Terminal
-from saffier.exceptions import RelationshipIncompatible
+from saffier.exceptions import RelationshipIncompatible, RelationshipNotFound
 from saffier.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from saffier import Model, ReflectModel
-
-terminal = Terminal()
 
 
 class Relation(ManyRelationProtocol):
@@ -66,7 +63,7 @@ class Relation(ManyRelationProtocol):
 
         return wrapped
 
-    async def add(self, child: "Model") -> None:
+    async def add(self, child: Type["Model"]) -> None:
         """
         Adds a child to the model as a list
 
@@ -75,14 +72,33 @@ class Relation(ManyRelationProtocol):
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
         if not isinstance(child, self.to):
-            error = terminal.write_error(f"The child is not from the type '{self.to.__name__}'.")
-            raise RelationshipIncompatible(error)
+            raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         self._relation_params.update({self.owner_name: self.instance, self.to_name: child})
         exists = await self.through.query.filter(**self._relation_params).exists()
 
         if not exists:
             await self.through.query.create(**self._relation_params)
+
+    async def remove(self, child: Type["Model"]) -> None:
+        """Removes a child from the list of many to many.
+
+        . Validates if there is a relationship between the entities.
+        . Removes the field if there is
+        """
+        if not isinstance(child, self.to):
+            raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
+
+        self._relation_params.update({self.owner_name: self.instance, self.to_name: child})
+        exists = await self.through.query.filter(**self._relation_params).exists()
+
+        if not exists:
+            raise RelationshipNotFound(
+                detail=f"There is no relationship between '{self.owner_name}' and '{self.to_name}: {child.pk}'."
+            )
+
+        child = await self.through.query.filter(**self._relation_params).get()
+        await child.delete()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"

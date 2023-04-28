@@ -9,8 +9,8 @@ from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
-from saffier.db.related import RelatedField
-from saffier.db.relation import Relation
+from saffier.db.relationships.related import RelatedField
+from saffier.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
