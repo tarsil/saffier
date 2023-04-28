@@ -8,6 +8,7 @@ from sqlalchemy.engine import Engine
 import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
+from saffier.db.constants import MANY_TO_MANY_RELATION
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
@@ -211,11 +212,10 @@ class Model(ModelMeta, ModelUtil):
         if key in self.fields:
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.
-            # value = self.fields[key].expand_relationship(value)
             field = self.fields[key]
 
             if isinstance(field, saffier.ManyToManyField):
-                value = getattr(self, f"relation_{key}")
+                value = getattr(self, MANY_TO_MANY_RELATION.format(key=key))
             else:
                 value = self.fields[key].expand_relationship(value)
 

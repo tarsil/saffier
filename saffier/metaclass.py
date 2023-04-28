@@ -7,6 +7,7 @@ import sqlalchemy
 
 from saffier import fields as saffier_fields
 from saffier.core.registry import Registry
+from saffier.db.constants import MANY_TO_MANY_RELATION
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.db.relationships.related import RelatedField
@@ -155,7 +156,7 @@ def _set_many_to_many_relation(
         m2m.create_through_model()
         m2m.through.build_table()
         relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
-        setattr(model_class, f"relation_{field}", relation)
+        setattr(model_class, MANY_TO_MANY_RELATION.format(key=field), relation)
 
 
 class BaseModelMeta(type):
