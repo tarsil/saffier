@@ -140,9 +140,7 @@ def _set_related_name_for_foreign_keys(
 
 
 def _set_many_to_many_relation(
-    many_to_many_fields: typing.Set[
-        typing.Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]
-    ],
+    m2m: saffier_fields.ManyToManyField,
     model_class: typing.Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
@@ -151,12 +149,9 @@ def _set_many_to_many_relation(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-
-    for m2m in many_to_many_fields:
-        m2m.create_through_model()
-        m2m.through.build_table()
-        relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
-        setattr(model_class, MANY_TO_MANY_RELATION.format(key=field), relation)
+    m2m.create_through_model()
+    relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
+    setattr(model_class, MANY_TO_MANY_RELATION.format(key=field), relation)
 
 
 class BaseModelMeta(type):
@@ -364,7 +359,7 @@ class BaseModelMeta(type):
 
         for field, value in new_class.fields.items():
             if isinstance(value, saffier_fields.ManyToManyField):
-                _set_many_to_many_relation(meta.many_to_many_fields, new_class, field)
+                _set_many_to_many_relation(value, new_class, field)
 
         # Set the manager
         for _, value in attrs.items():

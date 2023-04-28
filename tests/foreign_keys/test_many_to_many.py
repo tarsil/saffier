@@ -36,6 +36,15 @@ class Album(saffier.Model):
         registry = models
 
 
+class Studio(saffier.Model):
+    name = saffier.CharField(max_length=255)
+    users = saffier.ManyToManyField(User)
+    albums = saffier.ManyToManyField(Album)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -159,3 +168,48 @@ async def test_raises_RelationshipNotFound():
         raised.value.args[0]
         == f"There is no relationship between 'album' and 'track: {track3.pk}'."
     )
+
+
+async def test_many_to_many_many_fields():
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    track3 = await Track.query.create(title="The Waters", position=3)
+
+    album1 = await Album.query.create(name="Malibu")
+    album2 = await Album.query.create(name="Santa Monica")
+    album3 = await Album.query.create(name="Las Vegas")
+
+    user1 = await User.query.create(name="Charlie")
+    user2 = await User.query.create(name="Monica")
+    user3 = await User.query.create(name="Snoopy")
+
+    studio = await Studio.query.create(name="Downtown Records")
+
+    # add tracks to albums
+    await album1.tracks.add(track1)
+    await album2.tracks.add(track2)
+    await album3.tracks.add(track3)
+
+    # Add users and albums to studio
+    await studio.users.add(user1)
+    await studio.users.add(user2)
+    await studio.users.add(user3)
+    await studio.albums.add(album1)
+    await studio.albums.add(album2)
+    await studio.albums.add(album3)
+
+    # Start querying
+
+    total_users = await studio.users.all()
+    total_albums = await studio.albums.all()
+
+    assert len(total_users) == 3
+    assert len(total_albums) == 3
+
+    total_tracks_album1 = await album1.tracks.all()
+    total_tracks_album2 = await album1.tracks.all()
+    total_tracks_album3 = await album1.tracks.all()
+
+    assert len(total_tracks_album1) == 1
+    assert len(total_tracks_album2) == 1
+    assert len(total_tracks_album3) == 1
