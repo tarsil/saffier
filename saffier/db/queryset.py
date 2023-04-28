@@ -45,6 +45,14 @@ class QuerySetProps:
     def pkname(self) -> typing.Any:
         return self.model_class.pkname  # type: ignore
 
+    @property
+    def is_m2m(self) -> bool:
+        return bool(self.model_class._meta.is_multi)
+
+    @property
+    def m2m_related(self) -> bool:
+        return self.model_class._meta.multi_related[0]
+
 
 class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
@@ -149,9 +157,11 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         """
         tables = [self.table]
         select_from = self.table
+
         has_many_fk_same_table = False
 
         for item in self._select_related:
+            # For m2m relationships
             model_class = self.model_class
             select_from = self.table
 
@@ -219,6 +229,13 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
 
         self._expression = expression
         return expression
+
+    def _get_model_class(self):
+        if not self.is_m2m:
+            return self.model_class
+
+        model_class = self.model_class._meta.multi_related_model["owner"]
+        return model_class
 
     def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
         from saffier.models import Model
@@ -544,6 +561,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns the queryset records based on specific filters
         """
         queryset = self._clone()
+
+        if self.is_m2m:
+            queryset.distinct_on = [self.m2m_related]
+
         if kwargs:
             return await queryset.filter(**kwargs).all()
 
@@ -554,10 +575,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
-        return [
+
+        results = [
             queryset.model_class.from_query_result(row, select_related=self._select_related)
             for row in rows
         ]
+
+        if not self.is_m2m:
+            return results
+
+        return [getattr(result, self.m2m_related) for result in results]
 
     async def get(self, **kwargs: typing.Any) -> SaffierModel:
         """

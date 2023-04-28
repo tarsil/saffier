@@ -45,7 +45,7 @@ class Studio(saffier.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
     yield
@@ -204,12 +204,115 @@ async def test_many_to_many_many_fields():
     total_albums = await studio.albums.all()
 
     assert len(total_users) == 3
+    assert total_users[0].pk == user1.pk
+    assert total_users[1].pk == user2.pk
+    assert total_users[2].pk == user3.pk
+
     assert len(total_albums) == 3
 
     total_tracks_album1 = await album1.tracks.all()
-    total_tracks_album2 = await album1.tracks.all()
-    total_tracks_album3 = await album1.tracks.all()
-
     assert len(total_tracks_album1) == 1
+    assert total_tracks_album1[0].pk == track1.pk
+
+    total_tracks_album2 = await album2.tracks.all()
     assert len(total_tracks_album2) == 1
+    assert total_tracks_album2[0].pk == track2.pk
+
+    total_tracks_album3 = await album3.tracks.all()
     assert len(total_tracks_album3) == 1
+    assert total_tracks_album3[0].pk == track3.pk
+
+
+async def test_related_name_query():
+    album = await Album.query.create(name="Malibu")
+    album2 = await Album.query.create(name="Santa Monica")
+
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    track3 = await Track.query.create(title="The Waters", position=3)
+
+    await album.tracks.add(track1)
+    await album.tracks.add(track2)
+    await album2.tracks.add(track3)
+
+    album_tracks = await album.tracks.all()
+    assert len(album_tracks) == 2
+
+    assert album_tracks[0].pk == track1.pk
+    assert album_tracks[1].pk == track2.pk
+
+    tracks_album = await track1.track_albumtracks_set.all()
+
+    assert len(tracks_album) == 1
+    assert tracks_album[0].pk == album.pk
+
+    tracks_album = await track3.track_albumtracks_set.all()
+
+    assert len(tracks_album) == 1
+    assert tracks_album[0].pk == album2.pk
+
+
+async def test_related_name_query_nested():
+    album = await Album.query.create(name="Malibu")
+    album2 = await Album.query.create(name="Santa Monica")
+
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    track3 = await Track.query.create(title="The Waters", position=3)
+
+    await album.tracks.add(track1)
+    await album.tracks.add(track2)
+    await album2.tracks.add(track3)
+
+    album_tracks = await album.tracks.all()
+    assert len(album_tracks) == 2
+
+    assert album_tracks[0].pk == track1.pk
+    assert album_tracks[1].pk == track2.pk
+
+    tracks_album = await track1.track_albumtracks_set.filter(album__name=album.name)
+
+    assert len(tracks_album) == 1
+    assert tracks_album[0].pk == album.pk
+
+    tracks_album = await track3.track_albumtracks_set.filter(album__name=album2.name)
+
+    assert len(tracks_album) == 1
+    assert tracks_album[0].pk == album2.pk
+
+    tracks_album = await track1.track_albumtracks_set.filter(track__title=track1.title)
+
+    assert len(tracks_album) == 1
+    assert tracks_album[0].pk == album.pk
+
+    tracks_album = await track3.track_albumtracks_set.filter(track__title=track3.title)
+
+    assert len(tracks_album) == 1
+    assert tracks_album[0].pk == album2.pk
+
+
+async def test_related_name_query_returns_nothing():
+    album = await Album.query.create(name="Malibu")
+    album2 = await Album.query.create(name="Santa Monica")
+
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    track3 = await Track.query.create(title="The Waters", position=3)
+
+    await album.tracks.add(track1)
+    await album.tracks.add(track2)
+    await album2.tracks.add(track3)
+
+    album_tracks = await album.tracks.all()
+    assert len(album_tracks) == 2
+
+    assert album_tracks[0].pk == track1.pk
+    assert album_tracks[1].pk == track2.pk
+
+    tracks_album = await track1.track_albumtracks_set.filter(album__name=album2.name)
+
+    assert len(tracks_album) == 0
+
+    tracks_album = await track3.track_albumtracks_set.filter(album__name=album.name)
+
+    assert len(tracks_album) == 0

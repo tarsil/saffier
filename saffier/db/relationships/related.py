@@ -25,7 +25,22 @@ class RelatedField:
         self.related_from = related_from
         self.instance = instance
 
+    def m2m_related(self):
+        """
+        Guarantees the the m2m filter is done by the owner of the call
+        and not by the children.
+        """
+        if not self.related_from._meta.is_multi:
+            return
+
+        self.related_from._meta.multi_related = [
+            key
+            for key, value in self.related_from.fields.items()
+            if key != self.related_to.__name__.lower() and isinstance(value, fields.ForeignKey)
+        ]
+
     def __get__(self, instance: Any, owner: Any) -> Any:
+        self.m2m_related()
         return self.__class__(
             related_name=self.related_name,
             related_to=self.related_to,

@@ -373,7 +373,14 @@ class ManyToManyField(Field):
         class_name = f"{owner_name}{to_name}"
         tablename = f"{owner_name.lower()}s_{to_name}s".lower()
 
-        new_meta_namespace = {"tablename": tablename, "registry": self.owner._meta.registry}
+        new_meta_namespace = {
+            "tablename": tablename,
+            "registry": self.owner._meta.registry,
+            "is_multi": True,
+            "multi_related": [to_name.lower()],
+            "multi_related_model": {"owner": self.owner, "to": self.to},
+        }
+
         new_meta = type("MetaInfo", (), new_meta_namespace)
 
         # Define the related names
