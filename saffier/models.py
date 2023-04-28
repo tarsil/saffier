@@ -5,6 +5,7 @@ import typing
 import sqlalchemy
 from sqlalchemy.engine import Engine
 
+import saffier
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
 from saffier.db.datastructures import Index, UniqueConstraint
@@ -94,7 +95,6 @@ class Model(ModelMeta, ModelUtil):
         unique_together = cls._meta.unique_together
         index_constraints = cls._meta.indexes
 
-        breakpoint()
         columns = []
         for name, field in cls.fields.items():
             columns.append(field.get_column(name))
@@ -211,7 +211,14 @@ class Model(ModelMeta, ModelUtil):
         if key in self.fields:
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.
-            value = self.fields[key].expand_relationship(value)
+            # value = self.fields[key].expand_relationship(value)
+            field = self.fields[key]
+
+            if isinstance(field, saffier.ManyToManyField):
+                value = getattr(self, f"relation_{key}")
+            else:
+                value = self.fields[key].expand_relationship(value)
+
         super().__setattr__(key, value)
 
     def __eq__(self, other: typing.Any) -> bool:

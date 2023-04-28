@@ -21,7 +21,6 @@ from saffier.db.fields import (
 )
 from saffier.db.fields import IPAddress as CoreIPAddress
 from saffier.db.fields import Password, SaffierField, String, Time
-from saffier.protocols.many_relationship import ManyRelationProtocol
 from saffier.sqlalchemy.fields import IPAddress
 
 if typing.TYPE_CHECKING:
@@ -255,16 +254,13 @@ class ForeignKey(Field):
         related_name: typing.Optional[str] = None,
         **kwargs: Any,
     ):
-        m2m = kwargs.pop("m2m", False)
+        assert on_delete is not None, "on_delete must not be null."
 
-        if not m2m:
-            assert on_delete is not None, "on_delete must not be null."
+        if on_delete == SET_NULL and not null:
+            raise AssertionError("When SET_NULL is enabled, null must be True.")
 
-            if on_delete == SET_NULL and not null:
-                raise AssertionError("When SET_NULL is enabled, null must be True.")
-
-            if on_update and (on_update == SET_NULL and not null):
-                raise AssertionError("When SET_NULL is enabled, null must be True.")
+        if on_update and (on_update == SET_NULL and not null):
+            raise AssertionError("When SET_NULL is enabled, null must be True.")
 
         super().__init__(null=null)
         self.to = to
@@ -307,7 +303,7 @@ class ForeignKey(Field):
         return target(pk=value)
 
 
-class ManyToManyField(ForeignKey, ManyRelationProtocol):
+class ManyToManyField(Field):
     """
     Representation of a ManyToManyField based on a foreignkey.
     """
@@ -324,10 +320,35 @@ class ManyToManyField(ForeignKey, ManyRelationProtocol):
             )
             warnings.warn(message, UserWarning, stacklevel=2)
 
-        related_name = kwargs.pop("related_name", None)
-
-        super().__init__(to=to, related_name=related_name, m2m=True)
+        super().__init__(null=True)
+        self.to = to
         self.through = through
+        self.related_name = kwargs.pop("related_name", None)
+
+    @property
+    def target(self) -> typing.Any:
+        if not hasattr(self, "_target"):
+            if isinstance(self.to, str):
+                self._target = self.registry.models[self.to]  # type: ignore
+            else:
+                self._target = self.to
+        return self._target
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        target = self.target
+        to_field = target.fields[target.pkname]
+
+        column_type = to_field.get_column_type()
+        constraints = [
+            sqlalchemy.schema.ForeignKey(
+                f"{target._meta.tablename}.{target.pkname}",
+                ondelete=saffier.CASCADE,
+                onupdate=saffier.CASCADE,
+                name=f"fk_{self.owner._meta.tablename}_{target._meta.tablename}"
+                f"_{target.pkname}_{name}",
+            )
+        ]
+        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
 
     def add_model_to_register(self, model: typing.Type["Model"]):
         """
@@ -356,9 +377,9 @@ class ManyToManyField(ForeignKey, ManyRelationProtocol):
                 "Meta": new_meta,
                 "id": saffier.IntegerField(primary_key=True),
                 f"{owner_name.lower()}": ForeignKey(
-                    self.owner, on_delete=saffier.CASCADE, null=False
+                    self.owner, on_delete=saffier.CASCADE, null=True
                 ),
-                f"{to_name.lower()}": ForeignKey(self.to, on_delete=saffier.CASCADE, null=False),
+                f"{to_name.lower()}": ForeignKey(self.to, on_delete=saffier.CASCADE, null=True),
             },
         )
         self.through = typing.cast(typing.Type["Model"], through_model)

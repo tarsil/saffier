@@ -10,6 +10,7 @@ from saffier.core.registry import Registry
 from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.manager import Manager
 from saffier.db.related import RelatedField
+from saffier.db.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
@@ -137,6 +138,26 @@ def _set_related_name_for_foreign_keys(
         setattr(foreign_key.target, default_related_name, related_field)
 
 
+def _set_many_to_many_relation(
+    many_to_many_fields: typing.Set[
+        typing.Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]
+    ],
+    model_class: typing.Union["Model", "ReflectModel"],
+    field: str,
+) -> None:
+    """
+    Sets the related name for the foreign keys.
+    When a `related_name` is generated, creates a RelatedField from the table pointed
+    from the ForeignKey declaration and the the table declaring it.
+    """
+
+    for m2m in many_to_many_fields:
+        m2m.create_through_model()
+        m2m.through.build_table()
+        relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
+        setattr(model_class, f"relation_{field}", relation)
+
+
 class BaseModelMeta(type):
     __slots__ = ()
 
@@ -221,10 +242,15 @@ class BaseModelMeta(type):
 
                 if isinstance(value, saffier_fields.OneToOneField):
                     one_to_one_fields.add(value)
+                    continue
                 elif isinstance(value, saffier_fields.ManyToManyField):
                     many_to_many_fields.add(value)
-                elif isinstance(value, saffier_fields.ForeignKey):
+                    continue
+                elif isinstance(value, saffier_fields.ForeignKey) and not isinstance(
+                    value, saffier_fields.ManyToManyField
+                ):
                     foreign_key_fields.add(value)
+                    continue
 
         for slot in fields:
             attrs.pop(slot, None)
@@ -331,16 +357,19 @@ class BaseModelMeta(type):
         # Sets the foreign key fields
         if meta.foreign_key_fields:
             _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
-        elif meta.many_to_many_fields:
-            for field in meta.many_to_many_fields:
-                field.create_through_model()
+        # elif meta.many_to_many_fields:
+        #     for field in meta.many_to_many_fields:
+        #         field.create_through_model()
+
+        for field, value in new_class.fields.items():
+            if isinstance(value, saffier_fields.ManyToManyField):
+                _set_many_to_many_relation(meta.many_to_many_fields, new_class, field)
 
         # Set the manager
         for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
 
-        breakpoint()
         return new_class
 
     @property
