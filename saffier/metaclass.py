@@ -39,6 +39,7 @@ class MetaInfo:
         "_model",
         "reflect",
         "_managers",
+        "is_multi",
     )
 
     def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
@@ -59,6 +60,7 @@ class MetaInfo:
         self.indexes: typing.Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
         self._managers: bool = getattr(meta, "_managers", None)
+        self.is_multi: bool = getattr(meta, "is_multi", False)
 
 
 def _check_model_inherited_registry(
@@ -330,6 +332,7 @@ class BaseModelMeta(type):
 
         registry = meta.registry
         new_class.database = registry.database
+        meta.is_multi = False
 
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:
@@ -353,13 +356,11 @@ class BaseModelMeta(type):
         # Sets the foreign key fields
         if meta.foreign_key_fields:
             _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
-        # elif meta.many_to_many_fields:
-        #     for field in meta.many_to_many_fields:
-        #         field.create_through_model()
 
         for field, value in new_class.fields.items():
             if isinstance(value, saffier_fields.ManyToManyField):
                 _set_many_to_many_relation(value, new_class, field)
+                meta.is_multi = True
 
         # Set the manager
         for _, value in attrs.items():

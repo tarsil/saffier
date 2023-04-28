@@ -325,6 +325,11 @@ class ManyToManyField(Field):
         self.through = through
         self.related_name = kwargs.pop("related_name", None)
 
+        if self.related_name:
+            assert isinstance(self.related_name, str), "related_name must be a string."
+
+        self.related_name = self.related_name.lower() if self.related_name else None
+
     @property
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
@@ -370,6 +375,20 @@ class ManyToManyField(Field):
 
         new_meta_namespace = {"tablename": tablename, "registry": self.owner._meta.registry}
         new_meta = type("MetaInfo", (), new_meta_namespace)
+
+        # Define the related names
+        owner_related_name = (
+            f"{self.related_name}_{class_name.lower()}s_set"
+            if self.related_name
+            else f"{owner_name.lower()}_{class_name.lower()}s_set"
+        )
+
+        to_related_name = (
+            f"{self.related_name}_{class_name.lower()}s_set"
+            if self.related_name
+            else f"{to_name.lower()}_{class_name.lower()}s_set"
+        )
+
         through_model = type(
             class_name,
             (saffier.Model,),
@@ -377,9 +396,14 @@ class ManyToManyField(Field):
                 "Meta": new_meta,
                 "id": saffier.IntegerField(primary_key=True),
                 f"{owner_name.lower()}": ForeignKey(
-                    self.owner, on_delete=saffier.CASCADE, null=True
+                    self.owner,
+                    on_delete=saffier.CASCADE,
+                    null=True,
+                    related_name=owner_related_name,
                 ),
-                f"{to_name.lower()}": ForeignKey(self.to, on_delete=saffier.CASCADE, null=True),
+                f"{to_name.lower()}": ForeignKey(
+                    self.to, on_delete=saffier.CASCADE, null=True, related_name=to_related_name
+                ),
             },
         )
         self.through = typing.cast(typing.Type["Model"], through_model)
