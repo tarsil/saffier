@@ -41,5 +41,17 @@ class ForeignKeyBadConfigured(SaffierException):
     ...
 
 
+class RelationshipIncompatible(SaffierException):
+    ...
+
+
+class DuplicateRecordError(SaffierException):
+    ...
+
+
+class RelationshipNotFound(SaffierException):
+    ...
+
+
 class CommandEnvironmentError(SaffierException):
     ...

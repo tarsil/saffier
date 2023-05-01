@@ -25,6 +25,30 @@ class RelatedField:
         self.related_from = related_from
         self.instance = instance
 
+    @functools.cached_property
+    def manager(self):
+        """Returns the manager class"""
+        return self.related_from._meta.manager
+
+    @functools.cached_property
+    def queryset(self):
+        return self.manager.get_queryset()
+
+    def m2m_related(self):
+        """
+        Guarantees the the m2m filter is done by the owner of the call
+        and not by the children.
+        """
+        if not self.related_from._meta.is_multi:
+            return
+
+        related = [
+            key
+            for key, value in self.related_from.fields.items()
+            if key != self.related_to.__name__.lower() and isinstance(value, fields.ForeignKey)
+        ]
+        return related
+
     def __get__(self, instance: Any, owner: Any) -> Any:
         return self.__class__(
             related_name=self.related_name,
@@ -38,9 +62,8 @@ class RelatedField:
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
-        manager = self.related_from._meta.manager
         try:
-            attr = getattr(manager.get_queryset(), item)
+            attr = getattr(self.queryset, item)
         except AttributeError:
             attr = getattr(self.related_from, item)
 
@@ -71,6 +94,10 @@ class RelatedField:
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             field = self.get_foreign_key_field_name()
             kwargs[field] = self.instance.pk
+
+            related = self.m2m_related()
+            if related:
+                self.queryset.m2m_related = related[0]
             return func(*args, **kwargs)
 
         return wrapped

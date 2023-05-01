@@ -45,6 +45,18 @@ class QuerySetProps:
     def pkname(self) -> typing.Any:
         return self.model_class.pkname  # type: ignore
 
+    @property
+    def is_m2m(self) -> bool:
+        return bool(self.model_class._meta.is_multi)
+
+    @property
+    def m2m_related(self) -> bool:
+        return self._m2m_related
+
+    @m2m_related.setter
+    def m2m_related(self, value: str) -> None:
+        self._m2m_related = value
+
 
 class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
@@ -59,6 +71,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         order_by: typing.Any = None,
         group_by: typing.Any = None,
         distinct_on: typing.Any = None,
+        m2m_related: typing.Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -71,6 +84,10 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._expression = None
         self._cache = None
+        self._m2m_related = m2m_related
+
+        if self.is_m2m and not self._m2m_related:
+            self._m2m_related = self.model_class._meta.multi_related[0]
 
     def _build_order_by_expression(
         self, order_by: typing.Any, expression: typing.Any
@@ -149,9 +166,11 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         """
         tables = [self.table]
         select_from = self.table
+
         has_many_fk_same_table = False
 
         for item in self._select_related:
+            # For m2m relationships
             model_class = self.model_class
             select_from = self.table
 
@@ -310,6 +329,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
             limit_count=self.limit_count,
             limit_offset=self._offset,
             order_by=self._order_by,
+            m2m_related=self.m2m_related,
         )
 
     def _validate_kwargs(self, **kwargs: typing.Any) -> typing.Any:
@@ -352,6 +372,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = self._expression
         queryset._cache = self._cache
+        queryset._m2m_related = self._m2m_related
         return queryset
 
     def _fetch_all(self) -> None:
@@ -544,6 +565,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns the queryset records based on specific filters
         """
         queryset = self._clone()
+
+        if self.is_m2m:
+            queryset.distinct_on = [self.m2m_related]
+
         if kwargs:
             return await queryset.filter(**kwargs).all()
 
@@ -554,10 +579,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
-        return [
+
+        results = [
             queryset.model_class.from_query_result(row, select_related=self._select_related)
             for row in rows
         ]
+
+        if not self.is_m2m:
+            return results
+
+        return [getattr(result, self.m2m_related) for result in results]
 
     async def get(self, **kwargs: typing.Any) -> SaffierModel:
         """
