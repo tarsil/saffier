@@ -41,7 +41,6 @@ class MetaInfo:
         "_managers",
         "is_multi",
         "multi_related",
-        "multi_related_model",
     )
 
     def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
@@ -64,7 +63,6 @@ class MetaInfo:
         self._managers: bool = getattr(meta, "_managers", None)
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: typing.List[str] = getattr(meta, "multi_related", [])
-        self.multi_related_model: typing.Type["Model"] = getattr(meta, "multi_related_model", {})
 
 
 def _check_model_inherited_registry(

@@ -71,6 +71,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         order_by: typing.Any = None,
         group_by: typing.Any = None,
         distinct_on: typing.Any = None,
+        m2m_related: typing.Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -83,8 +84,9 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._expression = None
         self._cache = None
+        self._m2m_related = m2m_related
 
-        if self.is_m2m:
+        if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class._meta.multi_related[0]
 
     def _build_order_by_expression(
@@ -327,6 +329,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
             limit_count=self.limit_count,
             limit_offset=self._offset,
             order_by=self._order_by,
+            m2m_related=self.m2m_related,
         )
 
     def _validate_kwargs(self, **kwargs: typing.Any) -> typing.Any:
@@ -369,6 +372,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = self._expression
         queryset._cache = self._cache
+        queryset._m2m_related = self._m2m_related
         return queryset
 
     def _fetch_all(self) -> None:

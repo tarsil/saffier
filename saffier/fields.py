@@ -378,7 +378,6 @@ class ManyToManyField(Field):
             "registry": self.owner._meta.registry,
             "is_multi": True,
             "multi_related": [to_name.lower()],
-            "multi_related_model": {"owner": self.owner, "to": self.to},
         }
 
         new_meta = type("MetaInfo", (), new_meta_namespace)
