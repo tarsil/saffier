@@ -45,6 +45,7 @@ nav:
   - Queries:
       - Queries: "queries/queries.md"
       - Related Name: "queries/related-name.md"
+      - ManyToMany: "queries/many-to-many.md"
   - Transactions: "transactions.md"
   - Relationships: "relationships.md"
   - Connection: "connection.md"

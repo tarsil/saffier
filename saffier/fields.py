@@ -368,6 +368,14 @@ class ManyToManyField(Field):
         Generates a middle model based on the owner of the field and the field itself and adds
         it to the main registry to make sure it generates the proper models and migrations.
         """
+        if self.through:
+            if isinstance(self.through, str):
+                self.through = self.owner._meta.registry.models[self.through]
+
+            self.through._meta.is_multi = True
+            self.through._meta.multi_related = [self.to.__name__.lower()]
+            return self.through
+
         owner_name = self.owner.__name__
         to_name = self.to.__name__
         class_name = f"{owner_name}{to_name}"
@@ -390,7 +398,7 @@ class ManyToManyField(Field):
         )
 
         to_related_name = (
-            f"{self.related_name}_{class_name.lower()}s_set"
+            f"{self.related_name}"
             if self.related_name
             else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
