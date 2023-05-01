@@ -51,7 +51,11 @@ class QuerySetProps:
 
     @property
     def m2m_related(self) -> bool:
-        return self.model_class._meta.multi_related[0]
+        return self._m2m_related
+
+    @m2m_related.setter
+    def m2m_related(self, value: str) -> None:
+        self._m2m_related = value
 
 
 class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
@@ -79,6 +83,9 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._expression = None
         self._cache = None
+
+        if self.is_m2m:
+            self._m2m_related = self.model_class._meta.multi_related[0]
 
     def _build_order_by_expression(
         self, order_by: typing.Any, expression: typing.Any
@@ -229,13 +236,6 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
 
         self._expression = expression
         return expression
-
-    def _get_model_class(self):
-        if not self.is_m2m:
-            return self.model_class
-
-        model_class = self.model_class._meta.multi_related_model["owner"]
-        return model_class
 
     def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
         from saffier.models import Model
