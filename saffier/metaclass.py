@@ -148,11 +148,6 @@ def _set_many_to_many_relation(
     model_class: typing.Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
-    """
-    Sets the related name for the foreign keys.
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
-    """
     m2m.create_through_model()
     relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
     setattr(model_class, MANY_TO_MANY_RELATION.format(key=field), relation)

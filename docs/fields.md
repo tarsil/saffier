@@ -281,6 +281,33 @@ from `saffier`.
     from saffier import CASCADE, SET_NULL, RESTRICT
     ```
 
+#### ManyToManyField
+
+```python
+import saffier
+
+
+class User(saffier.Model):
+    is_active = saffier.BooleanField(default=True)
+
+
+class Organisation(saffier.Model):
+    is_enabled = saffier.BooleanField(default=True)
+
+
+class MyModel(saffier.Model):
+    users = saffier.ManyToManyField(User)
+    organisations = saffier.ManyToManyField(Organisation)
+
+```
+
+##### Parameters
+
+* **to** - A string [model](./models.md) name or a class object of that same model.
+* **related_name** - The name to use for the relation from the related object back to this one.
+* **through** - The model to be used for the relationship. Saffier generates the model by default
+if none is provided.
+
 #### IPAddressField
 
 ```python
