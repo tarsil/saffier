@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.9.0
+
+### Added
+
+- Add protocols to Queryset.
+- Add Protocols to Related names
+- Support for the new [ManyToManyField](./fields.md##manytomanyfield)
+- Documentation for [ManyToManyField](./queries/many-to-many.md)
+
 ## 0.8.0
 
 ### Changed
