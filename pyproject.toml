@@ -44,7 +44,7 @@ dependencies = [
     "loguru>=0.6.0,<0.10.0",
     "databasez>=0.2.2",
     "orjson >=3.8.5,<4.0.0",
-    "pydantic>=1.10.5,<2.0.0",
+    "pydantic>=1.10.9,<2.0.0",
     "rich>=13.3.1,<14.0.0",
 ]
 keywords = [
@@ -86,7 +86,6 @@ test = [
     "isort>=5.0.6,<6.0.0",
     "freezegun>=1.2.2,<2.0.0",
     "mock==5.0.2",
-    "pydantic>=1.10.5",
     "pymysql>=1.0.2,<2.0.0",
     "types-orjson==3.6.2",
     "ruff>=0.0.256,<1.0.0",
@@ -121,7 +120,6 @@ ipython = ["ipython>=8.10.0,<9.0.0"]
 all = [
     "databasez[postgresql,mysql,sqlite]",
     "orjson>=3.8.5,<4.0.0",
-    "pydantic>=1.10.4,<2.0.0",
     "ptpython>=3.0.23,<4.0.0",
     "ipython>=8.10.0,<9.0.0",
 ]
