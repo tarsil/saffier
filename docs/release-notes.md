@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.10.0
+
+### Changed
+
+- Updated to the latest version of pydantic making sure all the fixes are in place.
+
 ## 0.9.0
 
 ### Added

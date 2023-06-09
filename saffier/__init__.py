@@ -1,4 +1,4 @@
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings
