@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.10.1
+
+### Changed
+
+- Minor update of the base of databasez package. PR [#56] by [@tarsil](https://github.com/tarsil/saffier/pull/56).
+
 ## 0.10.0
 
 ### Changed
