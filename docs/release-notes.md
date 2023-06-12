@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Minor update of the base of databasez package. PR [#56] by [@tarsil](https://github.com/tarsil/saffier/pull/56).
+- Minor update of the base of databasez package. PR [#56](https://github.com/tarsil/saffier/pull/56) by [@tarsil](https://github.com/tarsil).
 
 ## 0.10.0
 
