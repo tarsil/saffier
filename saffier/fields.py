@@ -48,12 +48,14 @@ class Field:
             kwargs["read_only"] = True
 
         self.null = kwargs.get("null", False)
+        self.default_value = kwargs.get("default", None)
         self.primary_key = primary_key
         self.index = index
         self.unique = unique
         self.validator: typing.Union[SaffierField, typing.Type[SaffierField]] = self.get_validator(
             **kwargs
         )
+        self.comment = kwargs.get("comment", None)
         self.owner = kwargs.pop("owner", None)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
@@ -62,6 +64,7 @@ class Field:
         """
         column_type = self.get_column_type()
         constraints = self.get_constraints()
+
         return sqlalchemy.Column(
             name,
             column_type,
@@ -70,6 +73,8 @@ class Field:
             nullable=self.null and not self.primary_key,
             index=self.index,
             unique=self.unique,
+            default=True,
+            comment=self.comment,
         )
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
