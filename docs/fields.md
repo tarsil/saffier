@@ -31,6 +31,7 @@ build an admin-like application.
     <sup>Set default to `""`</sup>
 
 * **default** - A value or a callable (function).
+* **comment** - A comment to be added with the field in the SQL database.
 
 ## Available fields
 
