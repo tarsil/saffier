@@ -73,7 +73,7 @@ class Field:
             nullable=self.null and not self.primary_key,
             index=self.index,
             unique=self.unique,
-            default=True,
+            default=self.default_value,
             comment=self.comment,
         )
 
