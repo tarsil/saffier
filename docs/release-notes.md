@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.10.2
+
+### Added
+
+- `comment` option for the fields. PR [#57](https://github.com/tarsil/saffier/pull/57) by [@tarsil](https://github.com/tarsil).
+
 ## 0.10.1
 
 ### Changed
