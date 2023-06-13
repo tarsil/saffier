@@ -4,6 +4,7 @@ import typing
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import declarative_base
 
 import saffier
 from saffier.core.schemas import Schema
@@ -169,6 +170,18 @@ class Model(ModelMeta, ModelUtil):
         # Update the instance.
         for key, value in dict(row._mapping).items():
             setattr(self, key, value)
+
+    @classmethod
+    def declarative(cls) -> typing.Any:
+        return cls.generate_model_declarative()
+
+    @classmethod
+    def generate_model_declarative(cls) -> typing.Any:
+        """Transforms a core Saffier table into a Declarative table."""
+        Base = declarative_base(metadata=cls._meta.registry._metadata)
+        cls._meta.registry._metadata = Base.metadata
+        model_table = type(cls.__name__, (Base,), {"__table__": cls.table})
+        return model_table
 
     @classmethod
     def from_query_result(cls, row: typing.Any, select_related: typing.Any = None) -> "Model":
