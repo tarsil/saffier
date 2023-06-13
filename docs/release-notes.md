@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.11.0
+
+### Added
+
+- [`delclarative()`](./models.md#declarative-models) to the models, allowing generating model types of SQLAlchemy declarative base.
+PR [#58](https://github.com/tarsil/saffier/pull/58) by [@tarsil](https://github.com/tarsil).
+
 ## 0.10.2
 
 ### Added

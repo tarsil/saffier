@@ -39,6 +39,12 @@ scenes.
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 
+### Declarative models
+
+If you need to generate a `declarative_model` from the SQLAlchemy type, you can simply call
+`Model.declarative()`. Example, `User.declarative()`. This will automatically generate the
+declarative model type for you.
+
 ### Attention
 
 If no `id` is declared in the model, **Saffier** will automatically generate an `id` of type
@@ -137,7 +143,7 @@ database table.
 
 Working with a [registry](./registry.md) is what makes **Saffier** dynamic and very flexible with
 the familiar interface we all love. Without the registry, the model doesn't know where it should
-get the data from. 
+get the data from.
 
 Imagine a `registry` like a bridge because it does exactly that.
 
@@ -169,7 +175,7 @@ to split the bases by responsabilities.
 
 #### With abstract classes
 
-What if your class is abstract? Can you inherit the registry anyway? 
+What if your class is abstract? Can you inherit the registry anyway?
 
 Of course! That doesn't change anything with the registry.
 
@@ -321,7 +327,7 @@ to one database field only.
 
 Now here is the tricky part. If you wanted to have **together** non-duplicate records with the
 same `email` and `name`, this is **not doing that**. This is in fact saying unique emails and
-unique names independent of each other. 
+unique names independent of each other.
 
 This is useful but depends on each use case.
 
