@@ -2,7 +2,7 @@
 
 ## 0.12.0
 
-## Added
+### Added
 
 - New version of the [`declarative()`](./declarative-models.md).
 PR [#59](https://github.com/tarsil/saffier/pull/60)  by [@tarsil](https://github.com/tarsil).
@@ -10,7 +10,7 @@ PR [#59](https://github.com/tarsil/saffier/pull/60)  by [@tarsil](https://github
 The latter will always exist but you can also import the `ManyToMany` and `OneToOne` as alternative
 instead.
 
-## Fixed
+### Fixed
 
 - Registry now allowing the `lru_caching` to happen properly.
 
