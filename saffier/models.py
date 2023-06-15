@@ -4,7 +4,7 @@ import typing
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import Mapped, relationship
 
 import saffier
 from saffier.core.schemas import Schema
@@ -178,9 +178,30 @@ class Model(ModelMeta, ModelUtil):
     @classmethod
     def generate_model_declarative(cls) -> typing.Any:
         """Transforms a core Saffier table into a Declarative table."""
-        Base = declarative_base(metadata=cls._meta.registry._metadata)
-        cls._meta.registry._metadata = Base.metadata
-        model_table = type(cls.__name__, (Base,), {"__table__": cls.table})
+        Base = cls._meta.registry.declarative_base
+
+        # Build the original table
+        fields = {"__table__": cls.table}
+
+        # Populates with table columns
+        for column in cls.table.columns:
+            fields[column.name] = column
+
+        # Generate base
+        model_table = type(cls.__name__, (Base,), fields)
+
+        # Make sure if there are foreignkeys, builds the relationships
+        for column in cls.table.columns:
+            if not column.foreign_keys:
+                continue
+
+            # Maps the relationships with the foreign keys and related names
+            field = cls.fields.get(column.name)
+            mapped_model: Mapped[field.to.__name__] = relationship(field.to.__name__)
+
+            # Adds to the current model
+            model_table.__mapper__.add_property(f"{column.name}_relation", mapped_model)
+
         return model_table
 
     @classmethod
