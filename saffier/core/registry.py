@@ -5,15 +5,15 @@ import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
+from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from saffier.conf import settings
-from saffier.core.datastructures import ArbitraryHashableBaseModel
 from saffier.db.connection import Database
 from saffier.exceptions import ImproperlyConfigured
 from saffier.types import DictAny
 
 
-class Registry(ArbitraryHashableBaseModel):
+class Registry:
     """
     Registers a database connection object
     """
@@ -60,6 +60,14 @@ class Registry(ArbitraryHashableBaseModel):
         url = self._get_database_url()
         engine = create_async_engine(url)
         return engine
+
+    @cached_property
+    def declarative_base(self) -> Any:
+        if self.db_schema:
+            metadata = sqlalchemy.MetaData(schema=self.db_schema)
+        else:
+            metadata = sqlalchemy.MetaData()
+        return sa_declarative_base(metadata=metadata)
 
     @property
     def engine(self):  # type: ignore

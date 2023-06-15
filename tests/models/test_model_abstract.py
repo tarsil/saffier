@@ -53,7 +53,7 @@ async def rollback_connections():
 
 
 async def test_model_does_not_exist():
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa
         await User.query.create(name="Test", language="EN")
 
 
