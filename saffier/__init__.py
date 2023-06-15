@@ -1,4 +1,4 @@
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings
@@ -24,7 +24,9 @@ from .fields import (
     IntegerField,
     IPAddressField,
     JSONField,
+    ManyToMany,
     ManyToManyField,
+    OneToOne,
     OneToOneField,
     PasswordField,
     TextField,
@@ -53,11 +55,13 @@ __all__ = [
     "IPAddressField",
     "IntegerField",
     "JSONField",
+    "ManyToMany",
     "ManyToManyField",
     "Manager",
     "Migrate",
     "Model",
     "MultipleObjectsReturned",
+    "OneToOne",
     "OneToOneField",
     "PasswordField",
     "QuerySet",

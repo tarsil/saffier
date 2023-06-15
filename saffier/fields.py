@@ -430,6 +430,9 @@ class ManyToManyField(Field):
         self.add_model_to_register(self.through)
 
 
+ManyToMany = ManyToManyField
+
+
 class OneToOneField(ForeignKey):
     """
     Representation of a one to one field.
@@ -452,6 +455,9 @@ class OneToOneField(ForeignKey):
             nullable=self.null,
             unique=True,
         )
+
+
+OneToOne = OneToOneField
 
 
 class ChoiceField(Field):
