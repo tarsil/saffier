@@ -183,10 +183,6 @@ class Model(ModelMeta, ModelUtil):
         # Build the original table
         fields = {"__table__": cls.table}
 
-        # Populates with table columns
-        for column in cls.table.columns:
-            fields[column.name] = column
-
         # Generate base
         model_table = type(cls.__name__, (Base,), fields)
 

@@ -302,6 +302,9 @@ class MyModel(saffier.Model):
 
 ```
 
+!!! Tip
+    You can use `saffier.ManyToMany` as alternative to `ManyToManyField` instead.
+
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
@@ -355,6 +358,9 @@ class MyModel(saffier.Model):
 ```
 
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.
+
+!!! Tip
+    You can use `saffier.OneToOne` as alternative to `OneToOneField` instead.
 
 #### TextField
 

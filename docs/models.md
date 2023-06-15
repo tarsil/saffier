@@ -39,12 +39,6 @@ scenes.
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 
-### Declarative models
-
-If you need to generate a `declarative_model` from the SQLAlchemy type, you can simply call
-`Model.declarative()`. Example, `User.declarative()`. This will automatically generate the
-declarative model type for you.
-
 ### Attention
 
 If no `id` is declared in the model, **Saffier** will automatically generate an `id` of type

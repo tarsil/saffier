@@ -29,7 +29,7 @@ class Track(saffier.Model):
 class Album(saffier.Model):
     id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
-    tracks = saffier.ManyToMany(Track, related_name="album_tracks")
+    tracks = saffier.ManyToManyField(Track, related_name="album_tracks")
 
     class Meta:
         registry = models
@@ -37,8 +37,8 @@ class Album(saffier.Model):
 
 class Studio(saffier.Model):
     name = saffier.CharField(max_length=255)
-    users = saffier.ManyToMany(User, related_name="studio_users")
-    albums = saffier.ManyToMany(Album, related_name="studio_albums")
+    users = saffier.ManyToManyField(User, related_name="studio_users")
+    albums = saffier.ManyToManyField(Album, related_name="studio_albums")
 
     class Meta:
         registry = models

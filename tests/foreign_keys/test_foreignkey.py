@@ -75,6 +75,15 @@ class Person(saffier.Model):
         registry = models
 
 
+class AnotherPerson(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
+    email = saffier.CharField(max_length=100)
+    profile = saffier.OneToOne(Profile, on_delete=saffier.CASCADE)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -251,7 +260,7 @@ async def test_on_delete_set_null():
     assert member.team.pk is None
 
 
-async def test_one_to_one_crud():
+async def test_one_to_one_field_crud():
     profile = await Profile.query.create(website="https://saffier.com")
     await Person.query.create(email="info@saffier.com", profile=profile)
 
@@ -269,6 +278,26 @@ async def test_one_to_one_crud():
 
     with pytest.raises(exceptions):
         await Person.query.create(email="contact@saffier.com", profile=profile)
+
+
+async def test_one_to_one_crud():
+    profile = await Profile.query.create(website="https://saffier.com")
+    await AnotherPerson.query.create(email="info@saffier.com", profile=profile)
+
+    person = await AnotherPerson.query.get(email="info@saffier.com")
+    assert person.profile.pk == profile.pk
+
+    await person.profile.load()
+    assert person.profile.website == "https://saffier.com"
+
+    exceptions = (
+        asyncpg.exceptions.UniqueViolationError,
+        pymysql.err.IntegrityError,
+        sqlite3.IntegrityError,
+    )
+
+    with pytest.raises(exceptions):
+        await AnotherPerson.query.create(email="contact@saffier.com", profile=profile)
 
 
 async def test_nullable_foreign_key():

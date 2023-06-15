@@ -39,6 +39,7 @@ plugins:
 nav:
   - Saffier: "index.md"
   - Models: "models.md"
+  - Declarative Models: "declarative-models.md"
   - Reflection: "reflection.md"
   - Managers: "managers.md"
   - Fields: "fields.md"
