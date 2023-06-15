@@ -5,7 +5,7 @@
 ### Added
 
 - New version of the [`declarative()`](./declarative-models.md).
-PR [#59](https://github.com/tarsil/saffier/pull/60)  by [@tarsil](https://github.com/tarsil).
+PR [#60](https://github.com/tarsil/saffier/pull/60)  by [@tarsil](https://github.com/tarsil).
 - `ManyToMany` and `OneToOne` added as alternatives to `ManyToManyField` and `OneToOneField`.
 The latter will always exist but you can also import the `ManyToMany` and `OneToOne` as alternative
 instead.
