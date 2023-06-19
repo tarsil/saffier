@@ -14,6 +14,7 @@ class ProfileChoice(Enum):
 
 class BaseModel(saffier.Model):
     class Meta:
+        abstract = True
         registry = registry
 
 
