@@ -1,6 +1,6 @@
 from typing import Any
 
-from saffier.db.models.queryset import QuerySet
+from saffier.db.query.queryset import QuerySet
 
 
 class Manager:

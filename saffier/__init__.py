@@ -33,7 +33,7 @@ from .db.models.fields import (
     UUIDField,
 )
 from .db.models.manager import Manager
-from .db.models.queryset import QuerySet
+from .db.query.queryset import QuerySet
 from .exceptions import DoesNotFound, MultipleObjectsReturned
 from .migrations import Migrate
 

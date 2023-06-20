@@ -375,10 +375,6 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         queryset._m2m_related = self._m2m_related
         return queryset
 
-    def _fetch_all(self) -> None:
-        if self._cache is None:
-            self._cache = self._make_query()
-
 
 class QuerySet(BaseQuerySet, QuerySetProtocol):
     """
