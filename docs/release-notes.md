@@ -1,5 +1,28 @@
 # Release Notes
 
+## 0.13.0
+
+### Changed
+
+- `fields` are now imported in a different path. **This is a breaking change**. [PR #62](https://github.com/tarsil/saffier/pull/63) by [@tarsil](https://github.com/tarsil/)
+
+**Before**
+
+```python
+from saffier import fields
+```
+
+**Now**
+
+```python
+from saffier.db.models import fields
+```
+
+### Added
+
+- Added `server_default` option for fields allowing to specify if the value should be generated from the DB and how to.
+- Added support for `save()` of the model. [PR #62](https://github.com/tarsil/saffier/pull/62) by [@tarsil](https://github.com/tarsil/)
+
 ## 0.12.0
 
 ### Added
