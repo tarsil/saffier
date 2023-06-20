@@ -5,8 +5,8 @@ from typing import Any
 import sqlalchemy
 from orjson import loads
 
-from saffier.sqlalchemy.protocols import BaseFieldProtocol
-from saffier.sqlalchemy.types import SubList
+from saffier.contrib.sqlalchemy.protocols import BaseFieldProtocol
+from saffier.contrib.sqlalchemy.types import SubList
 from saffier.types import DictAny
 
 DIALECTS = {"postgres": "postgres", "postgresql": "postgresql"}

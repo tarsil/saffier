@@ -4,16 +4,16 @@ import typing
 import sqlalchemy
 
 import saffier
+from saffier.conf import settings
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import DEFAULT_RELATED_LOOKUP_FIELD, FILTER_OPERATORS
+from saffier.db.models.fields import CharField, TextField
 from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
-from saffier.fields import CharField, TextField
 from saffier.protocols.queryset import QuerySetProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover
-    from saffier.models import Model, ReflectModel
+    from saffier.db.models.base import Model, ReflectModel
 
 
 _SaffierModel = typing.TypeVar("_SaffierModel", bound="Model")
@@ -240,7 +240,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
-        from saffier.models import Model
+        from saffier.db.models.base import Model
 
         clauses = []
         filter_clauses = self.filter_clauses
@@ -256,7 +256,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
 
                 # Determine if we should treat the final part as a
                 # filter operator or as a related field.
-                if parts[-1] in FILTER_OPERATORS:
+                if parts[-1] in settings.filter_operators:
                     op = parts[-1]
                     field_name = parts[-2]
                     related_parts = parts[:-2]
@@ -292,13 +292,13 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
                     # It raises the KeyError from the previous check
                     try:
                         model_class = getattr(self.model_class, key).related_to
-                        column = model_class.table.columns[DEFAULT_RELATED_LOOKUP_FIELD]
+                        column = model_class.table.columns[settings.default_related_lookup_field]
                     except AttributeError:
                         raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
-            op_attr = FILTER_OPERATORS[op]
+            op_attr = settings.filter_operators[op]
             has_escaped_character = False
 
             if op in ["contains", "icontains"]:
@@ -374,10 +374,6 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
         return queryset
-
-    def _fetch_all(self) -> None:
-        if self._cache is None:
-            self._cache = self._make_query()
 
 
 class QuerySet(BaseQuerySet, QuerySetProtocol):

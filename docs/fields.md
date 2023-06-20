@@ -54,13 +54,13 @@ import saffier
 From `saffier` you can access all the available fields.
 
 ```python
-from saffier import fields
+from saffier.db.models import fields
 ```
 
 From `fields` you should be able to access the fields directly.
 
 ```python
-from saffier.fields import BigIntegerField
+from saffier.db.models.fields import BigIntegerField
 ```
 
 You can import directly the desired field.

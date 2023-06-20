@@ -5,7 +5,7 @@ from orjson import OPT_OMIT_MICROSECONDS  # noqa
 from orjson import OPT_SERIALIZE_NUMPY  # noqa
 from orjson import dumps
 
-from saffier.fields import DateField, DateTimeField
+from saffier.db.models.fields import DateField, DateTimeField
 from saffier.types import DictAny
 
 
