@@ -1,7 +1,7 @@
 import typing
 
 if typing.TYPE_CHECKING:
-    from saffier.models import Model
+    from saffier.db.models.base import Model
 
 # Create a var type for the Saffier Model
 SaffierModel = typing.TypeVar("SaffierModel", bound="Model")

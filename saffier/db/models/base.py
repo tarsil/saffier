@@ -6,9 +6,9 @@ import sqlalchemy
 from sqlalchemy.engine import Engine
 
 from saffier.core.schemas import Schema
-from saffier.db.manager import Manager
+from saffier.db.models.manager import Manager
+from saffier.db.models.metaclass import MetaInfo, ModelMeta, ReflectMeta
 from saffier.exceptions import ImproperlyConfigured
-from saffier.metaclass import MetaInfo, ModelMeta, ReflectMeta
 from saffier.mixins.models import DeclarativeMixin, ModelBuilder
 
 M = typing.TypeVar("M", bound="Model")

@@ -7,13 +7,13 @@ import saffier
 from saffier.conf import settings
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
+from saffier.db.models.fields import CharField, TextField
 from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
-from saffier.fields import CharField, TextField
 from saffier.protocols.queryset import QuerySetProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover
-    from saffier.models import Model, ReflectModel
+    from saffier.db.models.base import Model, ReflectModel
 
 
 _SaffierModel = typing.TypeVar("_SaffierModel", bound="Model")
@@ -240,7 +240,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
-        from saffier.models import Model
+        from saffier.db.models.base import Model
 
         clauses = []
         filter_clauses = self.filter_clauses

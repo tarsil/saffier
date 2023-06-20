@@ -7,10 +7,8 @@ from .core.registry import Registry
 from .db.connection import Database
 from .db.constants import CASCADE, RESTRICT, SET_NULL
 from .db.datastructures import Index, UniqueConstraint
-from .db.manager import Manager
-from .db.queryset import QuerySet
-from .exceptions import DoesNotFound, MultipleObjectsReturned
-from .fields import (
+from .db.models import Model, ReflectModel
+from .db.models.fields import (
     BigIntegerField,
     BooleanField,
     CharField,
@@ -34,8 +32,10 @@ from .fields import (
     URLField,
     UUIDField,
 )
+from .db.models.manager import Manager
+from .db.models.queryset import QuerySet
+from .exceptions import DoesNotFound, MultipleObjectsReturned
 from .migrations import Migrate
-from .models import Model, ReflectModel
 
 __all__ = [
     "BigIntegerField",

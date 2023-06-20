@@ -5,19 +5,19 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy
 
-from saffier import fields as saffier_fields
 from saffier.conf import settings
 from saffier.core.registry import Registry
 from saffier.db.datastructures import Index, UniqueConstraint
-from saffier.db.manager import Manager
+from saffier.db.models import fields as saffier_fields
+from saffier.db.models.fields import BigIntegerField, Field
+from saffier.db.models.manager import Manager
 from saffier.db.relationships.related import RelatedField
 from saffier.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
-from saffier.fields import BigIntegerField, Field
 from saffier.types import DictAny
 
 if TYPE_CHECKING:
-    from saffier.models import Model, ReflectModel
+    from saffier.db.models.base import Model, ReflectModel
 
 
 class MetaInfo:

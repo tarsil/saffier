@@ -9,7 +9,7 @@ from saffier.core.utils import ModelUtil
 from saffier.db.datastructures import Index, UniqueConstraint
 
 if typing.TYPE_CHECKING:
-    from saffier.models import Model
+    from saffier.db.models.base import Model
 
 
 class ModelBuilder(ModelUtil):
