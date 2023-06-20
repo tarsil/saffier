@@ -18,6 +18,14 @@ class User(saffier.Model):
         registry = models
 
 
+class Profile(saffier.Model):
+    user = saffier.ForeignKey(User, related_name="profiles", on_delete=saffier.CASCADE)
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
@@ -95,3 +103,20 @@ async def test_create_model_on_set_id_to_none():
     first = await User.query.first()
 
     assert user.pk == first.pk
+
+
+async def test_save_foreignkey_on_save():
+    user = await User.query.create(name="Saffier")
+    profile = await Profile.query.create(user=user, name="Test")
+
+    profile.user.name = "John"
+
+    await profile.user.save()
+
+    user = await User.query.first()
+
+    assert user.name == "John"
+
+    total = await User.query.count()
+
+    assert total == 1
