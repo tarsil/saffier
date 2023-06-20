@@ -15,6 +15,8 @@ from saffier.db.manager import Manager
 from saffier.exceptions import ImproperlyConfigured
 from saffier.metaclass import MetaInfo, ModelMeta, ReflectMeta
 
+M = typing.TypeVar("M", bound="Model")
+
 
 def async_adapter(wrapped_func):
     """Adapter to run async functions inside the blocking"""
@@ -142,6 +144,9 @@ class Model(ModelMeta, ModelUtil):
         return self.__class__.table
 
     async def update(self, **kwargs: typing.Any) -> typing.Any:
+        """
+        Update operation of the database fields.
+        """
         fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
         validator = Schema(fields=fields)
         kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
@@ -154,6 +159,7 @@ class Model(ModelMeta, ModelUtil):
             setattr(self, key, value)
 
     async def delete(self) -> None:
+        """Delete operation from the database"""
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.delete().where(pk_column == self.pk)
 
@@ -170,6 +176,54 @@ class Model(ModelMeta, ModelUtil):
         # Update the instance.
         for key, value in dict(row._mapping).items():
             setattr(self, key, value)
+
+    def update_from_dict(self, dict_values: typing.Dict[str, typing.Any]) -> "Model":
+        """Updates the current model object with the new fields"""
+        for key, value in dict_values.items():
+            setattr(self, key, value)
+        return self
+
+    def extract_db_fields(self):
+        related_names = self._meta.related_names
+        return {k: v for k, v in self.__dict__.items() if k not in related_names}
+
+    async def save(self: M) -> M:
+        """
+        Performs a save of a given model instance.
+        When creating a user it will make sure it can update existing or
+        create a new one.
+        """
+        extracted_fields = self.extract_db_fields()
+
+        if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
+            extracted_fields.pop(self.pkname, None)
+
+        self.update_from_dict(dict(extracted_fields.items()))
+
+        fields = {
+            key: field.validator for key, field in self.fields.items() if key in extracted_fields
+        }
+        validator = Schema(fields=fields)
+        kwargs = self._update_auto_now_fields(validator.check(extracted_fields), self.fields)
+
+        # Performs the update or the create based on a possible existing primary key
+        if getattr(self, "pk", None) is None:
+            expression = self.table.insert().values(**kwargs)
+            pk_column = await self.database.execute(expression)
+            setattr(self, self.pkname, pk_column)
+        else:
+            pk_column = getattr(self.table.c, self.pkname)
+            expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
+            await self.database.execute(expression)
+
+        # Refresh the results
+        if any(
+            field.server_default is not None
+            for name, field in self.fields.items()
+            if name not in extracted_fields
+        ):
+            await self.load()
+        return self
 
     @classmethod
     def declarative(cls) -> typing.Any:

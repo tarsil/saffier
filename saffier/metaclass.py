@@ -41,6 +41,7 @@ class MetaInfo:
         "_managers",
         "is_multi",
         "multi_related",
+        "related_names",
     )
 
     def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
@@ -63,6 +64,7 @@ class MetaInfo:
         self._managers: bool = getattr(meta, "_managers", None)
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: typing.List[str] = getattr(meta, "multi_related", [])
+        self.related_names: typing.Set[str] = set()
 
 
 def _check_model_inherited_registry(
@@ -114,7 +116,7 @@ def _set_related_name_for_foreign_keys(
         typing.Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]
     ],
     model_class: typing.Union["Model", "ReflectModel"],
-) -> None:
+) -> str:
     """
     Sets the related name for the foreign keys.
     When a `related_name` is generated, creates a RelatedField from the table pointed
@@ -141,6 +143,8 @@ def _set_related_name_for_foreign_keys(
 
         # Set the related name
         setattr(foreign_key.target, default_related_name, related_field)
+
+    return default_related_name
 
 
 def _set_many_to_many_relation(
@@ -221,7 +225,7 @@ class BaseModelMeta(type):
 
             if not is_pk_present and not getattr(meta_class, "abstract", None):
                 if "id" not in attrs:
-                    attrs = {"id": BigIntegerField(primary_key=True), **attrs}
+                    attrs = {"id": BigIntegerField(primary_key=True, autoincrement=True), **attrs}
 
                 if not isinstance(attrs["id"], Field) or not attrs["id"].primary_key:
                     raise ImproperlyConfigured(
@@ -351,7 +355,8 @@ class BaseModelMeta(type):
 
         # Sets the foreign key fields
         if meta.foreign_key_fields:
-            _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            meta.related_names.add(related_name)
 
         for field, value in new_class.fields.items():
             if isinstance(value, saffier_fields.ManyToManyField):
