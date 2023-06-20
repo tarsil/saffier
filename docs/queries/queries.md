@@ -211,6 +211,37 @@ users = await User.query.all()
     can also be aggregated with other [queryset operations](#returning-querysets).
 
 
+### Save
+
+This is a classic operation that is very useful depending on which operations you need to perform.
+Used to save an existing object in the database. Slighly different from the [update](#update) and
+simpler to read.
+
+```python
+await User.query.create(is_active=True, email="foo@bar.com")
+
+user = await User.query.get(email="foo@bar.com")
+user.email = "bar@foo.com"
+
+await user.save()
+```
+
+Now a more unique, yet possible scenario with a save. Imagine you need to create an exact copy
+of an object and store it in the database. These cases are more common than you think but this is
+for example purposes only.
+
+```python
+await User.query.create(is_active=True, email="foo@bar.com", name="John Doe")
+
+user = await User.query.get(email="foo@bar.com")
+# User(id=1)
+
+# Making a quick copy
+user.id = None
+new_user = await user.save()
+# user(id=2)
+```
+
 ### Create
 
 Used to create model instances.

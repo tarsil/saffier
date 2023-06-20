@@ -67,5 +67,5 @@ async def test_model_custom_primary_key_raised_error_without_default(
 
     assert (
         raised.value.args[0]
-        == "Primary keys other then IntegerField and BigIntegerField, must provide a default."
+        == "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
     )
