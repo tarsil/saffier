@@ -31,6 +31,8 @@ build an admin-like application.
     <sup>Set default to `""`</sup>
 
 * **default** - A value or a callable (function).
+* **server_default** - nstance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
+construct representing the DDL DEFAULT value for the column.
 * **comment** - A comment to be added with the field in the SQL database.
 
 ## Available fields

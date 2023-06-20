@@ -57,6 +57,8 @@ class Field:
         )
         self.comment = kwargs.get("comment", None)
         self.owner = kwargs.pop("owner", None)
+        self.server_default = kwargs.pop("server_default", None)
+        self.server_onupdate = kwargs.pop("server_onupdate", None)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """
@@ -75,6 +77,7 @@ class Field:
             unique=self.unique,
             default=self.default_value,
             comment=self.comment,
+            server_default=self.server_default,
         )
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
@@ -92,7 +95,7 @@ class Field:
     def raise_for_non_default(self, default: typing.Any) -> typing.Any:
         if not isinstance(self, (IntegerField, BigIntegerField)) and not default:
             raise ValueError(
-                "Primary keys other then IntegerField and BigIntegerField, must provide a default."
+                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
 
 
