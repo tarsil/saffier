@@ -4,9 +4,9 @@ import typing
 import sqlalchemy
 
 import saffier
+from saffier.conf import settings
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import DEFAULT_RELATED_LOOKUP_FIELD, FILTER_OPERATORS
 from saffier.db.query.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.fields import CharField, TextField
@@ -256,7 +256,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
 
                 # Determine if we should treat the final part as a
                 # filter operator or as a related field.
-                if parts[-1] in FILTER_OPERATORS:
+                if parts[-1] in settings.filter_operators:
                     op = parts[-1]
                     field_name = parts[-2]
                     related_parts = parts[:-2]
@@ -292,13 +292,13 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
                     # It raises the KeyError from the previous check
                     try:
                         model_class = getattr(self.model_class, key).related_to
-                        column = model_class.table.columns[DEFAULT_RELATED_LOOKUP_FIELD]
+                        column = model_class.table.columns[settings.default_related_lookup_field]
                     except AttributeError:
                         raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
-            op_attr = FILTER_OPERATORS[op]
+            op_attr = settings.filter_operators[op]
             has_escaped_character = False
 
             if op in ["contains", "icontains"]:

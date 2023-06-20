@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import List, Set
+from typing import Dict, List, Set
 
 from pydantic import BaseConfig, BaseSettings
 
@@ -25,6 +25,21 @@ class SaffierSettings(BaseSettings):
         Do not override this one as SQLAlchemy doesn't support async for MSSQL.
         """
         return {"aioodbc"}
+
+    # General settings
+    default_related_lookup_field: str = "id"
+    filter_operators: Dict[str, str] = {
+        "exact": "__eq__",
+        "iexact": "ilike",
+        "contains": "like",
+        "icontains": "ilike",
+        "in": "in_",
+        "gt": "__gt__",
+        "gte": "__ge__",
+        "lt": "__lt__",
+        "lte": "__le__",
+    }
+    many_to_many_relation: str = "relation_{key}"
 
     class Config(BaseConfig):
         extra = "allow"

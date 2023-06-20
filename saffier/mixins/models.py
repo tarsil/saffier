@@ -4,8 +4,8 @@ import sqlalchemy
 from sqlalchemy.orm import Mapped, relationship
 
 import saffier
+from saffier.conf import settings
 from saffier.core.utils import ModelUtil
-from saffier.db.constants import MANY_TO_MANY_RELATION
 from saffier.db.datastructures import Index, UniqueConstraint
 
 if typing.TYPE_CHECKING:
@@ -119,7 +119,7 @@ class ModelBuilder(ModelUtil):
             field = self.fields[key]
 
             if isinstance(field, saffier.ManyToManyField):
-                value = getattr(self, MANY_TO_MANY_RELATION.format(key=key))
+                value = getattr(self, settings.many_to_many_relation.format(key=key))
             else:
                 value = self.fields[key].expand_relationship(value)
 
