@@ -146,7 +146,7 @@ async def test_both_auto_now_and_auto_now_add_raise_error():
         class Product(saffier.Model):
             registry = models
             fields = {
-                "id": fields.Integer(primary_key=True),
+                "id": fields.IntegerField(primary_key=True),
                 "created_datetime": fields.DateTimeField(auto_now_add=True, auto_now=True),
             }
 
