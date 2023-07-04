@@ -11,6 +11,9 @@ performance.
     This is a massive performance improvement done by Pydantic that is now compiled in Rust. This
     bring a whole new level of performance to Saffier as well.
 
+!!! Warning
+    To use Saffier with Esmerald, until it is announced compatibility with pydantic 2.0 with Esmerald, it is recommended to use saffier prior to this release.
+
 ## 0.13.0
 
 ### Changed
