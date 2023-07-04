@@ -273,15 +273,15 @@ class Number(SaffierField):
 
 
 class Integer(Number):
-    field_type = int
+    field_type: typing.Any = int
 
 
 class Float(Number):
-    field_type = int
+    field_type: typing.Any = float
 
 
 class Decimal(Number):
-    field_type = decimal.Decimal
+    field_type: typing.Any = decimal.Decimal
 
 
 class Boolean(SaffierField):
@@ -289,7 +289,7 @@ class Boolean(SaffierField):
         "type": "Must be a boolean.",
         "null": "May not be null.",
     }
-    coerse_values = {
+    coerse_values: typing.Mapping[typing.Union[str, int], bool] = {
         "true": True,
         "false": False,
         "on": True,
@@ -300,7 +300,7 @@ class Boolean(SaffierField):
         1: True,
         0: False,
     }
-    coerce_null_values = {"", "null", "none"}
+    coerce_null_values: typing.Set[str] = {"", "null", "none"}
 
     def __init__(self, *, coerce_types: bool = True, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)

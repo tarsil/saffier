@@ -10,7 +10,6 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from saffier.conf import settings
 from saffier.db.connection import Database
 from saffier.exceptions import ImproperlyConfigured
-from saffier.types import DictAny
 
 
 class Registry:
@@ -18,15 +17,15 @@ class Registry:
     Registers a database connection object
     """
 
-    def __init__(self, database: Database, **kwargs: DictAny) -> None:
+    def __init__(self, database: Database, **kwargs: Any) -> None:
         assert isinstance(
             database, Database
         ), "database must be an instance of saffier.core.db.Database"
 
         super().__init__(**kwargs)
         self.database = database
-        self.models: DictAny = {}
-        self.reflected: DictAny = {}
+        self.models: Any = {}
+        self.reflected: Any = {}
         self.db_schema = kwargs.get("schema", None)
 
         if self.db_schema:

@@ -1,8 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
-
-from saffier.types import DictAny
+from pydantic import BaseModel, ConfigDict
 
 object_setattr = object.__setattr__
 
@@ -19,7 +17,7 @@ class HashableBaseModel(BaseModel):
     __slots__ = ["__weakref__"]
 
     def __hash__(self) -> Any:
-        values: DictAny = {}
+        values: Any = {}
         for key, value in self.__dict__.items():
             values[key] = None
             if isinstance(value, (list, set)):
@@ -34,6 +32,4 @@ class ArbitraryHashableBaseModel(HashableBaseModel):
     Same as HashableBaseModel but allowing arbitrary values
     """
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)

@@ -12,7 +12,7 @@ The way of using the settings object within a Saffier use of the ORM is via:
 
 * **SAFFIER_SETTINGS_MODULE** environment variable.
 
-All the settings are **pydantic BaseSettings** objects which makes it easier to use and override
+All the settings are **[pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects which makes it easier to use and override
 when needed.
 
 ### SAFFIER_SETTINGS_MODULE

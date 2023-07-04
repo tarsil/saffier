@@ -1,10 +1,13 @@
 from functools import cached_property
 from typing import Dict, List, Set
 
-from pydantic import BaseConfig, BaseSettings
+from pydantic import ConfigDict
+from pydantic_settings import BaseSettings
 
 
 class SaffierSettings(BaseSettings):
+    model_config = ConfigDict(extra="allow", ignored_types=(cached_property,))
+
     ipython_args: List[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 
@@ -15,9 +18,9 @@ class SaffierSettings(BaseSettings):
     mssql_dialects: Set[str] = {"mssql"}
 
     # Drivers
-    postgres_drivers = {"aiopg", "asyncpg"}
-    mysql_drivers = {"aiomysql", "asyncmy"}
-    sqlite_drivers = {"aiosqlite"}
+    postgres_drivers: Set[str] = {"aiopg", "asyncpg"}
+    mysql_drivers: Set[str] = {"aiomysql", "asyncmy"}
+    sqlite_drivers: Set[str] = {"aiosqlite"}
 
     @property
     def mssql_drivers(self) -> Set[str]:
@@ -40,7 +43,3 @@ class SaffierSettings(BaseSettings):
         "lte": "__le__",
     }
     many_to_many_relation: str = "relation_{key}"
-
-    class Config(BaseConfig):
-        extra = "allow"
-        keep_untouched = (cached_property,)
