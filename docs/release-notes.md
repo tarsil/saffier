@@ -1,5 +1,16 @@
 # Release Notes
 
+## 0.14.0
+
+### Changed
+
+- Update Saffier core to start using [Pydantic 2.0](https://docs.pydantic.dev/2.0/) and improved
+performance.
+
+!!! Note
+    This is a massive performance improvement done by Pydantic that is now compiled in Rust. This
+    bring a whole new level of performance to Saffier as well.
+
 ## 0.13.0
 
 ### Changed
