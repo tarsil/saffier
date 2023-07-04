@@ -1,12 +1,12 @@
 import typing
 from enum import Enum
+from typing import Any
 
 from orjson import OPT_OMIT_MICROSECONDS  # noqa
 from orjson import OPT_SERIALIZE_NUMPY  # noqa
 from orjson import dumps
 
 from saffier.db.models.fields import DateField, DateTimeField
-from saffier.types import DictAny
 
 
 class ModelUtil:
@@ -14,7 +14,7 @@ class ModelUtil:
     Utils used by the Registry
     """
 
-    def _update_auto_now_fields(self, values: DictAny, fields: DictAny) -> DictAny:
+    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
         Updates the auto fields
         """

@@ -1,7 +1,7 @@
 import copy
 import inspect
 import typing
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy
 
@@ -14,7 +14,6 @@ from saffier.db.models.manager import Manager
 from saffier.db.relationships.related import RelatedField
 from saffier.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
-from saffier.types import DictAny
 
 if TYPE_CHECKING:
     from saffier.db.models.base import Model, ReflectModel
@@ -95,7 +94,9 @@ def _check_model_inherited_registry(
 
 
 def _check_manager_for_bases(
-    base: typing.Tuple[typing.Type, ...], attrs: DictAny, meta: typing.Optional[MetaInfo] = None
+    base: typing.Tuple[typing.Type, ...],
+    attrs: typing.Any,
+    meta: typing.Optional[MetaInfo] = None,
 ) -> None:
     """
     When an abstract class is declared, we must treat the manager's value coming from the top.
@@ -160,9 +161,7 @@ def _set_many_to_many_relation(
 class BaseModelMeta(type):
     __slots__ = ()
 
-    def __new__(
-        cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: DictAny
-    ) -> typing.Any:
+    def __new__(cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: Any) -> typing.Any:
         fields: typing.Dict[str, Field] = {}
         one_to_one_fields: typing.Any = set()
         foreign_key_fields: typing.Any = set()
@@ -172,7 +171,7 @@ class BaseModelMeta(type):
         registry: typing.Any = None
 
         # Searching for fields "Field" in the class hierarchy.
-        def __search_for_fields(base: typing.Type, attrs: DictAny) -> None:
+        def __search_for_fields(base: typing.Type, attrs: Any) -> None:
             """
             Search for class attributes of the type fields.Field in the given class.
 
@@ -202,7 +201,7 @@ class BaseModelMeta(type):
                 _check_manager_for_bases(base, attrs, meta)  # type: ignore
 
         # Search in the base classes
-        inherited_fields: DictAny = {}
+        inherited_fields: Any = {}
         for base in bases:
             __search_for_fields(base, inherited_fields)
 
@@ -389,9 +388,7 @@ class BaseModelMeta(type):
 
 
 class BaseModelReflectMeta(BaseModelMeta):
-    def __new__(
-        cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: DictAny
-    ) -> typing.Any:
+    def __new__(cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: Any) -> typing.Any:
         new_model = super().__new__(cls, name, bases, attrs)
 
         registry = new_model._meta.registry

@@ -3,11 +3,10 @@ from collections.abc import Mapping
 from typing import Any, Generator, List, Optional, TypeVar
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel as SaffierBaseModel
-from saffier.types import DictAny
 
 
 class Position(SaffierBaseModel):
-    def __init__(self, line_no: int, column_no: int, char_index: int, **kwargs: DictAny):
+    def __init__(self, line_no: int, column_no: int, char_index: int, **kwargs: Any):
         super().__init__(**kwargs)
         self.line_no = line_no
         self.column_no = column_no
@@ -40,7 +39,7 @@ class Message(SaffierBaseModel):
         position: Optional[Position] = None,
         start_position: Optional[Position] = None,
         end_position: Optional[Position] = None,
-        **kwargs: DictAny,
+        **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.text = text
@@ -177,7 +176,7 @@ class ValidationResult(SaffierBaseModel):
         *,
         value: Optional[Any] = None,
         error: Optional[BaseErrorType] = None,
-        **kwargs: DictAny,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         assert value is None or error is None

@@ -1,6 +1,6 @@
 from typing import Any, Dict, Mapping, Type
 
-from pydantic.fields import Undefined
+from pydantic.v1.fields import Undefined
 
 from saffier.core.base import Message
 from saffier.db.fields import SaffierField

@@ -7,7 +7,6 @@ from orjson import loads
 
 from saffier.contrib.sqlalchemy.protocols import BaseFieldProtocol
 from saffier.contrib.sqlalchemy.types import SubList
-from saffier.types import DictAny
 
 DIALECTS = {"postgres": "postgres", "postgresql": "postgresql"}
 
@@ -70,9 +69,7 @@ class List(BaseFieldProtocol):
     Representation of a List.
     """
 
-    def __init__(
-        self, impl: str = sqlalchemy.TEXT, cache_ok: bool = True, **kwargs: DictAny
-    ) -> None:
+    def __init__(self, impl: str = sqlalchemy.TEXT, cache_ok: bool = True, **kwargs: Any) -> None:
         self.delimiter = kwargs.pop("delimiter", ",")
         super().__init__(**kwargs)
         self.impl = impl
