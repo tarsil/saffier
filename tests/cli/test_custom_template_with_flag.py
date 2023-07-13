@@ -41,7 +41,7 @@ def create_folders():
         pass
 
 
-def xtest_alembic_version():
+def test_alembic_version():
     from saffier.migrations import alembic_version
 
     assert len(alembic_version) == 3
@@ -50,7 +50,7 @@ def xtest_alembic_version():
         assert isinstance(v, int)
 
 
-def xtest_migrate_upgrade_with_app_flag(create_folders):
+def test_migrate_upgrade_with_app_flag(create_folders):
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app init -t ./custom", is_app=False
     )
