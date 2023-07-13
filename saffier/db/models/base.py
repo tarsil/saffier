@@ -13,18 +13,6 @@ from saffier.mixins.models import DeclarativeMixin, ModelBuilder
 M = typing.TypeVar("M", bound="Model")
 
 
-# def async_adapter(wrapped_func):
-#     """Adapter to run async functions inside the blocking"""
-
-#     @functools.wraps(wrapped_func)
-#     def run_sync(*args, **kwargs):
-#         loop = asyncio.get_event_loop()
-#         task = wrapped_func(*args, **kwargs)
-#         return loop.run_until_complete(task)
-
-#     return run_sync
-
-
 class Model(ModelMeta, ModelBuilder, DeclarativeMixin):
     """
     The models will always have an id attribute as primery key.
