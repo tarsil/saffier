@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.14.2
+
+### Fixed
+
+- AsyncIO event loop blocking the reflection.
+
 ## 0.14.1
 
 ### Fixed
