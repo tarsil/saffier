@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.14.1
+
+### Fixed
+
+- Remove super init from `Registry`.
+
 ## 0.14.0
 
 ### Changed
