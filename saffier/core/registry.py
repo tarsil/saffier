@@ -22,14 +22,13 @@ class Registry:
             database, Database
         ), "database must be an instance of saffier.core.db.Database"
 
-        super().__init__(**kwargs)
         self.database = database
         self.models: Any = {}
         self.reflected: Any = {}
-        self.db_schema = kwargs.get("schema", None)
+        self._schema = kwargs.get("schema", None)
 
-        if self.db_schema:
-            self._metadata = sqlalchemy.MetaData(schema=self.db_schema)
+        if self._schema:
+            self._metadata = sqlalchemy.MetaData(schema=self._schema)
         else:
             self._metadata = sqlalchemy.MetaData()
 
@@ -62,8 +61,8 @@ class Registry:
 
     @cached_property
     def declarative_base(self) -> Any:
-        if self.db_schema:
-            metadata = sqlalchemy.MetaData(schema=self.db_schema)
+        if self._schema:
+            metadata = sqlalchemy.MetaData(schema=self._schema)
         else:
             metadata = sqlalchemy.MetaData()
         return sa_declarative_base(metadata=metadata)
