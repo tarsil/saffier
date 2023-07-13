@@ -1,4 +1,3 @@
-import asyncio
 import functools
 import typing
 
@@ -14,16 +13,16 @@ from saffier.mixins.models import DeclarativeMixin, ModelBuilder
 M = typing.TypeVar("M", bound="Model")
 
 
-def async_adapter(wrapped_func):
-    """Adapter to run async functions inside the blocking"""
+# def async_adapter(wrapped_func):
+#     """Adapter to run async functions inside the blocking"""
 
-    @functools.wraps(wrapped_func)
-    def run_sync(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        task = wrapped_func(*args, **kwargs)
-        return loop.run_until_complete(task)
+#     @functools.wraps(wrapped_func)
+#     def run_sync(*args, **kwargs):
+#         loop = asyncio.get_event_loop()
+#         task = wrapped_func(*args, **kwargs)
+#         return loop.run_until_complete(task)
 
-    return run_sync
+#     return run_sync
 
 
 class Model(ModelMeta, ModelBuilder, DeclarativeMixin):
@@ -203,10 +202,10 @@ class ReflectModel(ReflectMeta, Model):
         """
         metadata = cls._meta.registry._metadata  # type: ignore
         tablename = cls._meta.tablename
-        return cls.reflect(tablename, metadata, cls._meta.registry.database)
+        return cls.reflect(tablename, metadata)
 
     @classmethod
-    def inspect(cls, connection, tablename, metadata):
+    def reflect(cls, tablename, metadata):
         try:
             return sqlalchemy.Table(
                 tablename, metadata, autoload_with=cls._meta.registry.sync_engine
@@ -215,18 +214,3 @@ class ReflectModel(ReflectMeta, Model):
             raise ImproperlyConfigured(
                 detail=f"Table with the name {tablename} does not exist."
             ) from e
-
-    @classmethod
-    @async_adapter
-    async def reflect(
-        cls,
-        tablename: str,
-        metadata: sqlalchemy.MetaData,
-        database: typing.Any,
-    ) -> sqlalchemy.Table:
-        """SQLAlchemy doesn't support, yet, async reflection and therefore we must run
-        the event loop.
-        """
-        async with database.connection() as connection:
-            table = await connection.run_sync(cls.inspect, tablename, metadata)
-            return table
