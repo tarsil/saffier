@@ -6,6 +6,9 @@ got stuck trying to do it and wasted a lot of time?
 Well, Saffier gives you that possibility completely out of the box and ready to use with your
 application models.
 
+!!! Warning
+    Be aware of the use of this special class in production! It is advised not to use it there.
+
 ## Important
 
 Before reading this section, you should get familiar with the ways Saffier handles the discovery
@@ -14,6 +17,10 @@ of the applications.
 The following examples and explanations will be using the [auto discovery](./migrations/discovery.md#auto-discovery)
 but [--app and environment variables](./migrations/discovery.md##environment-variables) approach but the
 is equally valid and works in the same way.
+
+!!! Tip
+    See the [extras](./extras.md) section after getting familiar with the previous. There offers
+    a way of using the shell without going through the **Migrate** object.
 
 ## How does it work
 

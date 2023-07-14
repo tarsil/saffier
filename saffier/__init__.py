@@ -1,8 +1,9 @@
-__version__ = "0.14.2"
+__version__ = "0.15.0"
 
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings
 
+from .core.extras import SaffierExtra
 from .core.registry import Registry
 from .db.connection import Database
 from .db.constants import CASCADE, RESTRICT, SET_NULL
@@ -68,6 +69,7 @@ __all__ = [
     "RESTRICT",
     "ReflectModel",
     "Registry",
+    "SaffierExtra",
     "SaffierSettings",
     "SET_NULL",
     "TextField",

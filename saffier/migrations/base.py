@@ -1,22 +1,25 @@
 import argparse
 import os
 import typing
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
 from alembic.config import Config as AlembicConfig
 
-from saffier import Registry
-from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME
+from saffier.core.extras.base import BaseExtra
+from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
 from saffier.migrations.decorators import catch_errors
 
-alembic_version = tuple([int(v) for v in __alembic_version__.split(".")[0:3]])
+if TYPE_CHECKING:
+    from saffier.core.registry import Registry
+
+alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
 object_setattr = object.__setattr__
 
 
 class MigrateConfig:
-    def __init__(self, migrate: typing.Any, registry: Registry, **kwargs: Any) -> None:
+    def __init__(self, migrate: typing.Any, registry: "Registry", **kwargs: Any) -> None:
         self.migrate = migrate
         self.registry = registry
         self.directory = migrate.directory
@@ -43,7 +46,7 @@ class Config(AlembicConfig):
         return os.path.join(package_dir, "templates")
 
 
-class Migrate:
+class Migrate(BaseExtra):
     """
     Main migration object that should be used in any application
     that requires Saffier to control the migration process.
@@ -55,17 +58,17 @@ class Migrate:
     def __init__(
         self,
         app: typing.Any,
-        registry: Registry,
+        registry: "Registry",
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
-    ):
-        assert isinstance(registry, Registry), "Registry must be an instance of saffier.Registry"
+    ) -> None:
+        super().__init__(**kwargs)
 
         self.app = app
         self.configure_callbacks: typing.List[Callable] = []
         self.registry = registry
-        self.directory = str("migrations")
+        self.directory = "migrations"
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
@@ -77,7 +80,7 @@ class Migrate:
         Sets a saffier dictionary for the app object.
         """
         migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
-        object_setattr(app, "_saffier_db", {})
+        object_setattr(app, SAFFIER_DB, {})
         app._saffier_db["migrate"] = migrate
 
     def configure(self, f: Callable) -> Any:

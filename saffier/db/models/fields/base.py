@@ -1,12 +1,11 @@
 import typing
-import warnings
 from datetime import date, datetime
 
 import sqlalchemy
 
 import saffier
 from saffier.contrib.sqlalchemy.fields import IPAddress
-from saffier.core.terminal import Terminal
+from saffier.core.terminal import Print
 from saffier.db.constants import CASCADE, SET_NULL
 from saffier.db.fields import (
     URL,
@@ -26,7 +25,7 @@ from saffier.db.fields import Password, SaffierField, String, Time
 if typing.TYPE_CHECKING:
     from saffier import Model
 
-terminal = Terminal()
+terminal = Print()
 
 
 class Field:
@@ -324,10 +323,7 @@ class ManyToManyField(Field):
         **kwargs: typing.Any,
     ):
         if "null" in kwargs:
-            message = terminal.write_warning(
-                "Declaring `null` on a ManyToMany relationship has no effect."
-            )
-            warnings.warn(message, UserWarning, stacklevel=2)
+            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
         super().__init__(null=True)
         self.to = to

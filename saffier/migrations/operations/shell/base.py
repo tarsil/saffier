@@ -24,8 +24,13 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
     """
     Starts an interactive ipython shell with all the models
     and important python libraries.
+
+    This can be used with a Migration class or with SaffierExtra object lookup.
     """
-    registry = env.app._saffier_db["migrate"].registry
+    try:
+        registry = env.app._saffier_db["migrate"].registry
+    except AttributeError:
+        registry = env.app._saffier_extra["extra"].registry
 
     if (
         sys.platform != "win32"

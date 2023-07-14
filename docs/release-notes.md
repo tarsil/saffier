@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.15.0
+
+### Added
+
+- [SaffierExtra](./extras.md) class allowing the use of Saffier tools without depending on the `Migrate` object.
+
 ## 0.14.2
 
 ### Fixed
