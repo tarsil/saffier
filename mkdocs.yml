@@ -58,6 +58,7 @@ nav:
       - Discovery: "migrations/discovery.md"
       - Migrations: "migrations/migrations.md"
   - Tips and Tricks: "tips-and-tricks.md"
+  - Extras: "extras.md"
   - Test Client: "test-client.md"
   - Saffier People: "saffier-people.md"
   - Contributing: "contributing.md"
