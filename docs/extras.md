@@ -15,7 +15,7 @@ are cases where that doesn't happen and it is not needed, for example,
 
 A project using reflect models, means that somehow migrations are managed externally and not by
 Saffier and Saffier only needs to reflect those tables back into your code, so, do you really need
-the **Migrate** object here? **Short anwser is no**.
+the **Migrate** object here? **Short answer is no**.
 
 So how can you still use those features without depending on the Migrate object? Enters
 [SaffierExtra](#saffierextra).
