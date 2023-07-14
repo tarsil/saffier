@@ -11,6 +11,7 @@ from saffier.migrations.constants import (
     DISCOVERY_FUNCTIONS,
     SAFFIER_DB,
     SAFFIER_DISCOVER_APP,
+    SAFFIER_EXTRA,
 )
 
 
@@ -96,7 +97,9 @@ class MigrationEnv:
 
             # Iterates through the elements of the module.
             for attr, value in module.__dict__.items():
-                if callable(value) and hasattr(value, SAFFIER_DB):
+                if (callable(value) and hasattr(value, SAFFIER_DB)) or (
+                    callable(value) and hasattr(value, SAFFIER_EXTRA)
+                ):
                     app_path = f"{dotted_path}:{attr}"
                     return Scaffold(app=value, path=app_path)
 
@@ -106,7 +109,7 @@ class MigrationEnv:
                     app_path = f"{dotted_path}:{func}"
                     fn = getattr(module, func)()
 
-                    if hasattr(fn, SAFFIER_DB):
+                    if hasattr(fn, SAFFIER_DB) or hasattr(fn, SAFFIER_EXTRA):
                         return Scaffold(app=fn, path=app_path)
 
     def find_app(self, path: typing.Optional[str], cwd: Path) -> Scaffold:

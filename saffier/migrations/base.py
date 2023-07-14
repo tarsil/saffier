@@ -8,10 +8,11 @@ from alembic import command
 from alembic.config import Config as AlembicConfig
 
 from saffier import Registry
+from saffier.core.extras.base import BaseExtra
 from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME
 from saffier.migrations.decorators import catch_errors
 
-alembic_version = tuple([int(v) for v in __alembic_version__.split(".")[0:3]])
+alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
 object_setattr = object.__setattr__
 
 
@@ -43,7 +44,7 @@ class Config(AlembicConfig):
         return os.path.join(package_dir, "templates")
 
 
-class Migrate:
+class Migrate(BaseExtra):
     """
     Main migration object that should be used in any application
     that requires Saffier to control the migration process.
@@ -59,13 +60,15 @@ class Migrate:
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
-    ):
+    ) -> None:
         assert isinstance(registry, Registry), "Registry must be an instance of saffier.Registry"
+
+        super().__init__(**kwargs)
 
         self.app = app
         self.configure_callbacks: typing.List[Callable] = []
         self.registry = registry
-        self.directory = str("migrations")
+        self.directory = "migrations"
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
