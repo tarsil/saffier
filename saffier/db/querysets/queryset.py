@@ -703,13 +703,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         kwargs = self._validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
-        expression = self.table.insert().values(**kwargs)
-        self._set_query_expression(expression)
-
-        if self.pkname not in kwargs:
-            instance.pk = await self.database.execute(expression)
-        else:
-            await self.database.execute(expression)
+        instance = await instance.save(force_save=True, values=kwargs)
         return instance
 
     async def bulk_create(self, objs: typing.List[typing.Dict]) -> None:
