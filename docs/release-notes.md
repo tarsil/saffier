@@ -1,5 +1,22 @@
 # Release Notes
 
+## 0.16.0
+
+### Changed
+
+- Updated versions of the requirements to the latest.
+- Internal file structure
+- **Breaking change**. Before for fields the import was `from saffier.db.models.fields import ...` and that
+was now changed to `from saffier.db.fields import ...`
+
+### Added
+
+- `values()` and `values_list()` to the queryset.
+
+### Fixed
+
+- ConfigDict in settings.
+
 ## 0.15.0
 
 ### Added
