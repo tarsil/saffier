@@ -60,7 +60,7 @@ from saffier.db import fields
 From `fields` you should be able to access the fields directly.
 
 ```python
-from saffier.db.models.fields import BigIntegerField
+from saffier.db.fields import BigIntegerField
 ```
 
 You can import directly the desired field.
