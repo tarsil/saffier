@@ -7,9 +7,9 @@ import saffier
 from saffier.conf import settings
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.models.fields import CharField, TextField
-from saffier.db.query.protocols import AwaitableQuery
-from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
+from saffier.db.fields import CharField, TextField
+from saffier.db.querysets.protocols import AwaitableQuery
+from saffier.exceptions import DoesNotFound, MultipleObjectsReturned, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover
@@ -523,6 +523,76 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._select_related = related
         return queryset
 
+    async def values(
+        self,
+        fields: typing.Union[typing.Sequence[str], str, None] = None,
+        exclude: typing.Union[typing.Sequence[str], typing.Set[str]] = None,
+        exclude_none: bool = False,
+        flatten: bool = False,
+        **kwargs: typing.Any,
+    ) -> typing.List[typing.Any]:
+        """
+        Returns the results in a python dictionary format.
+        """
+        fields = fields or []
+        queryset: "QuerySet" = self._clone()
+        rows: typing.List[typing.Type["Model"]] = await queryset.all()
+
+        if not isinstance(fields, list):
+            raise QuerySetError(detail="Fields must be an iterable.")
+
+        if not fields:
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]  # type: ignore
+        else:
+            rows = [
+                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)  # type: ignore
+                for row in rows
+            ]
+
+        as_tuple = kwargs.pop("__as_tuple__", False)
+
+        if not as_tuple:
+            return rows
+
+        if not flatten:
+            rows = [tuple(row.values()) for row in rows]  # type: ignore
+        else:
+            try:
+                rows = [row[fields[0]] for row in rows]  # type: ignore
+            except KeyError:
+                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
+        return rows
+
+    async def values_list(
+        self,
+        fields: typing.Union[typing.Sequence[str], str, None] = None,
+        exclude: typing.Union[typing.Sequence[str], typing.Set[str]] = None,
+        exclude_none: bool = False,
+        flat: bool = False,
+    ) -> typing.List[typing.Any]:
+        """
+        Returns the results in a python dictionary format.
+        """
+        fields = fields or []
+        if flat and len(fields) > 1:
+            raise QuerySetError(
+                detail=f"Maximum of 1 in fields when `flat` is enables, got {len(fields)} instead."
+            ) from None
+
+        if flat and isinstance(fields, str):
+            fields = [fields]
+
+        if isinstance(fields, str):
+            fields = [fields]
+
+        return await self.values(
+            fields=fields,
+            exclude=exclude,
+            exclude_none=exclude_none,
+            flatten=flat,
+            __as_tuple__=True,
+        )
+
     async def exists(self) -> bool:
         """
         Returns a boolean indicating if a record exists or not.
@@ -633,13 +703,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         kwargs = self._validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
-        expression = self.table.insert().values(**kwargs)
-        self._set_query_expression(expression)
-
-        if self.pkname not in kwargs:
-            instance.pk = await self.database.execute(expression)
-        else:
-            await self.database.execute(expression)
+        instance = await instance.save(force_save=True, values=kwargs)
         return instance
 
     async def bulk_create(self, objs: typing.List[typing.Dict]) -> None:

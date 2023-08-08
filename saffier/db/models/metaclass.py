@@ -7,9 +7,9 @@ import sqlalchemy
 
 from saffier.conf import settings
 from saffier.core.registry import Registry
+from saffier.db import fields as saffier_fields
 from saffier.db.datastructures import Index, UniqueConstraint
-from saffier.db.models import fields as saffier_fields
-from saffier.db.models.fields import BigIntegerField, Field
+from saffier.db.fields import BigIntegerField, Field
 from saffier.db.models.manager import Manager
 from saffier.db.relationships.related import RelatedField
 from saffier.db.relationships.relation import Relation

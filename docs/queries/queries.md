@@ -351,6 +351,93 @@ user = await User.query.create(email="foo@bar.com")
 exists = await User.query.contains(instance=user)
 ```
 
+### Values
+
+Returns the model results in a dictionary like format.
+
+```python
+await User.query.create(name="John" email="foo@bar.com")
+
+# All values
+user = User.query.values()
+users == [
+    {"id": 1, "name": "John", "email": "foo@bar.com"},
+]
+
+# Only the name
+user = User.query.values("name")
+users == [
+    {"name": "John"},
+]
+# Or as a list
+# Only the name
+user = User.query.values(["name"])
+users == [
+    {"name": "John"},
+]
+
+# Exclude some values
+user = User.query.values(exclude=["id"])
+users == [
+    {"name": "John", "email": "foo@bar.com"},
+]
+```
+
+The `values()` can also be combined with `filter`, `only`, `exclude` as per usual.
+
+**Parameters**:
+
+* **fields** - Fields of values to return.
+* **exclude** - Fields to exclude from the return.
+* **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
+
+### Values list
+
+Returns the model results in a tuple like format.
+
+```python
+await User.query.create(name="John" email="foo@bar.com")
+
+# All values
+user = User.query.values_list()
+users == [
+    (1, "John" "foo@bar.com"),
+]
+
+# Only the name
+user = User.query.values_list("name")
+users == [
+    ("John",),
+]
+# Or as a list
+# Only the name
+user = User.query.values_list(["name"])
+users == [
+    ("John",),
+]
+
+# Exclude some values
+user = User.query.values(exclude=["id"])
+users == [
+    ("John", "foo@bar.com"),
+]
+
+# Flattened
+user = User.query.values_list("email", flat=True)
+users == [
+    "foo@bar.com",
+]
+```
+
+The `values_list()` can also be combined with `filter`, `only`, `exclude` as per usual.
+
+**Parameters**:
+
+* **fields** - Fields of values to return.
+* **exclude** - Fields to exclude from the return.
+* **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
+* **flat** - Boolean flag indicating the results should be flattened.
+
 ### Get or none
 
 When querying a model and do not want to raise a [DoesNotFound](../exceptions.md#doesnotfound) and

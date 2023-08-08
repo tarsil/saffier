@@ -53,5 +53,9 @@ class RelationshipNotFound(SaffierException):
     ...
 
 
+class QuerySetError(SaffierException):
+    ...
+
+
 class CommandEnvironmentError(SaffierException):
     ...

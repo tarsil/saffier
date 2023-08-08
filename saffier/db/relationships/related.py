@@ -1,7 +1,7 @@
 import functools
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
-from saffier.db.models import fields
+from saffier.db import fields
 
 if TYPE_CHECKING:
     from saffier import Model, ReflectModel
