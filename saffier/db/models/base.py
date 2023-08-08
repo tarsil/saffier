@@ -61,14 +61,14 @@ class Model(ModelMeta, ModelBuilder, DeclarativeMixin):
         include: Union[
             typing.Set[int],
             typing.Set[str],
-            dict[int, typing.Any],
+            typing.Dict[int, typing.Any],
             typing.Dict[str, typing.Any],
             None,
         ] = None,
         exclude: Union[
             typing.Set[int],
             typing.Set[str],
-            dict[int, typing.Any],
+            typing.Dict[int, typing.Any],
             typing.Dict[str, typing.Any],
             None,
         ] = None,
