@@ -1,5 +1,6 @@
 import functools
 import typing
+from typing import Union
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -52,6 +53,29 @@ class Model(ModelMeta, ModelBuilder, DeclarativeMixin):
                     tablename = "users"
 
         """
+
+    def model_dump(
+        self,
+        include: Union[
+            set[int], set[str], dict[int, typing.Any], dict[str, typing.Any] | None
+        ] = None,
+        exclude: Union[
+            set[int], set[str], dict[int, typing.Any], dict[str, typing.Any] | None
+        ] = None,
+        exclude_none: bool = False,
+    ) -> typing.Dict[str, typing.Any]:
+        """
+        Dumps the model in a dict format.
+        """
+        row_dict = dict(self.__dict__.items())
+
+        if include is not None:
+            row_dict = {k: v for k, v in row_dict.items() if k in include}
+        if exclude is not None:
+            row_dict = {k: v for k, v in row_dict.items() if k not in exclude}
+        if exclude_none:
+            row_dict = {k: v for k, v in row_dict.items() if v is not None}
+        return row_dict
 
     async def update(self, **kwargs: typing.Any) -> typing.Any:
         """
