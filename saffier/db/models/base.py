@@ -59,10 +59,18 @@ class Model(ModelMeta, ModelBuilder, DeclarativeMixin):
     def model_dump(
         self,
         include: Union[
-            set[int], set[str], dict[int, typing.Any], dict[str, typing.Any] | None
+            typing.Set[int],
+            typing.Set[str],
+            dict[int, typing.Any],
+            typing.Dict[str, typing.Any],
+            None,
         ] = None,
         exclude: Union[
-            set[int], set[str], dict[int, typing.Any], dict[str, typing.Any] | None
+            typing.Set[int],
+            typing.Set[str],
+            dict[int, typing.Any],
+            typing.Dict[str, typing.Any],
+            None,
         ] = None,
         exclude_none: bool = False,
     ) -> typing.Dict[str, typing.Any]:
