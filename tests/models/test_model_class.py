@@ -1,7 +1,7 @@
 import pytest
 
 import saffier
-from saffier.db import fields
+from saffier.db.fields import _internal as fields_internal
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -63,8 +63,8 @@ def test_model_class():
     assert str(User(id=1)) == "User(id=1)"
     assert repr(User(id=1)) == "<User: User(id=1)>"
 
-    assert isinstance(User.query.schema.fields["id"], fields.Integer)
-    assert isinstance(User.query.schema.fields["name"], fields.String)
+    assert isinstance(User.query.schema.fields["id"], fields_internal.Integer)
+    assert isinstance(User.query.schema.fields["name"], fields_internal.String)
 
 
 def test_model_pk():

@@ -54,7 +54,7 @@ import saffier
 From `saffier` you can access all the available fields.
 
 ```python
-from saffier.db.models import fields
+from saffier.db import fields
 ```
 
 From `fields` you should be able to access the fields directly.

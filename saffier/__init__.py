@@ -8,8 +8,7 @@ from .core.registry import Registry
 from .db.connection import Database
 from .db.constants import CASCADE, RESTRICT, SET_NULL
 from .db.datastructures import Index, UniqueConstraint
-from .db.models import Model, ReflectModel
-from .db.models.fields import (
+from .db.fields import (
     BigIntegerField,
     BooleanField,
     CharField,
@@ -33,8 +32,9 @@ from .db.models.fields import (
     URLField,
     UUIDField,
 )
+from .db.models import Model, ReflectModel
 from .db.models.manager import Manager
-from .db.query.queryset import QuerySet
+from .db.querysets.queryset import QuerySet
 from .exceptions import DoesNotFound, MultipleObjectsReturned
 from .migrations import Migrate
 

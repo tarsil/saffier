@@ -7,7 +7,7 @@ import saffier
 from saffier.contrib.sqlalchemy.fields import IPAddress
 from saffier.core.terminal import Print
 from saffier.db.constants import CASCADE, SET_NULL
-from saffier.db.fields import (
+from saffier.db.fields._internal import (
     URL,
     UUID,
     Any,
@@ -19,8 +19,8 @@ from saffier.db.fields import (
     Float,
     Integer,
 )
-from saffier.db.fields import IPAddress as CoreIPAddress
-from saffier.db.fields import Password, SaffierField, String, Time
+from saffier.db.fields._internal import IPAddress as CoreIPAddress
+from saffier.db.fields._internal import Password, SaffierField, String, Time
 
 if typing.TYPE_CHECKING:
     from saffier import Model

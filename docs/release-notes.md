@@ -47,7 +47,7 @@ from saffier import fields
 **Now**
 
 ```python
-from saffier.db.models import fields
+from saffier.db import fields
 ```
 
 ### Added

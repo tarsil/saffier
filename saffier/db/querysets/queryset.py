@@ -7,8 +7,8 @@ import saffier
 from saffier.conf import settings
 from saffier.core.schemas import Schema
 from saffier.core.utils import ModelUtil
-from saffier.db.models.fields import CharField, TextField
-from saffier.db.query.protocols import AwaitableQuery
+from saffier.db.fields import CharField, TextField
+from saffier.db.querysets.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.protocols.queryset import QuerySetProtocol
 
