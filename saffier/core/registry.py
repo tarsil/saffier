@@ -15,13 +15,13 @@ from saffier.exceptions import ImproperlyConfigured
 class Registry:
     """
     The command center for the models being generated
-    for Edgy.
+    for Saffier.
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
         assert isinstance(
             database, Database
-        ), "database must be an instance of edgy.core.connection.Database"
+        ), "database must be an instance of saffier.db.connection.Database"
 
         self.database = database
         self.models: Any = {}
@@ -76,9 +76,9 @@ class Registry:
             elif url.dialect in settings.sqlite_dialects:
                 url = url.replace(driver="aiosqlite")
             elif url.dialect in settings.mssql_dialects:
-                raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
+                raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         elif url.driver in settings.mssql_drivers:
-            raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
+            raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         return str(url)
 
     @cached_property
