@@ -123,7 +123,7 @@ $ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier ma
 $ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier migrate
 ```
 
-And the list goes on and on, you get the gist. Too understand which commands are available, check
+And the list goes on and on, you get the gist. To understand which commands are available, check
 the [commands](./migrations/migrations.md) available to you and the [shell support](./shell.md) for
 the Saffier shell support.
 
