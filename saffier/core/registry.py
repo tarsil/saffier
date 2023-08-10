@@ -37,7 +37,7 @@ class Registry:
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
-            model_class.build()
+            model_class.build_table()
         return self._metadata
 
     @metadata.setter
