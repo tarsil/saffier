@@ -63,16 +63,17 @@ Saffier is some sort of a fork from [Encode ORM](https://www.encode.io/orm/) but
 core and with a complete set of tools with a familiar interface to work with.
 If you are familiar with Django, then you came for a treat 😄.
 
-This was necessary because the team behind [Encode ORM](https://www.encode.io/orm/) is extremely
-busy and could not dedicate as much time as they would like to the project so I decided to continue
-and improve.
-
 Saffier leverages the power of **Pydantic** for its fields while offering a friendly, familiar and
 easy to use interface.
 
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
 [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
 design thanks to its origins.
+
+### Special notes
+
+Saffier couldn't exist without [Encode ORM](https://www.encode.io/orm/) and the continous work
+done by the amazing team behind it. For that reason, thank you!
 
 ## Features
 
