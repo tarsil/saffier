@@ -65,6 +65,7 @@ async def test_bulk_create():
             {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
         ]
     )
+    breakpoint()
     products = await Product.query.all()
     assert len(products) == 2
     assert products[0].data == {"foo": 123}
