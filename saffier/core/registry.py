@@ -48,11 +48,10 @@ class Registry:
         """
         Creates a model schema if it does not exist.
         """
-        async with self.database:
-            async with self.engine.begin() as connection:
-                await connection.execute(
-                    sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
-                )
+        expression = sqlalchemy.text(
+            str(sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists))
+        )
+        await self.database.execute(expression)
 
     async def drop_schema(
         self, schema: str, cascade: bool = False, if_exists: bool = False
@@ -60,11 +59,12 @@ class Registry:
         """
         Drops an existing model schema.
         """
-        async with self.database:
-            async with self.engine.begin() as connection:
-                await connection.execute(
-                    sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)
-                )
+        expression = sqlalchemy.text(
+            str(
+                sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)  # type: ignore
+            )
+        )
+        await self.database.execute(expression)
 
     def _get_database_url(self) -> str:
         url = self.database.url
