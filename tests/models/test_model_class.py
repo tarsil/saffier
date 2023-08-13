@@ -1,7 +1,7 @@
 import pytest
 
 import saffier
-from saffier.db.fields import _internal as fields_internal
+from saffier.core.db.fields import _internal as fields_internal
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL

@@ -2,8 +2,8 @@ from typing import Any, Dict, Mapping, Type
 
 from pydantic_core._pydantic_core import PydanticUndefined as Undefined
 
-from saffier.core.base import Message
-from saffier.db.fields._internal import SaffierField
+from saffier.core.db.fields._internal import SaffierField
+from saffier.core.utils.base import Message
 from saffier.exceptions import ValidationError
 
 

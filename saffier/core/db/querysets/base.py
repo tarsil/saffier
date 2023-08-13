@@ -5,15 +5,15 @@ import sqlalchemy
 
 import saffier
 from saffier.conf import settings
-from saffier.core.schemas import Schema
-from saffier.core.utils import ModelUtil
+from saffier.core.db.querysets.protocols import AwaitableQuery
+from saffier.core.utils.model import ModelUtil
+from saffier.core.utils.schemas import Schema
 from saffier.db.fields import CharField, TextField
-from saffier.db.querysets.protocols import AwaitableQuery
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover
-    from saffier.db.models.base import Model, ReflectModel
+    from saffier.core.db.models.base import Model, ReflectModel
 
 
 _SaffierModel = typing.TypeVar("_SaffierModel", bound="Model")
@@ -240,7 +240,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
-        from saffier.db.models.base import Model
+        from saffier.core.db.models.base import Model
 
         clauses = []
         filter_clauses = self.filter_clauses

@@ -12,7 +12,7 @@ from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
 from saffier.migrations.decorators import catch_errors
 
 if TYPE_CHECKING:
-    from saffier.core.registry import Registry
+    from saffier.core.connection.registry import Registry
 
 alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
 object_setattr = object.__setattr__

@@ -4,7 +4,7 @@ import string
 import pytest
 
 import saffier
-from saffier.db.datastructures import Index
+from saffier.core.db.datastructures import Index
 from saffier.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 

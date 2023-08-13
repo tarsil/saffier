@@ -1,6 +1,6 @@
 import typing
 
-from saffier.core.base import BaseError
+from saffier.core.utils.base import BaseError
 
 
 class SaffierException(Exception):
@@ -54,6 +54,14 @@ class RelationshipNotFound(SaffierException):
 
 
 class QuerySetError(SaffierException):
+    ...
+
+
+class ModelReferenceError(SaffierException):
+    ...
+
+
+class SchemaError(SaffierException):
     ...
 
 

@@ -3,12 +3,11 @@ __version__ = "0.16.0"
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings
 
-from .core.extras import SaffierExtra
-from .core.registry import Registry
-from .db.connection import Database
-from .db.constants import CASCADE, RESTRICT, SET_NULL
-from .db.datastructures import Index, UniqueConstraint
-from .db.fields import (
+from .core.connection.database import Database
+from .core.connection.registry import Registry
+from .core.db.constants import CASCADE, RESTRICT, SET_NULL
+from .core.db.datastructures import Index, UniqueConstraint
+from .core.db.fields import (
     BigIntegerField,
     BooleanField,
     CharField,
@@ -32,9 +31,10 @@ from .db.fields import (
     URLField,
     UUIDField,
 )
-from .db.models import Model, ReflectModel
-from .db.models.manager import Manager
-from .db.querysets.queryset import QuerySet
+from .core.db.models import Model, ReflectModel
+from .core.db.models.manager import Manager
+from .core.db.querysets.base import QuerySet
+from .core.extras import SaffierExtra
 from .exceptions import DoesNotFound, MultipleObjectsReturned
 from .migrations import Migrate
 

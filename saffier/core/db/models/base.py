@@ -5,10 +5,10 @@ from typing import Union
 import sqlalchemy
 from sqlalchemy.engine import Engine
 
-from saffier.core.schemas import Schema
-from saffier.db.models.manager import Manager
-from saffier.db.models.metaclass import MetaInfo, ModelMeta, ReflectMeta
-from saffier.db.models.mixins.models import DeclarativeMixin, ModelBuilder
+from saffier.core.db.models.manager import Manager
+from saffier.core.db.models.metaclass import MetaInfo, ModelMeta, ReflectMeta
+from saffier.core.db.models.mixins.models import DeclarativeMixin, ModelBuilder
+from saffier.core.utils.schemas import Schema
 from saffier.exceptions import ImproperlyConfigured
 
 M = typing.TypeVar("M", bound="Model")

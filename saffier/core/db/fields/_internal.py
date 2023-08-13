@@ -3,10 +3,10 @@ import re
 import typing
 from math import isfinite
 
-from saffier.core import formats
-from saffier.core.base import ValidationResult
 from saffier.core.datastructures import ArbitraryHashableBaseModel
-from saffier.core.unique import Uniqueness
+from saffier.core.utils import formats
+from saffier.core.utils.base import ValidationResult
+from saffier.core.utils.unique import Uniqueness
 from saffier.exceptions import ValidationError
 
 FORMATS = {

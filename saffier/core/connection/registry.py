@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any
+from typing import Any, Dict
 
 import sqlalchemy
 from sqlalchemy import Engine, create_engine
@@ -8,63 +8,44 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from saffier.conf import settings
-from saffier.db.connection import Database
+from saffier.core.connection.database import Database
+from saffier.core.connection.schemas import Schema
 from saffier.exceptions import ImproperlyConfigured
 
 
 class Registry:
     """
     The command center for the models being generated
-    for Saffier.
+    for Edgy.
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
         assert isinstance(
             database, Database
-        ), "database must be an instance of saffier.db.connection.Database"
+        ), "database must be an instance of saffier.core.connection.Database"
 
-        self.database = database
-        self.models: Any = {}
-        self.reflected: Any = {}
-        self._schema = kwargs.get("schema", None)
+        self.database: Database = database
+        self.models: Dict[str, Any] = {}
+        self.reflected: Dict[str, Any] = {}
+        self.db_schema = kwargs.get("schema", None)
 
-        if self._schema:
-            self._metadata = sqlalchemy.MetaData(schema=self._schema)
+        self.schema = Schema(registry=self)
 
-        else:
-            self._metadata = sqlalchemy.MetaData()
+        self._metadata = (
+            sqlalchemy.MetaData(schema=self.db_schema)
+            if self.db_schema is not None
+            else sqlalchemy.MetaData()
+        )
 
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
-            model_class.build_table()
+            model_class.build(schema=self.db_schema)
         return self._metadata
 
     @metadata.setter
     def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
-
-    async def create_schema(self, schema: str, if_not_exists: bool = False) -> None:
-        """
-        Creates a model schema if it does not exist.
-        """
-        expression = sqlalchemy.text(
-            str(sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists))
-        )
-        await self.database.execute(expression)
-
-    async def drop_schema(
-        self, schema: str, cascade: bool = False, if_exists: bool = False
-    ) -> None:
-        """
-        Drops an existing model schema.
-        """
-        expression = sqlalchemy.text(
-            str(
-                sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)  # type: ignore
-            )
-        )
-        await self.database.execute(expression)
 
     def _get_database_url(self) -> str:
         url = self.database.url
@@ -76,9 +57,9 @@ class Registry:
             elif url.dialect in settings.sqlite_dialects:
                 url = url.replace(driver="aiosqlite")
             elif url.dialect in settings.mssql_dialects:
-                raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
+                raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
         elif url.driver in settings.mssql_drivers:
-            raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
+            raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
         return str(url)
 
     @cached_property
@@ -89,8 +70,8 @@ class Registry:
 
     @cached_property
     def declarative_base(self) -> Any:
-        if self._schema:
-            metadata = sqlalchemy.MetaData(schema=self._schema)
+        if self.db_schema:
+            metadata = sqlalchemy.MetaData(schema=self.db_schema)
         else:
             metadata = sqlalchemy.MetaData()
         return sa_declarative_base(metadata=metadata)
@@ -110,17 +91,16 @@ class Registry:
         return self._get_sync_engine
 
     async def create_all(self) -> None:
-        if self._schema:
-            await self.create_schema(self._schema, True)
+        if self.db_schema:
+            await self.schema.create_schema(self.db_schema, True)
         async with self.database:
             async with self.engine.begin() as connection:
                 await connection.run_sync(self.metadata.create_all)
-
         await self.engine.dispose()
 
     async def drop_all(self) -> None:
-        if self._schema:
-            await self.drop_schema(self._schema, True, True)
+        if self.db_schema:
+            await self.schema.drop_schema(self.db_schema, True, True)
         async with self.database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)

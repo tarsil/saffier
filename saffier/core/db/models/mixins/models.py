@@ -5,11 +5,11 @@ from sqlalchemy.orm import Mapped, relationship
 
 import saffier
 from saffier.conf import settings
-from saffier.core.utils import ModelUtil
-from saffier.db.datastructures import Index, UniqueConstraint
+from saffier.core.db.datastructures import Index, UniqueConstraint
+from saffier.core.utils.model import ModelUtil
 
 if typing.TYPE_CHECKING:
-    from saffier.db.models.base import Model
+    from saffier.core.db.models.base import Model
 
 
 class ModelBuilder(ModelUtil):

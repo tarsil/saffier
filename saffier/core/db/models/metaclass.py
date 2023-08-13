@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy
 
 from saffier.conf import settings
-from saffier.core.registry import Registry
+from saffier.core.connection.registry import Registry
+from saffier.core.db.datastructures import Index, UniqueConstraint
+from saffier.core.db.models.manager import Manager
+from saffier.core.db.relationships.related import RelatedField
+from saffier.core.db.relationships.relation import Relation
 from saffier.db import fields as saffier_fields
-from saffier.db.datastructures import Index, UniqueConstraint
 from saffier.db.fields import BigIntegerField, Field
-from saffier.db.models.manager import Manager
-from saffier.db.relationships.related import RelatedField
-from saffier.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from saffier.db.models.base import Model, ReflectModel
+    from saffier.core.db.models.base import Model, ReflectModel
 
 
 class MetaInfo:

@@ -5,7 +5,7 @@ import pytest
 from asyncpg.exceptions import UniqueViolationError
 
 import saffier
-from saffier.db.datastructures import UniqueConstraint
+from saffier.core.db.datastructures import UniqueConstraint
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 

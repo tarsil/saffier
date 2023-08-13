@@ -32,15 +32,13 @@ class Uniqueness:
         elif element is False:
             return self.FALSE
         elif isinstance(element, list):
-            return ("list", tuple([self.make_hashable(item) for item in element]))
+            return ("list", tuple(self.make_hashable(item) for item in element))
         elif isinstance(element, dict):
             return (
                 "dict",
                 tuple(
-                    [
-                        (self.make_hashable(key), self.make_hashable(value))
-                        for key, value in element.items()
-                    ]
+                    (self.make_hashable(key), self.make_hashable(value))
+                    for key, value in element.items()
                 ),
             )
         return element
