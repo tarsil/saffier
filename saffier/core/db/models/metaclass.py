@@ -1,18 +1,18 @@
 import copy
 import inspect
 import typing
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union, cast
 
 import sqlalchemy
 
 from saffier.conf import settings
 from saffier.core.connection.registry import Registry
+from saffier.core.db import fields as saffier_fields
 from saffier.core.db.datastructures import Index, UniqueConstraint
+from saffier.core.db.fields import BigIntegerField, Field
 from saffier.core.db.models.manager import Manager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
-from saffier.db import fields as saffier_fields
-from saffier.db.fields import BigIntegerField, Field
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -368,18 +368,35 @@ class BaseModelMeta(type):
 
         return new_class
 
+    def get_db_shema(cls) -> Union[str, None]:
+        """
+        Returns a db_schema from registry if any is passed.
+        """
+        if hasattr(cls, "_meta") and hasattr(cls._meta, "registry"):
+            return cast("str", cls._meta.registry.db_schema)
+        return None
+
     @property
     def table(cls) -> typing.Any:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
+
+        Making sure the following scenarios are met:
+
+        1. If there is a context_db_schema, it will return for those, which means, the `using`
+        if being utilised.
+        2. If a db_schema in the `registry` is passed, then it will use that as a default.
+        3. If none is passed, defaults to the shared schema of the database connected.
         """
+        db_schema = cls.get_db_shema()
+
         if not hasattr(cls, "_table"):
-            cls._table = cls.build_table()
+            cls._table = cls.build(db_schema)
         elif hasattr(cls, "_table"):
             table = cls._table
             if table.name.lower() != cls._meta.tablename:
-                cls._table = cls.build_table()
+                cls._table = cls.build(db_schema)
         return cls._table
 
     @property

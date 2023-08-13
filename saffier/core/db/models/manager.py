@@ -10,7 +10,7 @@ class Manager:
 
     Example:
         from saffier.managers import ModelManager
-        from saffier.models import Model
+        from saffier.core.db.models import Model
 
 
         class MyCustomManager(ModelManager):

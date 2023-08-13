@@ -6,7 +6,7 @@ from orjson import OPT_OMIT_MICROSECONDS  # noqa
 from orjson import OPT_SERIALIZE_NUMPY  # noqa
 from orjson import dumps
 
-from saffier.db.fields import DateField, DateTimeField
+from saffier.core.db.fields import DateField, DateTimeField
 
 
 class ModelUtil:

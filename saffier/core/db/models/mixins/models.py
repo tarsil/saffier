@@ -1,4 +1,5 @@
 import typing
+from typing import cast
 
 import sqlalchemy
 from sqlalchemy.orm import Mapped, relationship
@@ -45,14 +46,16 @@ class ModelBuilder(ModelUtil):
         return self.__class__.table
 
     @classmethod
-    def build_table(cls) -> typing.Any:
+    def build(cls, schema: typing.Optional[str] = None) -> typing.Any:
         """
         Performs the operation of building the core SQLAlchemy Table object.
         Builds the constrainst, indexes, columns and metadata based on the
         provided Meta class object.
         """
         tablename = cls._meta.tablename
-        metadata = cls._meta.registry._metadata  # type: ignore
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls._meta.registry._metadata)  # type: ignore
+        metadata.schema = schema
+
         unique_together = cls._meta.unique_together
         index_constraints = cls._meta.indexes
 

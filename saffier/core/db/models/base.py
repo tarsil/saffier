@@ -242,11 +242,12 @@ class ReflectModel(ReflectMeta, Model):
         setattr(self, self.pkname, value)
 
     @classmethod
-    def build_table(cls) -> typing.Any:
+    def build(cls, schema: typing.Optional[str] = None) -> typing.Any:
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata = cls._meta.registry._metadata  # type: ignore
+        metadata = typing.cast("sqlalchemy.MetaData", cls._meta.registry._metadata)  # type: ignore
+        metadata.schema = schema
         tablename = cls._meta.tablename
         return cls.reflect(tablename, metadata)
 

@@ -5,10 +5,10 @@ import sqlalchemy
 
 import saffier
 from saffier.conf import settings
+from saffier.core.db.fields import CharField, TextField
 from saffier.core.db.querysets.protocols import AwaitableQuery
 from saffier.core.utils.model import ModelUtil
 from saffier.core.utils.schemas import Schema
-from saffier.db.fields import CharField, TextField
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol
 
