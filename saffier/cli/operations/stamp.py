@@ -1,7 +1,7 @@
 import click
 
-from saffier.migrations.base import stamp as _stamp
-from saffier.migrations.env import MigrationEnv
+from saffier.cli.base import stamp as _stamp
+from saffier.cli.env import MigrationEnv
 
 
 @click.option(

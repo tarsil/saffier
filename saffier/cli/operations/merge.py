@@ -2,8 +2,8 @@ from typing import Any
 
 import click
 
-from saffier.migrations.base import merge as _merge
-from saffier.migrations.env import MigrationEnv
+from saffier.cli.base import merge as _merge
+from saffier.cli.env import MigrationEnv
 
 
 @click.option(

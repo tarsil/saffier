@@ -5,8 +5,8 @@ Client to interact with Saffier models and migrations.
 
 import click
 
-from saffier.migrations.base import branches as _branches
-from saffier.migrations.env import MigrationEnv
+from saffier.cli.base import branches as _branches
+from saffier.cli.env import MigrationEnv
 
 
 @click.option(

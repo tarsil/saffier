@@ -1,7 +1,7 @@
 from esmerald import Esmerald
 
 from saffier import Registry
-from saffier.migrations.constants import SAFFIER_DB, SAFFIER_EXTRA
+from saffier.cli.constants import SAFFIER_DB, SAFFIER_EXTRA
 from tests.cli.main import app as main_app
 from tests.cli.main_extra import app as extra_app
 

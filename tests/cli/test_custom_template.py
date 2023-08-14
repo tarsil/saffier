@@ -42,7 +42,7 @@ def create_folders():
 
 
 def test_alembic_version():
-    from saffier.migrations import alembic_version
+    from saffier.cli import alembic_version
 
     assert len(alembic_version) == 3
 

@@ -2,8 +2,8 @@ from typing import Any
 
 import click
 
-from saffier.migrations.base import downgrade as _downgrade
-from saffier.migrations.env import MigrationEnv
+from saffier.cli.base import upgrade as _upgrade
+from saffier.cli.env import MigrationEnv
 
 
 @click.option(
@@ -22,9 +22,12 @@ from saffier.migrations.env import MigrationEnv
     "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
 )
 @click.command()
-@click.argument("revision", default="-1")
-def downgrade(
+@click.argument("revision", default="head")
+def migrate(
     env: MigrationEnv, directory: str, sql: bool, tag: str, arg: Any, revision: str
 ) -> None:
-    """Revert to a previous version"""
-    _downgrade(env.app, directory, revision, sql, tag, arg)
+    """
+    Upgrades to the latest version or to a specific version
+    provided by the --tag.
+    """
+    _upgrade(env.app, directory, revision, sql, tag, arg)

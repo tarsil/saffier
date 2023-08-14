@@ -1,7 +1,7 @@
 import click
 
-from saffier.migrations.base import check as _check
-from saffier.migrations.env import MigrationEnv
+from saffier.cli.base import check as _check
+from saffier.cli.env import MigrationEnv
 
 
 @click.option(

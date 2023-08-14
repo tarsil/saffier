@@ -3,6 +3,7 @@ __version__ = "0.16.0"
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings
 
+from .cli import Migrate
 from .core.connection.database import Database
 from .core.connection.registry import Registry
 from .core.db.constants import CASCADE, RESTRICT, SET_NULL
@@ -36,7 +37,6 @@ from .core.db.models.manager import Manager
 from .core.db.querysets.base import QuerySet
 from .core.extras import SaffierExtra
 from .exceptions import DoesNotFound, MultipleObjectsReturned
-from .migrations import Migrate
 
 __all__ = [
     "BigIntegerField",

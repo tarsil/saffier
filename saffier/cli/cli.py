@@ -8,16 +8,9 @@ from functools import wraps
 
 import click
 
-from saffier.core.terminal import Print
-from saffier.exceptions import CommandEnvironmentError
-from saffier.migrations.constants import (
-    APP_PARAMETER,
-    EXCLUDED_COMMANDS,
-    HELP_PARAMETER,
-    IGNORE_COMMANDS,
-)
-from saffier.migrations.env import MigrationEnv
-from saffier.migrations.operations import (
+from saffier.cli.constants import APP_PARAMETER, EXCLUDED_COMMANDS, HELP_PARAMETER, IGNORE_COMMANDS
+from saffier.cli.env import MigrationEnv
+from saffier.cli.operations import (
     check,
     current,
     downgrade,
@@ -34,6 +27,8 @@ from saffier.migrations.operations import (
     show,
     stamp,
 )
+from saffier.core.terminal import Print
+from saffier.exceptions import CommandEnvironmentError
 
 printer = Print()
 

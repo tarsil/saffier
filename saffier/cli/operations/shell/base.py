@@ -6,10 +6,10 @@ import click
 import nest_asyncio
 
 from saffier import Registry
+from saffier.cli.env import MigrationEnv
+from saffier.cli.operations.shell.enums import ShellOption
 from saffier.core.events import AyncLifespanContextManager
 from saffier.core.sync import execsync
-from saffier.migrations.env import MigrationEnv
-from saffier.migrations.operations.shell.enums import ShellOption
 
 
 @click.option(
@@ -55,13 +55,13 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
 
     async with lifespan(app):
         if kernel == ShellOption.IPYTHON:
-            from saffier.migrations.operations.shell.ipython import get_ipython
+            from saffier.cli.operations.shell.ipython import get_ipython
 
             ipython_shell = get_ipython(app=app, registry=registry)
             nest_asyncio.apply()
             ipython_shell()
         else:
-            from saffier.migrations.operations.shell.ptpython import get_ptpython
+            from saffier.cli.operations.shell.ptpython import get_ptpython
 
             ptpython = get_ptpython(app=app, registry=registry)
             nest_asyncio.apply()

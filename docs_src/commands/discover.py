@@ -6,7 +6,7 @@ from pathlib import Path
 from esmerald import Esmerald, Include
 from my_project.utils import get_db_connection
 
-from saffier.migrations import Migrate
+from saffier.cli import Migrate
 
 
 def build_path():

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from saffier.cli.constants import SAFFIER_DB, SAFFIER_EXTRA
 from saffier.core.extras.base import BaseExtra
 from saffier.core.terminal import Print, Terminal
-from saffier.migrations.constants import SAFFIER_DB, SAFFIER_EXTRA
 
 if TYPE_CHECKING:
     from saffier.core.connection.registry import Registry

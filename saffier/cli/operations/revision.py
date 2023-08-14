@@ -1,13 +1,7 @@
-"""
-Client to interact with Saffier models and migrations.
-"""
-
-from typing import Any
-
 import click
 
-from saffier.migrations.base import migrate as _migrate
-from saffier.migrations.env import MigrationEnv
+from saffier.cli.base import revision as _revision
+from saffier.cli.env import MigrationEnv
 
 
 @click.option(
@@ -17,6 +11,14 @@ from saffier.migrations.env import MigrationEnv
     help=('Migration script directory (default is "migrations")'),
 )
 @click.option("-m", "--message", default=None, help="Revision message")
+@click.option(
+    "--autogenerate",
+    is_flag=True,
+    help=(
+        "Populate revision script with candidate migration "
+        "operations, based on comparison of database to model"
+    ),
+)
 @click.option(
     "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
 )
@@ -37,24 +39,29 @@ from saffier.migrations.env import MigrationEnv
 @click.option(
     "--rev-id", default=None, help=("Specify a hardcoded revision id instead of generating " "one")
 )
-@click.option(
-    "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
-)
 @click.command()
-def makemigrations(
+def revision(
     env: MigrationEnv,
     directory: str,
     message: str,
+    autogenerate: bool,
     sql: bool,
     head: str,
     splice: bool,
     branch_label: str,
     version_path: str,
     rev_id: str,
-    arg: Any,
 ) -> None:
-    """Autogenerate a new revision file (Alias for
-    'revision --autogenerate')"""
-    _migrate(
-        env.app, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg
+    """Create a new revision file."""
+    _revision(
+        env.app,
+        directory,
+        message,
+        autogenerate,
+        sql,
+        head,
+        splice,
+        branch_label,
+        version_path,
+        rev_id,
     )

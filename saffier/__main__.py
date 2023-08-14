@@ -1,4 +1,4 @@
-from saffier.migrations.cli import saffier_cli
+from saffier.cli.cli import saffier_cli
 
 
 def run_cli() -> None:

@@ -3,9 +3,9 @@ import sys
 import typing
 
 from saffier import Registry
+from saffier.cli.operations.shell.utils import import_objects
 from saffier.conf import settings
 from saffier.core.terminal import Print
-from saffier.migrations.operations.shell.utils import import_objects
 
 printer = Print()
 

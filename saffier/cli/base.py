@@ -7,9 +7,9 @@ from alembic import __version__ as __alembic_version__
 from alembic import command
 from alembic.config import Config as AlembicConfig
 
+from saffier.cli.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
+from saffier.cli.decorators import catch_errors
 from saffier.core.extras.base import BaseExtra
-from saffier.migrations.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
-from saffier.migrations.decorators import catch_errors
 
 if TYPE_CHECKING:
     from saffier.core.connection.registry import Registry

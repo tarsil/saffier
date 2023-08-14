@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 
-from saffier.exceptions import CommandEnvironmentError
-from saffier.migrations.constants import (
+from saffier.cli.constants import (
     DISCOVERY_FILES,
     DISCOVERY_FUNCTIONS,
     SAFFIER_DB,
     SAFFIER_DISCOVER_APP,
     SAFFIER_EXTRA,
 )
+from saffier.exceptions import CommandEnvironmentError
 
 
 @dataclass
