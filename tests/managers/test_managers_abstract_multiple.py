@@ -2,7 +2,7 @@ import pytest
 
 import saffier
 from saffier import Manager
-from saffier.db.querysets.queryset import QuerySet
+from saffier.core.db.querysets.base import QuerySet
 from saffier.exceptions import ImproperlyConfigured
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL

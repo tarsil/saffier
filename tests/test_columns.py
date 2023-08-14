@@ -7,7 +7,7 @@ from enum import Enum
 import pytest
 
 import saffier
-from saffier.db import fields
+from saffier.core.db import fields
 from saffier.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 

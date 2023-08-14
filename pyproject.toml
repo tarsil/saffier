@@ -71,7 +71,7 @@ Funding = "https://github.com/sponsors/tarsil"
 Source = "https://github.com/tarsil/saffier"
 
 [project.scripts]
-saffier = "saffier.migrations.cli:saffier_cli"
+saffier = "saffier.__main__:run_cli"
 
 [project.optional-dependencies]
 test = [

@@ -8,9 +8,9 @@ from alembic import context
 from rich.console import Console
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from saffier.cli.constants import APP_PARAMETER
+from saffier.cli.env import MigrationEnv
 from saffier.exceptions import SaffierException
-from saffier.migrations.constants import APP_PARAMETER
-from saffier.migrations.env import MigrationEnv
 from tests.settings import TEST_DATABASE
 
 # The console used for the outputs

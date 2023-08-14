@@ -51,8 +51,6 @@ jobs:
       # - name: "Run lint checks"
       #   run: "scripts/check"
       - name: "Run tests"
-        run: "scripts/test"
-      - name: "Run tests with PostgreSQL"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/saffier"
         run: "scripts/test"
