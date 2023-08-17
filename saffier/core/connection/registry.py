@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any, Dict
+from typing import Any, Dict, Mapping, Type
 
 import sqlalchemy
 from sqlalchemy import Engine, create_engine
@@ -16,7 +16,7 @@ from saffier.exceptions import ImproperlyConfigured
 class Registry:
     """
     The command center for the models being generated
-    for Edgy.
+    for Saffier.
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
@@ -28,6 +28,7 @@ class Registry:
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
         self.db_schema = kwargs.get("schema", None)
+        self.extra: Mapping[str, Type["Database"]] = kwargs.pop("extra", {})
 
         self.schema = Schema(registry=self)
 
@@ -57,9 +58,9 @@ class Registry:
             elif url.dialect in settings.sqlite_dialects:
                 url = url.replace(driver="aiosqlite")
             elif url.dialect in settings.mssql_dialects:
-                raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
+                raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         elif url.driver in settings.mssql_drivers:
-            raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
+            raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         return str(url)
 
     @cached_property

@@ -9,12 +9,12 @@ from orjson import dumps
 from saffier.core.db.fields import DateField, DateTimeField
 
 
-class ModelUtil:
+class DateParser:
     """
     Utils used by the Registry
     """
 
-    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
+    def update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
         Updates the auto fields
         """

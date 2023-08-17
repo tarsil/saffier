@@ -40,7 +40,7 @@ async def test_meta_tablename():
 
     user = await User.query.get(name="Saffier")
 
-    assert user._meta.tablename == "users"
+    assert user.meta.tablename == "users"
 
 
 async def test_meta_registry():
@@ -51,4 +51,4 @@ async def test_meta_registry():
 
     user = await User.query.get(name="Saffier")
 
-    assert user._meta.registry == models
+    assert user.meta.registry == models

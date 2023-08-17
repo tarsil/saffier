@@ -440,7 +440,7 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 
 ### Get or none
 
-When querying a model and do not want to raise a [DoesNotFound](../exceptions.md#doesnotfound) and
+When querying a model and do not want to raise a [ObjectNotFound](../exceptions.md#doesnotfound) and
 instead returns a `None`.
 
 ```python

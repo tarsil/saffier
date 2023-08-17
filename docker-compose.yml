@@ -17,14 +17,23 @@ services:
     ports:
       - "5432:5432"
 
-  redis:
+  saffier_alt:
     restart: always
-    image: redis:latest
+    image: postgres:12.3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "saffier_alt"
+    volumes:
+      - "saffier_alt:/var/lib/postgresql/data"
+    command: >-
+        --jit=false
     ports:
-      - "6379:6379"
-    expose:
-      - "6379"
+      - "5433:5432"
 
 volumes:
   saffier:
+    external: true
+  saffier_alt:
     external: true

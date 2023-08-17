@@ -328,6 +328,6 @@ def test_assertation_error_on_missing_on_delete():
             is_active = saffier.BooleanField(default=True)
 
         class MyOtherModel(saffier.Model):
-            model = saffier.ForeignKey(MyModel)
+            model = saffier.ForeignKey(MyModel, on_delete=None)
 
     assert raised.value.args[0] == "on_delete must not be null."

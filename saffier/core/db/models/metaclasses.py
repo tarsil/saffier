@@ -10,13 +10,13 @@ from saffier.core.connection.registry import Registry
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.fields import BigIntegerField, Field
-from saffier.core.db.models.manager import Manager
+from saffier.core.db.models.managers import Manager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from saffier.core.db.models.base import Model, ReflectModel
+    from saffier.core.db.models.model import Model, ReflectModel
 
 
 class MetaInfo:
@@ -35,9 +35,9 @@ class MetaInfo:
         "many_to_many_fields",
         "pk_attribute",
         "manager",
-        "_model",
+        "model",
         "reflect",
-        "_managers",
+        "managers",
         "is_multi",
         "multi_related",
         "related_names",
@@ -55,12 +55,12 @@ class MetaInfo:
         self.many_to_many_fields: typing.Set[str] = set()
         self.foreign_key_fields: typing.Set[str] = set()
         self.pk_attribute: typing.Union[Field, str] = getattr(meta, "pk_attribute", "")
-        self._model: typing.Optional[typing.Type["Model"]] = None
+        self.model: typing.Optional[typing.Type["Model"]] = None
         self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: typing.Any = getattr(meta, "unique_together", None)
         self.indexes: typing.Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
-        self._managers: bool = getattr(meta, "_managers", None)
+        self.managers: bool = getattr(meta, "managers", None)
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: typing.List[str] = getattr(meta, "multi_related", [])
         self.related_names: typing.Set[str] = set()
@@ -78,7 +78,7 @@ def _check_model_inherited_registry(
     found_registry: typing.Optional[typing.Type[Registry]] = None
 
     for base in bases:
-        meta: MetaInfo = getattr(base, "_meta", None)  # type: ignore
+        meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
         if not meta:
             continue
 
@@ -184,7 +184,7 @@ class BaseModelMeta(type):
             for parent in base.__mro__[1:]:
                 __search_for_fields(parent, attrs)
 
-            meta: typing.Union[MetaInfo, None] = getattr(base, "_meta", None)
+            meta: typing.Union[MetaInfo, None] = getattr(base, "meta", None)
             if not meta:
                 # Mixins and other classes
                 for key, value in inspect.getmembers(base):
@@ -252,7 +252,7 @@ class BaseModelMeta(type):
 
         for slot in fields:
             attrs.pop(slot, None)
-        attrs["_meta"] = meta = MetaInfo(meta_class)
+        attrs["meta"] = meta = MetaInfo(meta_class)
 
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
@@ -288,7 +288,7 @@ class BaseModelMeta(type):
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
         else:
-            meta._managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
+            meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
@@ -345,7 +345,7 @@ class BaseModelMeta(type):
         new_class._db_model = True
         new_class.fields = meta.fields_mapping
 
-        meta._model = new_class  # type: ignore
+        meta.model = new_class  # type: ignore
         meta.manager.model_class = new_class
 
         # Set the owner of the field
@@ -372,8 +372,8 @@ class BaseModelMeta(type):
         """
         Returns a db_schema from registry if any is passed.
         """
-        if hasattr(cls, "_meta") and hasattr(cls._meta, "registry"):
-            return cast("str", cls._meta.registry.db_schema)
+        if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
+            return cast("str", cls.meta.registry.db_schema)
         return None
 
     @property
@@ -395,9 +395,19 @@ class BaseModelMeta(type):
             cls._table = cls.build(db_schema)
         elif hasattr(cls, "_table"):
             table = cls._table
-            if table.name.lower() != cls._meta.tablename:
+            if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build(db_schema)
         return cls._table
+
+    def table_schema(cls, schema: str) -> Any:
+        """
+        Making sure the tables on inheritance state, creates the new
+        one properly.
+
+        The use of context vars instead of using the lru_cache comes from
+        a warning from `ruff` where lru can lead to memory leaks.
+        """
+        return cls.build(schema=schema)
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
@@ -408,7 +418,7 @@ class BaseModelReflectMeta(BaseModelMeta):
     def __new__(cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: Any) -> typing.Any:
         new_model = super().__new__(cls, name, bases, attrs)
 
-        registry = new_model._meta.registry
+        registry = new_model.meta.registry
 
         # Remove the reflected models from the registry
         # Add the reflecte model to the views section of the refected
