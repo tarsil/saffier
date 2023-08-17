@@ -7,13 +7,13 @@ import saffier
 from saffier.conf import settings
 from saffier.core.db.fields import CharField, TextField
 from saffier.core.db.querysets.protocols import AwaitableQuery
-from saffier.core.utils.model import ModelUtil
+from saffier.core.utils.model import DateParser
 from saffier.core.utils.schemas import Schema
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol
 
 if typing.TYPE_CHECKING:  # pragma: no cover
-    from saffier.core.db.models.base import Model, ReflectModel
+    from saffier.core.db.models.model import Model, ReflectModel
 
 
 _SaffierModel = typing.TypeVar("_SaffierModel", bound="Model")
@@ -58,7 +58,7 @@ class QuerySetProps:
         self._m2m_related = value
 
 
-class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
+class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -240,7 +240,7 @@ class BaseQuerySet(QuerySetProps, ModelUtil, AwaitableQuery[SaffierModel]):
         return expression
 
     def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
-        from saffier.core.db.models.base import Model
+        from saffier.core.db.models.model import Model
 
         clauses = []
         filter_clauses = self.filter_clauses

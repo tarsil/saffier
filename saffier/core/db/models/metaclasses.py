@@ -16,7 +16,7 @@ from saffier.core.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from saffier.core.db.models.base import Model, ReflectModel
+    from saffier.core.db.models.model import Model, ReflectModel
 
 
 class MetaInfo:

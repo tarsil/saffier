@@ -1,3 +1,3 @@
-from .base import Model, ReflectModel
+from .model import Model, ReflectModel
 
 __all__ = ["Model", "ReflectModel"]
