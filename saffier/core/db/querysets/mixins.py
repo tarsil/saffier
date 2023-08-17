@@ -18,7 +18,7 @@ class QuerySetPropsMixin:
     @property
     def database(self) -> Database:
         if getattr(self, "_database", None) is None:
-            return cast("Database", self.model_class.meta.registry.database)
+            return cast("Database", self.model_class._meta.registry.database)
         return self._database
 
     @database.setter
@@ -41,7 +41,7 @@ class QuerySetPropsMixin:
 
     @property
     def is_m2m(self) -> bool:
-        return bool(self.model_class.meta.is_multi)
+        return bool(self.model_class._meta.is_multi)
 
     @property
     def m2m_related(self) -> str:
@@ -75,10 +75,10 @@ class TenancyMixin:
         registry.
         """
         assert (
-            connection_name in self.model_class.meta.registry.extra
+            connection_name in self.model_class._meta.registry.extra
         ), f"`another` is not in the connections extra of the model`{self.model_class.__name__}` registry"
 
-        connection: Type["Registry"] = self.model_class.meta.registry.extra[connection_name]
+        connection: Type["Registry"] = self.model_class._meta.registry.extra[connection_name]
         if schema:
             return set_queryset_database(self, self.model_class, connection, schema)
         queryset = set_queryset_database(self, self.model_class, connection)

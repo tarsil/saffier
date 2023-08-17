@@ -2,7 +2,7 @@ import typing
 from typing import Union
 
 from saffier.core.db.models.base import SaffierBaseModel, SaffierBaseReflectModel
-from saffier.core.db.models.manager import Manager
+from saffier.core.db.models.managers import Manager
 from saffier.core.db.models.metaclasses import MetaInfo
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow

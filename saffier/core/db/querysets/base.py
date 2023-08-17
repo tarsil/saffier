@@ -1,77 +1,60 @@
 import copy
-import typing
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import sqlalchemy
 
 import saffier
 from saffier.conf import settings
 from saffier.core.db.fields import CharField, TextField
+from saffier.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
 from saffier.core.utils.model import DateParser
 from saffier.core.utils.schemas import Schema
 from saffier.exceptions import DoesNotFound, MultipleObjectsReturned, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol
 
-if typing.TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:  # pragma: no cover
+    from saffier import Database
     from saffier.core.db.models.model import Model, ReflectModel
 
 
-_SaffierModel = typing.TypeVar("_SaffierModel", bound="Model")
-ReflectSaffierModel = typing.TypeVar("ReflectSaffierModel", bound="ReflectModel")
+_SaffierModel = TypeVar("_SaffierModel", bound="Model")
+ReflectSaffierModel = TypeVar("ReflectSaffierModel", bound="ReflectModel")
 
-SaffierModel = typing.Union[_SaffierModel, ReflectSaffierModel]
-
-
-class QuerySetProps:
-    """
-    Properties used by the Queryset are placed in isolation
-    for clean access and maintainance.
-    """
-
-    @property
-    def database(self) -> typing.Any:
-        return self.model_class._meta.registry.database  # type: ignore
-
-    @property
-    def table(self) -> sqlalchemy.Table:
-        return self.model_class.table  # type: ignore
-
-    @property
-    def schema(self) -> Schema:
-        fields = {key: field.validator for key, field in self.model_class.fields.items()}  # type: ignore
-        return Schema(fields=fields)
-
-    @property
-    def pkname(self) -> typing.Any:
-        return self.model_class.pkname  # type: ignore
-
-    @property
-    def is_m2m(self) -> bool:
-        return bool(self.model_class._meta.is_multi)
-
-    @property
-    def m2m_related(self) -> bool:
-        return self._m2m_related
-
-    @m2m_related.setter
-    def m2m_related(self, value: str) -> None:
-        self._m2m_related = value
+SaffierModel = Union[_SaffierModel, ReflectSaffierModel]
 
 
-class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
+class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[SaffierModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
         self,
-        model_class: typing.Any = None,
-        filter_clauses: typing.Any = None,
-        select_related: typing.Any = None,
-        limit_count: typing.Any = None,
-        limit_offset: typing.Any = None,
-        order_by: typing.Any = None,
-        group_by: typing.Any = None,
-        distinct_on: typing.Any = None,
-        m2m_related: typing.Any = None,
+        model_class: Any = None,
+        database: Union["Database", None] = None,
+        filter_clauses: Any = None,
+        select_related: Any = None,
+        limit_count: Any = None,
+        limit_offset: Any = None,
+        order_by: Any = None,
+        group_by: Any = None,
+        distinct_on: Any = None,
+        m2m_related: Any = None,
+        using_schema: Any = None,
+        table: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = model_class
@@ -85,29 +68,29 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
         self._expression = None
         self._cache = None
         self._m2m_related = m2m_related
+        self.using_schema = using_schema
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class._meta.multi_related[0]
 
-    def _build_order_by_expression(
-        self, order_by: typing.Any, expression: typing.Any
-    ) -> typing.Any:
+        if table is not None:
+            self.table = table
+        if database is not None:
+            self.database = database
+
+    def _build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
         order_by = list(map(self._prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
-    def _build_group_by_expression(
-        self, group_by: typing.Any, expression: typing.Any
-    ) -> typing.Any:
+    def _build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
         """Builds the group by expression"""
         group_by = list(map(self._prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
-    def _build_filter_clauses_expression(
-        self, filter_clauses: typing.Any, expression: typing.Any
-    ) -> typing.Any:
+    def _build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
         """Builds the filter clauses expression"""
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
@@ -116,17 +99,15 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
         expression = expression.where(clause)
         return expression
 
-    def _build_select_distinct(
-        self, distinct_on: typing.Any, expression: typing.Any
-    ) -> typing.Any:
+    def _build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
         """Filters selects only specific fields"""
         distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
         expression = expression.distinct(*distinct_on)
         return expression
 
     def is_multiple_foreign_key(
-        self, model_class: typing.Union[typing.Type["Model"], typing.Type["ReflectModel"]]
-    ) -> typing.Tuple[bool, typing.List[typing.Tuple[str, str, str]]]:
+        self, model_class: Union[Type["Model"], Type["ReflectModel"]]
+    ) -> Tuple[bool, List[Tuple[str, str, str]]]:
         """
         Checks if the table has multiple foreign keys to the same table.
         Iterates through all fields of type ForeignKey and OneToOneField and checks if there are
@@ -157,7 +138,7 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
 
         return has_many, foreign_keys
 
-    def _build_tables_select_from_relationship(self) -> typing.Any:
+    def _build_tables_select_from_relationship(self) -> Any:
         """
         Builds the tables relationships and joins.
         When a table contains more than one foreign key pointing to the same
@@ -208,7 +189,7 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
 
         return tables, select_from
 
-    def _build_select(self) -> typing.Any:
+    def _build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
@@ -239,7 +220,7 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
         self._expression = expression
         return expression
 
-    def _filter_query(self, exclude: bool = False, **kwargs: typing.Any) -> typing.Any:
+    def _filter_query(self, exclude: bool = False, **kwargs: Any) -> Any:
         from saffier.core.db.models.model import Model
 
         clauses = []
@@ -324,15 +305,17 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
 
         return self.__class__(
             model_class=self.model_class,
+            database=self._database,
             filter_clauses=filter_clauses,
             select_related=select_related,
             limit_count=self.limit_count,
             limit_offset=self._offset,
             order_by=self._order_by,
             m2m_related=self.m2m_related,
+            table=self.table,
         )
 
-    def _validate_kwargs(self, **kwargs: typing.Any) -> typing.Any:
+    def _validate_kwargs(self, **kwargs: Any) -> Any:
         fields = self.model_class.fields
         validator = Schema(fields={key: value.validator for key, value in fields.items()})
         kwargs = validator.check(kwargs)
@@ -341,22 +324,22 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
                 kwargs[key] = value.validator.get_default_value()
         return kwargs
 
-    def _prepare_order_by(self, order_by: str) -> typing.Any:
+    def _prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
-    def _prepare_group_by(self, group_by: str) -> typing.Any:
+    def _prepare_group_by(self, group_by: str) -> Any:
         group_by = group_by.lstrip("-")
         group_col = self.table.columns[group_by]
         return group_col
 
-    def _prepare_fields_for_distinct(self, distinct_on: str) -> typing.Any:
+    def _prepare_fields_for_distinct(self, distinct_on: str) -> Any:
         distinct_on = self.table.columns[distinct_on]
         return distinct_on
 
-    def _clone(self) -> typing.Any:
+    def _clone(self) -> Any:
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -373,6 +356,8 @@ class BaseQuerySet(QuerySetProps, DateParser, AwaitableQuery[SaffierModel]):
         queryset._expression = self._expression
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
+        queryset._database = self.database
+        queryset.table = self.table
         return queryset
 
 
@@ -381,7 +366,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     QuerySet object used for query retrieving.
     """
 
-    def __get__(self, instance: typing.Any, owner: typing.Any) -> typing.Any:
+    def __get__(self, instance: Any, owner: Any) -> Any:
         return self.__class__(model_class=owner)
 
     @property
@@ -389,14 +374,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return str(self._expression)
 
     @sql.setter
-    def sql(self, value: typing.Any) -> None:
+    def sql(self, value: Any) -> None:
         self._expression = value
 
-    async def __aiter__(self) -> typing.AsyncIterator[SaffierModel]:
+    async def __aiter__(self) -> AsyncIterator[SaffierModel]:
         for value in await self:  # type: ignore
             yield value
 
-    def _set_query_expression(self, expression: typing.Any) -> None:
+    def _set_query_expression(self, expression: Any) -> None:
         """
         Sets the value of the sql property to the expression used.
         """
@@ -405,10 +390,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def _filter_or_exclude(
         self,
-        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         exclude: bool = False,
-        **kwargs: typing.Any,
-    ) -> typing.Any:
+        **kwargs: Any,
+    ) -> Any:
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
@@ -423,8 +408,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def filter(
         self,
-        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
-        **kwargs: typing.Any,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
     ) -> "QuerySet":
         """
         Filters the QuerySet by the given kwargs and clause.
@@ -433,15 +418,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def exclude(
         self,
-        clause: typing.Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
-        **kwargs: typing.Any,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
     ) -> "QuerySet":
         """
         Exactly the same as the filter but for the exclude.
         """
         return self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
 
-    def lookup(self, term: typing.Any) -> "QuerySet":
+    def lookup(self, term: Any) -> "QuerySet":
         """
         Broader way of searching for a given term
         """
@@ -506,7 +491,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.distinct_on = distinct_on
         return queryset
 
-    def select_related(self, related: typing.Any) -> "QuerySet":
+    def select_related(self, related: Any) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -525,18 +510,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def values(
         self,
-        fields: typing.Union[typing.Sequence[str], str, None] = None,
-        exclude: typing.Union[typing.Sequence[str], typing.Set[str]] = None,
+        fields: Union[Sequence[str], str, None] = None,
+        exclude: Union[Sequence[str], Set[str]] = None,
         exclude_none: bool = False,
         flatten: bool = False,
-        **kwargs: typing.Any,
-    ) -> typing.List[typing.Any]:
+        **kwargs: Any,
+    ) -> List[Any]:
         """
         Returns the results in a python dictionary format.
         """
         fields = fields or []
         queryset: "QuerySet" = self._clone()
-        rows: typing.List[typing.Type["Model"]] = await queryset.all()
+        rows: List[Type["Model"]] = await queryset.all()
 
         if not isinstance(fields, list):
             raise QuerySetError(detail="Fields must be an iterable.")
@@ -565,11 +550,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def values_list(
         self,
-        fields: typing.Union[typing.Sequence[str], str, None] = None,
-        exclude: typing.Union[typing.Sequence[str], typing.Set[str]] = None,
+        fields: Union[Sequence[str], str, None] = None,
+        exclude: Union[Sequence[str], Set[str]] = None,
         exclude_none: bool = False,
         flat: bool = False,
-    ) -> typing.List[typing.Any]:
+    ) -> List[Any]:
         """
         Returns the results in a python dictionary format.
         """
@@ -611,7 +596,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self._set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
-    async def get_or_none(self, **kwargs: typing.Any) -> typing.Union[SaffierModel, None]:
+    async def get_or_none(self, **kwargs: Any) -> Union[SaffierModel, None]:
         """
         Fetch one object matching the parameters or returns None.
         """
@@ -626,7 +611,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise MultipleObjectsReturned()
         return self.model_class.from_query_result(rows[0], select_related=self._select_related)
 
-    async def all(self, **kwargs: typing.Any) -> typing.List[SaffierModel]:
+    async def all(self, **kwargs: Any) -> List[SaffierModel]:
         """
         Returns the queryset records based on specific filters
         """
@@ -656,7 +641,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         return [getattr(result, self.m2m_related) for result in results]
 
-    async def get(self, **kwargs: typing.Any) -> SaffierModel:
+    async def get(self, **kwargs: Any) -> SaffierModel:
         """
         Returns a single record based on the given kwargs.
         """
@@ -673,7 +658,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise MultipleObjectsReturned()
         return self.model_class.from_query_result(rows[0], select_related=self._select_related)
 
-    async def first(self, **kwargs: typing.Any) -> SaffierModel:
+    async def first(self, **kwargs: Any) -> SaffierModel:
         """
         Returns the first record of a given queryset.
         """
@@ -685,7 +670,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if rows:
             return rows[0]
 
-    async def last(self, **kwargs: typing.Any) -> SaffierModel:
+    async def last(self, **kwargs: Any) -> SaffierModel:
         """
         Returns the last record of a given queryset.
         """
@@ -697,7 +682,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if rows:
             return rows[0]
 
-    async def create(self, **kwargs: typing.Any) -> SaffierModel:
+    async def create(self, **kwargs: Any) -> SaffierModel:
         """
         Creates a record in a specific table.
         """
@@ -706,7 +691,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         instance = await instance.save(force_save=True, values=kwargs)
         return instance
 
-    async def bulk_create(self, objs: typing.List[typing.Dict]) -> None:
+    async def bulk_create(self, objs: List[Dict]) -> None:
         """
         Bulk creates records in a table
         """
@@ -716,7 +701,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self._set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def bulk_update(self, objs: typing.List[SaffierModel], fields: typing.List[str]) -> None:
+    async def bulk_update(self, objs: List[SaffierModel], fields: List[str]) -> None:
         """
         Bulk updates records in a table.
 
@@ -766,7 +751,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self._set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def update(self, **kwargs: typing.Any) -> int:
+    async def update(self, **kwargs: Any) -> int:
         """
         Updates a record in a specific table with the given kwargs.
         """
@@ -785,8 +770,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await self.database.execute(expression)
 
     async def get_or_create(
-        self, defaults: typing.Dict[str, typing.Any], **kwargs: typing.Any
-    ) -> typing.Tuple[SaffierModel, bool]:
+        self, defaults: Dict[str, Any], **kwargs: Any
+    ) -> Tuple[SaffierModel, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
@@ -799,8 +784,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return instance, True
 
     async def update_or_create(
-        self, defaults: typing.Dict[str, typing.Any], **kwargs: typing.Any
-    ) -> typing.Tuple[SaffierModel, bool]:
+        self, defaults: Dict[str, Any], **kwargs: Any
+    ) -> Tuple[SaffierModel, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """
@@ -821,18 +806,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise ValueError("'obj' must be a model or reflect model instance.")
         return await self.filter(pk=instance.pk).exists()
 
-    async def _execute(self) -> typing.Any:
+    async def _execute(self) -> Any:
         return await self.all()
 
     def __await__(
         self,
-    ) -> typing.Generator[typing.Any, None, typing.List[SaffierModel]]:
+    ) -> Generator[Any, None, List[SaffierModel]]:
         return self._execute().__await__()
 
-    def __class_getitem__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+    def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls
 
-    def __deepcopy__(self, memo: typing.Any) -> typing.Any:
+    def __deepcopy__(self, memo: Any) -> Any:
         """Don't populate the QuerySet's cache."""
         obj = self.__class__()
         for k, v in self.__dict__.items():

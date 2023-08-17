@@ -10,7 +10,7 @@ from saffier.core.connection.registry import Registry
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.fields import BigIntegerField, Field
-from saffier.core.db.models.manager import Manager
+from saffier.core.db.models.managers import Manager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
@@ -398,6 +398,16 @@ class BaseModelMeta(type):
             if table.name.lower() != cls._meta.tablename:
                 cls._table = cls.build(db_schema)
         return cls._table
+
+    def table_schema(cls, schema: str) -> Any:
+        """
+        Making sure the tables on inheritance state, creates the new
+        one properly.
+
+        The use of context vars instead of using the lru_cache comes from
+        a warning from `ruff` where lru can lead to memory leaks.
+        """
+        return cls.build(schema=schema)
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:

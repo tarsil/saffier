@@ -1,5 +1,6 @@
 from typing import Any
 
+from saffier.core.db.context_vars import get_tenant, set_tenant
 from saffier.core.db.querysets.base import QuerySet
 
 
@@ -34,7 +35,13 @@ class Manager:
     def get_queryset(self) -> "QuerySet":
         """
         Returns the queryset object.
+
+        Checks for a global possible tenant and returns the corresponding queryset.
         """
+        tenant = get_tenant()
+        if tenant:
+            set_tenant(None)
+            return QuerySet(self.model_class, table=self.model_class.table_schema(tenant))  # type: ignore
         return QuerySet(self.model_class)
 
     def __getattr__(self, item: Any) -> Any:
