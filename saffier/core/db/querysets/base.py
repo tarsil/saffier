@@ -71,7 +71,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         self.using_schema = using_schema
 
         if self.is_m2m and not self._m2m_related:
-            self._m2m_related = self.model_class._meta.multi_related[0]
+            self._m2m_related = self.model_class.meta.multi_related[0]
 
         if table is not None:
             self.table = table

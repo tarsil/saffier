@@ -295,10 +295,10 @@ class ForeignKey(Field):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}",
+                f"{target.meta.tablename}.{target.pkname}",
                 ondelete=self.on_delete,
                 onupdate=self.on_update,
-                name=f"fk_{self.owner._meta.tablename}_{target._meta.tablename}"
+                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
                 f"_{target.pkname}_{name}",
             )
         ]
@@ -351,10 +351,10 @@ class ManyToManyField(Field):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}",
+                f"{target.meta.tablename}.{target.pkname}",
                 ondelete=saffier.CASCADE,
                 onupdate=saffier.CASCADE,
-                name=f"fk_{self.owner._meta.tablename}_{target._meta.tablename}"
+                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
                 f"_{target.pkname}_{name}",
             )
         ]
@@ -375,10 +375,10 @@ class ManyToManyField(Field):
         """
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.owner._meta.registry.models[self.through]
+                self.through = self.owner.meta.registry.models[self.through]
 
-            self.through._meta.is_multi = True
-            self.through._meta.multi_related = [self.to.__name__.lower()]
+            self.through.meta.is_multi = True
+            self.through.meta.multi_related = [self.to.__name__.lower()]
             return self.through
 
         owner_name = self.owner.__name__
@@ -388,7 +388,7 @@ class ManyToManyField(Field):
 
         new_meta_namespace = {
             "tablename": tablename,
-            "registry": self.owner._meta.registry,
+            "registry": self.owner.meta.registry,
             "is_multi": True,
             "multi_related": [to_name.lower()],
         }
@@ -445,7 +445,7 @@ class OneToOneField(ForeignKey):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(

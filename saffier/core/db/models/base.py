@@ -55,12 +55,12 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Builds the constrainst, indexes, columns and metadata based on the
         provided Meta class object.
         """
-        tablename = cls._meta.tablename
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls._meta.registry._metadata)  # type: ignore
+        tablename = cls.meta.tablename
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
         metadata.schema = schema
 
-        unique_together = cls._meta.unique_together
-        index_constraints = cls._meta.indexes
+        unique_together = cls.meta.unique_together
+        index_constraints = cls.meta.indexes
 
         columns = []
         for name, field in cls.fields.items():
@@ -115,7 +115,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
         """
-        related_names = self._meta.related_names
+        related_names = self.meta.related_names
         return {k: v for k, v in self.__dict__.items() if k not in related_names}
 
     def __setattr__(self, key: typing.Any, value: typing.Any) -> typing.Any:
@@ -164,16 +164,16 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata = typing.cast("sqlalchemy.MetaData", cls._meta.registry._metadata)  # type: ignore
+        metadata = typing.cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
         metadata.schema = schema
-        tablename = cls._meta.tablename
+        tablename = cls.meta.tablename
         return cls.reflect(tablename, metadata)
 
     @classmethod
     def reflect(cls, tablename, metadata):
         try:
             return sqlalchemy.Table(
-                tablename, metadata, autoload_with=cls._meta.registry.sync_engine
+                tablename, metadata, autoload_with=cls.meta.registry.sync_engine
             )
         except Exception as e:
             raise ImproperlyConfigured(

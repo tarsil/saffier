@@ -18,7 +18,7 @@ class DeclarativeMixin:
         """
         Transforms a core Saffier table into a Declarative model table.
         """
-        Base = cls._meta.registry.declarative_base
+        Base = cls.meta.registry.declarative_base
 
         # Build the original table
         fields = {"__table__": cls.table}

@@ -20,7 +20,7 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
     """
 
     query = Manager()
-    _meta = MetaInfo(None)
+    meta = MetaInfo(None)
     _db_model: bool = False
     _raw_query: typing.Optional[str] = None
 
