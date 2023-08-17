@@ -5,7 +5,7 @@ import sqlalchemy
 
 import saffier
 from saffier.contrib.sqlalchemy.fields import IPAddress
-from saffier.core.db.constants import CASCADE, SET_NULL
+from saffier.core.db.constants import CASCADE, RESTRICT, SET_NULL
 from saffier.core.db.fields._internal import (
     URL,
     UUID,
@@ -257,8 +257,8 @@ class ForeignKey(Field):
         self,
         to: typing.Type["Model"],
         null: bool = False,
-        on_delete: typing.Optional[str] = None,
-        on_update: typing.Optional[str] = None,
+        on_delete: str = RESTRICT,
+        on_update: str = CASCADE,
         related_name: typing.Optional[str] = None,
         **kwargs: Any,
     ):

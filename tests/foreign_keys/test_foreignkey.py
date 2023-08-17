@@ -3,10 +3,10 @@ import sqlite3
 import asyncpg
 import pymysql
 import pytest
+from tests.settings import DATABASE_URL
 
 import saffier
 from saffier.testclient import DatabaseTestClient as Database
-from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -191,9 +191,7 @@ async def test_multiple_fk():
     team = await Team.query.create(org=other, name="Green Team")
     await Member.query.create(team=team, email="e@example.org")
 
-    members = (
-        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
-    )
+    members = await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
     assert len(members) == 4
     for member in members:
         assert member.team.org.ident == "ACME Ltd"
@@ -328,6 +326,6 @@ def test_assertation_error_on_missing_on_delete():
             is_active = saffier.BooleanField(default=True)
 
         class MyOtherModel(saffier.Model):
-            model = saffier.ForeignKey(MyModel)
+            model = saffier.ForeignKey(MyModel, on_delete=None)
 
     assert raised.value.args[0] == "on_delete must not be null."

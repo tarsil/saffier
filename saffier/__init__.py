@@ -36,7 +36,7 @@ from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import Manager
 from .core.db.querysets.base import QuerySet
 from .core.extras import SaffierExtra
-from .exceptions import DoesNotFound, MultipleObjectsReturned
+from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
     "BigIntegerField",
@@ -48,7 +48,7 @@ __all__ = [
     "DateField",
     "DateTimeField",
     "DecimalField",
-    "DoesNotFound",
+    "ObjectNotFound",
     "EmailField",
     "FloatField",
     "ForeignKey",

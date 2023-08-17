@@ -2,7 +2,7 @@ import pytest
 
 import saffier
 from saffier.core.db import fields as saffier_fields
-from saffier.exceptions import DoesNotFound, MultipleObjectsReturned
+from saffier.exceptions import MultipleObjectsReturned, ObjectNotFound
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -99,7 +99,7 @@ async def test_model_crud():
 
 
 async def test_model_get():
-    with pytest.raises(DoesNotFound):
+    with pytest.raises(ObjectNotFound):
         await User.query.get()
 
     user = await User.query.create(name="Test")

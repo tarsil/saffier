@@ -46,7 +46,13 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @property
     def table(self) -> sqlalchemy.Table:
-        return self.__class__.table
+        if getattr(self, "_table", None) is None:
+            return cast("sqlalchemy.Table", self.__class__.table)
+        return self._table
+
+    @table.setter
+    def table(self, value: sqlalchemy.Table) -> None:
+        self._table = value
 
     @classmethod
     def build(cls, schema: typing.Optional[str] = None) -> typing.Any:

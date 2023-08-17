@@ -2,18 +2,18 @@
 
 All **Saffier** custom exceptions derive from the base `SaffierException`.
 
-## DoesNotFound
+## ObjectNotFound
 
 Raised when querying a model instance and it does not exist.
 
 ```python
-from saffier.exceptions import DoesNotFound
+from saffier.exceptions import ObjectNotFound
 ```
 
 Or simply:
 
 ```python
-from saffier import DoesNotFound
+from saffier import ObjectNotFound
 ```
 
 ## MultipleObjectsReturned

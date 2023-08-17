@@ -13,5 +13,5 @@ class AwaitableQuery(typing.Generic[SaffierModel]):
     def __init__(self, model_class: typing.Type[SaffierModel]) -> None:
         self.model_class: typing.Type[SaffierModel] = model_class
 
-    async def _execute(self) -> typing.Any:
+    async def execute(self) -> typing.Any:
         raise NotImplementedError()

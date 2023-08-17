@@ -21,8 +21,11 @@ class SaffierException(Exception):
         return "".join(self.args).strip()
 
 
-class DoesNotFound(SaffierException):
+class ObjectNotFound(SaffierException):
     ...
+
+
+DoesNotFound = ObjectNotFound
 
 
 class MultipleObjectsReturned(SaffierException):

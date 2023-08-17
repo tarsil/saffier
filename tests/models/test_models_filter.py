@@ -1,7 +1,7 @@
 import pytest
 
 import saffier
-from saffier.exceptions import DoesNotFound
+from saffier.exceptions import ObjectNotFound
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -67,7 +67,7 @@ async def test_model_filter():
     user = await User.query.get(name="Lucy")
     assert user.name == "Lucy"
 
-    with pytest.raises(DoesNotFound):
+    with pytest.raises(ObjectNotFound):
         await User.query.get(name="Jim")
 
     await Product.query.create(name="T-Shirt", rating=5, in_stock=True)

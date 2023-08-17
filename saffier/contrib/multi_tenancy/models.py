@@ -1,7 +1,5 @@
 import uuid
-from datetime import date
 from typing import Any, Dict, Type, cast
-from uuid import UUID
 
 from loguru import logger
 
@@ -19,13 +17,13 @@ class TenantMixin(saffier.Model):
     the tenants with saffier contrib.
     """
 
-    schema_name: str = saffier.CharField(max_length=63, unique=True, index=True)
-    domain_url: str = saffier.URLField(null=True, default=settings.domain, max_length=2048)
-    tenant_name: str = saffier.CharField(max_length=100, unique=True, null=False)
-    tenant_uuid: UUID = saffier.UUIDField(default=uuid.uuid4, null=False)
-    paid_until: date = saffier.DateField(null=True)
-    on_trial: bool = saffier.BooleanField(null=True)  # type: ignore
-    created_on: date = saffier.DateField(auto_now_add=True)
+    schema_name = saffier.CharField(max_length=63, unique=True, index=True)
+    domain_url = saffier.URLField(null=True, default=settings.domain, max_length=2048)
+    tenant_name = saffier.CharField(max_length=100, unique=True, null=False)
+    tenant_uuid = saffier.UUIDField(default=uuid.uuid4, null=False)
+    paid_until = saffier.DateField(null=True)
+    on_trial = saffier.BooleanField(null=True)  # type: ignore
+    created_on = saffier.DateField(auto_now_add=True)
 
     # Default True, the schema will be automatically created and synched when it is saved.
     auto_create_schema: bool = getattr(settings, "auto_create_schema", True)
@@ -103,7 +101,9 @@ class DomainMixin(saffier.Model):
     """
 
     domain = saffier.CharField(max_length=253, unique=True, db_index=True)
-    tenant = saffier.ForeignKey(settings.tenant_model, index=True, related_name="domains")
+    tenant = saffier.ForeignKey(
+        settings.tenant_model, index=True, on_delete=saffier.CASCADE, related_name="domains"
+    )
     is_primary = saffier.BooleanField(default=True, index=True)
 
     class Meta:
@@ -147,12 +147,14 @@ class TenantUserMixin(saffier.Model):
         settings.auth_user_model,
         null=False,
         blank=False,
+        on_delete=saffier.CASCADE,
         related_name="tenant_user_users",
     )
     tenant = saffier.ForeignKey(
         settings.tenant_model,
         null=False,
         blank=False,
+        on_delete=saffier.CASCADE,
         related_name="tenant_users_tenant",
     )
     is_active = saffier.BooleanField(default=False)
