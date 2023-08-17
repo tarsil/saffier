@@ -50,6 +50,9 @@ nav:
   - Transactions: "transactions.md"
   - Relationships: "relationships.md"
   - Connection: "connection.md"
+  - Tenancy:
+      - Edgy: "tenancy/saffier.md"
+      - Contrib: "tenancy/contrib.md"
   - Registry: "registry.md"
   - Shell Support: "shell.md"
   - Settings: "settings.md"
