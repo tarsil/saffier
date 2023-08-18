@@ -13,6 +13,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import sqlalchemy
@@ -57,7 +58,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         table: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
-        self.model_class = model_class
+        self.model_class = cast("Type[Model]", model_class)
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
@@ -67,7 +68,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._expression = None
         self._cache = None
-        self._m2m_related = m2m_related
+        self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
 
         if self.is_m2m and not self._m2m_related:
@@ -115,7 +116,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
 
         Returns a tuple of bool, list of tuples
         """
-        fields = model_class.fields
+        fields = model_class.fields  # type: ignore
         foreign_keys = []
         has_many = False
 
@@ -136,7 +137,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
                 else:
                     counter += 1
 
-        return has_many, foreign_keys
+        return has_many, foreign_keys  # type: ignore
 
     def build_tables_select_from_relationship(self) -> Any:
         """
@@ -167,7 +168,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
 
                 # If there is multiple FKs to the same table
                 if not has_many_fk_same_table:
-                    select_from = sqlalchemy.sql.join(select_from, table)
+                    select_from = sqlalchemy.sql.join(select_from, table)  # type: ignore
                 else:
                     lookup_field = None
 
@@ -179,7 +180,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
                             lookup_field = field
                             break
 
-                    select_from = sqlalchemy.sql.join(
+                    select_from = sqlalchemy.sql.join(  # type: ignore
                         select_from,
                         table,
                         select_from.c.id == getattr(table.c, lookup_field),
@@ -217,10 +218,10 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         if self.distinct_on:
             expression = self.build_select_distinct(self.distinct_on, expression=expression)
 
-        self._expression = expression
+        self._expression = expression  # type: ignore
         return expression
 
-    def filter_query(self, exclude: bool = False, **kwargs: Any) -> Any:
+    def filter_query(self, exclude: bool = False, **kwargs: Any) -> "QuerySet":
         from saffier.core.db.models.model import Model
 
         clauses = []
@@ -303,16 +304,19 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         else:
             filter_clauses += clauses
 
-        return self.__class__(
-            model_class=self.model_class,
-            database=self._database,
-            filter_clauses=filter_clauses,
-            select_related=select_related,
-            limit_count=self.limit_count,
-            limit_offset=self._offset,
-            order_by=self._order_by,
-            m2m_related=self.m2m_related,
-            table=self.table,
+        return cast(
+            "QuerySet",
+            self.__class__(
+                model_class=self.model_class,
+                database=self._database,
+                filter_clauses=filter_clauses,
+                select_related=select_related,
+                limit_count=self.limit_count,
+                limit_offset=self._offset,
+                order_by=self._order_by,
+                m2m_related=self.m2m_related,
+                table=self.table,
+            ),
         )
 
     def validate_kwargs(self, **kwargs: Any) -> Any:
@@ -336,8 +340,8 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         return group_col
 
     def prepare_fields_for_distinct(self, distinct_on: str) -> Any:
-        distinct_on = self.table.columns[distinct_on]
-        return distinct_on
+        _distinct_on: sqlalchemy.Column = self.table.columns[distinct_on]
+        return _distinct_on
 
     def clone(self) -> Any:
         """
@@ -378,7 +382,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self._expression = value
 
     async def __aiter__(self) -> AsyncIterator[SaffierModel]:
-        for value in await self:  # type: ignore
+        for value in await self:
             yield value
 
     def set_query_expression(self, expression: Any) -> None:
@@ -393,7 +397,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         exclude: bool = False,
         **kwargs: Any,
-    ) -> Any:
+    ) -> "QuerySet":
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
@@ -587,7 +591,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = queryset.build_select()
         expression = sqlalchemy.exists(expression).select()
         queryset.set_query_expression(expression)
-        return await queryset.database.fetch_val(expression)
+        _exists = await queryset.database.fetch_val(expression)
+        return cast("bool", _exists)
 
     async def count(self) -> int:
         """
@@ -597,7 +602,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = queryset.build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         queryset.set_query_expression(expression)
-        return await queryset.database.fetch_val(expression)
+        _count = await queryset.database.fetch_val(expression)
+        return cast("int", _count)
 
     async def get_or_none(self, **kwargs: Any) -> Union[SaffierModel, None]:
         """
@@ -667,7 +673,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows[0], select_related=queryset._select_related
         )
 
-    async def first(self, **kwargs: Any) -> SaffierModel:
+    async def first(self, **kwargs: Any) -> Union[SaffierModel, None]:
         """
         Returns the first record of a given queryset.
         """
@@ -678,8 +684,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await queryset.limit(1).order_by("id").all()
         if rows:
             return rows[0]
+        return None
 
-    async def last(self, **kwargs: Any) -> SaffierModel:
+    async def last(self, **kwargs: Any) -> Union[SaffierModel, None]:
         """
         Returns the last record of a given queryset.
         """
@@ -690,6 +697,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await queryset.order_by("-id").all()
         if rows:
             return rows[0]
+        return None
 
     async def create(self, **kwargs: Any) -> SaffierModel:
         """
@@ -746,7 +754,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         pk = getattr(queryset.table.c, queryset.pkname)
         expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
-        kwargs = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
+        kwargs: Dict[str, Any] = {
+            field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
+        }
         pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
 
         query_list = []
@@ -766,7 +776,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.set_query_expression(expression)
         await queryset.database.execute(expression)
 
-    async def update(self, **kwargs: Any) -> int:
+    async def update(self, **kwargs: Any) -> None:
         """
         Updates a record in a specific table with the given kwargs.
         """

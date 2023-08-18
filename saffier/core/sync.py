@@ -5,7 +5,7 @@ import anyio
 from anyio._core._eventloop import threadlocals
 
 
-def execsync(async_function: Any, raise_error: bool = True):
+def execsync(async_function: Any, raise_error: bool = True) -> Any:
     """
     Runs any async function inside a blocking function (sync).
     """

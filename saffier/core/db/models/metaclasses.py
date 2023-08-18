@@ -1,7 +1,18 @@
 import copy
 import inspect
-import typing
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 import sqlalchemy
 
@@ -43,39 +54,38 @@ class MetaInfo:
         "related_names",
     )
 
-    def __init__(self, meta: typing.Optional["Model.Meta"] = None) -> None:
+    def __init__(self, meta: Any = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.pk: Optional[Field] = None
+        self.pk_attribute: Union[Field, str] = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
-        self.fields: typing.Set = set()
-        self.fields_mapping: typing.Dict[str, Field] = {}
-        self.registry: typing.Optional[typing.Type[Registry]] = getattr(meta, "registry", None)
-        self.tablename: typing.Optional[str] = getattr(meta, "tablename", None)
-        self.parents: typing.Any = getattr(meta, "parents", None) or []
-        self.pk: typing.Optional[Field] = None
-        self.one_to_one_fields: typing.Set[str] = set()
-        self.many_to_many_fields: typing.Set[str] = set()
-        self.foreign_key_fields: typing.Set[str] = set()
-        self.pk_attribute: typing.Union[Field, str] = getattr(meta, "pk_attribute", "")
-        self.model: typing.Optional[typing.Type["Model"]] = None
-        self.manager: Manager = getattr(meta, "manager", Manager())
-        self.unique_together: typing.Any = getattr(meta, "unique_together", None)
-        self.indexes: typing.Any = getattr(meta, "indexes", None)
+        self.fields: Set[Any] = set()
+        self.fields_mapping: Dict[str, Field] = {}
+        self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
+        self.tablename: Optional[str] = getattr(meta, "tablename", None)
+        self.parents: Any = getattr(meta, "parents", None) or []
+        self.many_to_many_fields: Set[str] = set()
+        self.foreign_key_fields: Dict[str, Any] = {}
+        self.model: Optional[Type["Model"]] = None
+        self.manager: "Manager" = getattr(meta, "manager", Manager())
+        self.unique_together: Any = getattr(meta, "unique_together", None)
+        self.indexes: Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
-        self.managers: bool = getattr(meta, "managers", None)
+        self.managers: List[Manager] = getattr(meta, "managers", [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
-        self.multi_related: typing.List[str] = getattr(meta, "multi_related", [])
-        self.related_names: typing.Set[str] = set()
+        self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
+        self.related_names: Set[str] = set()
+        self.related_fields: Dict[str, Any] = {}
 
 
-def _check_model_inherited_registry(
-    bases: typing.Tuple[typing.Type, ...]
-) -> typing.Type[Registry]:
+def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
 
     If not found, then a ImproperlyConfigured exception is raised.
     """
-    found_registry: typing.Optional[typing.Type[Registry]] = None
+    found_registry: Optional[Type[Registry]] = None
 
     for base in bases:
         meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
@@ -94,9 +104,9 @@ def _check_model_inherited_registry(
 
 
 def _check_manager_for_bases(
-    base: typing.Tuple[typing.Type, ...],
-    attrs: typing.Any,
-    meta: typing.Optional[MetaInfo] = None,
+    base: Tuple[Type, ...],
+    attrs: Any,
+    meta: Optional[MetaInfo] = None,
 ) -> None:
     """
     When an abstract class is declared, we must treat the manager's value coming from the top.
@@ -113,10 +123,8 @@ def _check_manager_for_bases(
 
 
 def _set_related_name_for_foreign_keys(
-    foreign_keys: typing.Set[
-        typing.Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]
-    ],
-    model_class: typing.Union["Model", "ReflectModel"],
+    foreign_keys: Set[Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]],
+    model_class: Union["Model", "ReflectModel"],
 ) -> str:
     """
     Sets the related name for the foreign keys.
@@ -127,7 +135,7 @@ def _set_related_name_for_foreign_keys(
         default_related_name = getattr(foreign_key, "related_name", None)
 
         if not default_related_name:
-            default_related_name = f"{model_class.__name__.lower()}s_set"
+            default_related_name = f"{model_class.__name__.lower()}s_set"  # type: ignore
 
         elif hasattr(foreign_key.target, default_related_name):
             raise ForeignKeyBadConfigured(
@@ -145,12 +153,12 @@ def _set_related_name_for_foreign_keys(
         # Set the related name
         setattr(foreign_key.target, default_related_name, related_field)
 
-    return default_related_name
+    return cast("str", default_related_name)
 
 
 def _set_many_to_many_relation(
     m2m: saffier_fields.ManyToManyField,
-    model_class: typing.Union["Model", "ReflectModel"],
+    model_class: Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
     m2m.create_through_model()
@@ -161,17 +169,17 @@ def _set_many_to_many_relation(
 class BaseModelMeta(type):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: Any) -> typing.Any:
-        fields: typing.Dict[str, Field] = {}
-        one_to_one_fields: typing.Any = set()
-        foreign_key_fields: typing.Any = set()
-        many_to_many_fields: typing.Any = set()
+    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
+        fields: Dict[str, Field] = {}
+        one_to_one_fields: Any = set()
+        foreign_key_fields: Any = set()
+        many_to_many_fields: Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
-        registry: typing.Any = None
+        registry: Any = None
 
         # Searching for fields "Field" in the class hierarchy.
-        def __search_for_fields(base: typing.Type, attrs: Any) -> None:
+        def __search_for_fields(base: Type, attrs: Any) -> None:
             """
             Search for class attributes of the type fields.Field in the given class.
 
@@ -184,7 +192,7 @@ class BaseModelMeta(type):
             for parent in base.__mro__[1:]:
                 __search_for_fields(parent, attrs)
 
-            meta: typing.Union[MetaInfo, None] = getattr(base, "meta", None)
+            meta: Union[MetaInfo, None] = getattr(base, "meta", None)
             if not meta:
                 # Mixins and other classes
                 for key, value in inspect.getmembers(base):
@@ -245,7 +253,7 @@ class BaseModelMeta(type):
                     many_to_many_fields.add(value)
                     continue
                 elif isinstance(value, saffier_fields.ForeignKey) and not isinstance(
-                    value, saffier_fields.ManyToManyField
+                    value, saffier_fields.ManyToManyField  # type: ignore
                 ):
                     foreign_key_fields.add(value)
                     continue
@@ -292,7 +300,7 @@ class BaseModelMeta(type):
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
-            if hasattr(new_class, "_db_model") and new_class._db_model:
+            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
                 meta.registry = _check_model_inherited_registry(bases)
             else:
                 return new_class
@@ -342,7 +350,7 @@ class BaseModelMeta(type):
             if field.primary_key:
                 new_class.pkname = name
 
-        new_class._db_model = True
+        new_class.__db_model__ = True
         new_class.fields = meta.fields_mapping
 
         meta.model = new_class  # type: ignore
@@ -357,7 +365,7 @@ class BaseModelMeta(type):
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
-        for field, value in new_class.fields.items():
+        for field, value in new_class.fields.items():  # type: ignore
             if isinstance(value, saffier_fields.ManyToManyField):
                 _set_many_to_many_relation(value, new_class, field)
 
@@ -377,7 +385,7 @@ class BaseModelMeta(type):
         return None
 
     @property
-    def table(cls) -> typing.Any:
+    def table(cls) -> Any:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
@@ -411,11 +419,11 @@ class BaseModelMeta(type):
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
-        return cls._table.columns
+        return cast("sqlalchemy.sql.ColumnCollection", cls._table.columns)
 
 
 class BaseModelReflectMeta(BaseModelMeta):
-    def __new__(cls, name: str, bases: typing.Tuple[typing.Type, ...], attrs: Any) -> typing.Any:
+    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         new_model = super().__new__(cls, name, bases, attrs)
 
         registry = new_model.meta.registry

@@ -6,7 +6,7 @@ import sqlalchemy
 DIALECTS = {"postgres": "postgres"}
 
 
-class BaseFieldProtocol(sqlalchemy.TypeDecorator):  # type: ignore
+class BaseFieldProtocol(sqlalchemy.TypeDecorator):
     """
     When implementing a field representation from SQLAlchemy, the protocol will be enforced
     """

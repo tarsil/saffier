@@ -17,7 +17,7 @@ defaults.update(
         "datetime": datetime.datetime,
         "timedelta": datetime.timedelta,
         "BaseModel": pydantic.BaseModel,
-        "BaseConfig": pydantic.BaseConfig,
+        "ConfigDict": pydantic.ConfigDict,
         "settings": saffier.settings,
     }
 )
@@ -47,26 +47,26 @@ def import_objects(app: Any, registry: Registry) -> Dict[Any, Any]:
     welcome_message(app)
     printer.write_success(79 * "-", colour=OutputColour.CYAN3)
 
-    def import_defaults():
+    def import_defaults() -> None:
         for name, module in defaults.items():
             directive = import_statement.format(module_path=module.__module__, model=name)
             printer.write_success(directive, colour=OutputColour.CYAN3)
             imported_objects[name] = module
 
-    def _import_objects(lookup_dict: Dict[Any, Any]) -> Any:
+    def _import_objects(lookup_dict: Dict[Any, Any]) -> None:
         for _, model in sorted(lookup_dict.items()):
             directive = import_statement.format(module_path=model.__module__, model=model.__name__)
             printer.write_success(directive, colour=OutputColour.CYAN3)
             imported_objects[model.__name__] = model
 
-    def import_models():
+    def import_models() -> None:
         if not registry.models:
             return
 
         printer.write_success("Models".center(79, "-"), colour=OutputColour.CYAN3)
         _import_objects(registry.models)
 
-    def import_reflected_models():
+    def import_reflected_models() -> None:
         if not registry.reflected:
             return
 

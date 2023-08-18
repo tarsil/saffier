@@ -1,19 +1,17 @@
 import functools
-import typing
-from typing import cast
+from typing import Any, ClassVar, Dict, Optional, Sequence, cast
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
+from typing_extensions import Self
 
 import saffier
 from saffier.conf import settings
 from saffier.core.db.datastructures import Index, UniqueConstraint
-from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta
+from saffier.core.db.models.managers import Manager
+from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from saffier.core.utils.model import DateParser
 from saffier.exceptions import ImproperlyConfigured
-
-if typing.TYPE_CHECKING:
-    from saffier.core.db.models.model import Model
 
 
 class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
@@ -22,20 +20,25 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     a common mixin.
     """
 
+    query: ClassVar[Manager] = Manager()
+    meta: ClassVar[MetaInfo] = MetaInfo(None)
+    __db_model__: ClassVar[bool] = False
+    __raw_query__: ClassVar[Optional[str]] = None
+
     @property
-    def pk(self) -> typing.Any:
+    def pk(self) -> Any:
         return getattr(self, self.pkname)
 
     @pk.setter
-    def pk(self, value: typing.Any) -> typing.Any:
+    def pk(self, value: Any) -> Any:
         setattr(self, self.pkname, value)
 
     @property
-    def raw_query(self) -> typing.Any:
-        return getattr(self, self._raw_query)  # type: ignore
+    def raw_query(self) -> Any:
+        return getattr(self, self.__raw_query__)  # type: ignore
 
     @raw_query.setter
-    def raw_query(self, value: typing.Any) -> typing.Any:
+    def raw_query(self, value: Any) -> Any:
         setattr(self, self.raw_query, value)
 
     def __repr__(self) -> str:
@@ -55,7 +58,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         self._table = value
 
     @classmethod
-    def build(cls, schema: typing.Optional[str] = None) -> typing.Any:
+    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
         """
         Performs the operation of building the core SQLAlchemy Table object.
         Builds the constrainst, indexes, columns and metadata based on the
@@ -85,13 +88,11 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             indexes.append(index)
 
         return sqlalchemy.Table(
-            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True
+            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True  # type: ignore
         )
 
     @classmethod
-    def _get_unique_constraints(
-        cls, columns: typing.Sequence
-    ) -> typing.Optional[sqlalchemy.UniqueConstraint]:
+    def _get_unique_constraints(cls, columns: Sequence) -> Optional[sqlalchemy.UniqueConstraint]:
         """
         Returns the unique constraints for the model.
 
@@ -104,19 +105,19 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return sqlalchemy.UniqueConstraint(*columns)
 
     @classmethod
-    def _get_indexes(cls, index: Index) -> typing.Optional[sqlalchemy.Index]:
+    def _get_indexes(cls, index: Index) -> Optional[sqlalchemy.Index]:
         """
         Creates the index based on the Index fields
         """
-        return sqlalchemy.Index(index.name, *index.fields)
+        return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    def update_from_dict(self, dict_values: typing.Dict[str, typing.Any]) -> "Model":
+    def update_from_dict(self, dict_values: Dict[str, Any]) -> Self:
         """Updates the current model object with the new fields"""
         for key, value in dict_values.items():
             setattr(self, key, value)
         return self
 
-    def extract_db_fields(self):
+    def extract_db_fields(self) -> Dict[str, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
@@ -124,7 +125,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         related_names = self.meta.related_names
         return {k: v for k, v in self.__dict__.items() if k not in related_names}
 
-    def __setattr__(self, key: typing.Any, value: typing.Any) -> typing.Any:
+    def __setattr__(self, key: Any, value: Any) -> Any:
         if key in self.fields:
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.
@@ -137,7 +138,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
         super().__setattr__(key, value)
 
-    def __eq__(self, other: typing.Any) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
             return False
         for key in self.fields.keys():
@@ -158,28 +159,28 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
         return sqlalchemy.create_engine(url)
 
     @property
-    def pk(self) -> typing.Any:
+    def pk(self) -> Any:
         return getattr(self, self.pkname, None)
 
     @pk.setter
-    def pk(self, value: typing.Any) -> typing.Any:
+    def pk(self, value: Any) -> Any:
         setattr(self, self.pkname, value)
 
     @classmethod
-    def build(cls, schema: typing.Optional[str] = None) -> typing.Any:
+    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata = typing.cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        metadata = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
         metadata.schema = schema
-        tablename = cls.meta.tablename
+        tablename: str = cast("str", cls.meta.tablename)
         return cls.reflect(tablename, metadata)
 
     @classmethod
-    def reflect(cls, tablename, metadata):
+    def reflect(cls, tablename: str, metadata: sqlalchemy.MetaData) -> sqlalchemy.Table:
         try:
             return sqlalchemy.Table(
-                tablename, metadata, autoload_with=cls.meta.registry.sync_engine
+                tablename, metadata, autoload_with=cls.meta.registry.sync_engine  # type: ignore
             )
         except Exception as e:
             raise ImproperlyConfigured(

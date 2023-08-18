@@ -28,9 +28,9 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
     This can be used with a Migration class or with SaffierExtra object lookup.
     """
     try:
-        registry = env.app._saffier_db["migrate"].registry
+        registry = env.app._saffier_db["migrate"].registry  # type: ignore
     except AttributeError:
-        registry = env.app._saffier_extra["extra"].registry
+        registry = env.app._saffier_extra["extra"].registry  # type: ignore
 
     if (
         sys.platform != "win32"

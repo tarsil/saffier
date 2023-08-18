@@ -16,7 +16,7 @@ class Index:
     fields: Optional[Sequence[str]] = None
 
     @model_validator(mode="before")
-    def validate_data(cls, values: Any) -> Any:  # type: ignore
+    def validate_data(cls, values: Any) -> Any:
         name = values.kwargs.get("name")
 
         if name is not None and len(name) > cls.max_name_length:
@@ -45,7 +45,7 @@ class UniqueConstraint:
     fields: List[str]
 
     @model_validator(mode="before")
-    def validate_data(cls, values: Any) -> Any:  # type: ignore
+    def validate_data(cls, values: Any) -> Any:
         fields = values.kwargs.get("fields")
 
         if not isinstance(fields, (tuple, list)):

@@ -44,7 +44,7 @@ class IPAddress(BaseFieldProtocol):
     Representation of an IP field.
     """
 
-    impl: str = sqlalchemy.CHAR
+    impl: str = sqlalchemy.CHAR  # type: ignore
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any) -> Any:
@@ -69,7 +69,7 @@ class List(BaseFieldProtocol):
     Representation of a List.
     """
 
-    def __init__(self, impl: str = sqlalchemy.TEXT, cache_ok: bool = True, **kwargs: Any) -> None:
+    def __init__(self, impl: str = sqlalchemy.TEXT, cache_ok: bool = True, **kwargs: Any) -> None:  # type: ignore
         self.delimiter = kwargs.pop("delimiter", ",")
         super().__init__(**kwargs)
         self.impl = impl
@@ -87,7 +87,7 @@ class List(BaseFieldProtocol):
 
     def process_result_value(self, value: Any, dialect: Any) -> Any:
         if value is None:
-            return SubList(self.delimiter)  # type: ignore
+            return SubList(self.delimiter)
         if isinstance(value, list):
             return value
-        return SubList(self.delimiter, value.split(self.delimiter))  # type: ignore
+        return SubList(self.delimiter, value.split(self.delimiter))

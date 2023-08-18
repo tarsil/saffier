@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Type, cast
+
+from sqlalchemy.engine.result import Row
 
 if TYPE_CHECKING:
     from saffier import Model
@@ -6,7 +8,9 @@ if TYPE_CHECKING:
 
 class ModelRow:
     @classmethod
-    def from_query_result(cls, row: Any, select_related: Any = None) -> Type["Model"]:
+    def from_query_result(
+        cls, row: Row, select_related: Optional[Sequence[Any]] = None
+    ) -> Optional[Type["Model"]]:
         """
         Instantiate a model instance, given a database row.
         """
@@ -41,4 +45,4 @@ class ModelRow:
             elif column.name not in item:
                 item[column.name] = row[column]
 
-        return cls(**item)
+        return cast("Type[Model]", cls(**item))

@@ -152,7 +152,7 @@ async def run_migrations_online() -> Any:
         async with connectable.connect() as connection:
             await connection.run_sync(do_run_migrations)
     else:
-        connectable = create_engine(database_url._url)
+        connectable = create_engine(database_url._url)  # type: ignore
         with connectable.connect() as connection:
             do_run_migrations(connection)
 

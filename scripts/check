@@ -10,9 +10,6 @@ export SOURCE_FILES="saffier tests"
 export EXCLUDE=__init__.py
 export MAIN="saffier"
 
-set -x
-./scripts/sync-version
-
 ${PREFIX}mypy $MAIN
 ${PREFIX}ruff $SOURCE_FILES --line-length 99
 ${PREFIX}black $SOURCE_FILES --check --diff --check --line-length 99
