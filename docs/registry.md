@@ -52,7 +52,7 @@ that is also possible thanks to the registry with [Meta](./models.md#the-meta-cl
 
 ## Schemas
 
-This is another great supported feature from Edgy. This allows you to manipulate database schema
+This is another great supported feature from Saffier. This allows you to manipulate database schema
 operations like [creating schemas](#create-schema) or [dropping schemas](#drop-schema).
 
 This can be particulary useful if you want to create a [multi-tenancy](./tenancy/saffier.md) application

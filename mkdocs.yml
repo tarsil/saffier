@@ -51,7 +51,7 @@ nav:
   - Relationships: "relationships.md"
   - Connection: "connection.md"
   - Tenancy:
-      - Edgy: "tenancy/saffier.md"
+      - Saffier: "tenancy/saffier.md"
       - Contrib: "tenancy/contrib.md"
   - Registry: "registry.md"
   - Shell Support: "shell.md"

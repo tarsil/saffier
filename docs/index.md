@@ -42,6 +42,32 @@ weaknesses and specific use cases.
 This ORM is built on the top of SQLAlchemy core and aims to simplify the way the setup and queries
 are done into a more common and familiar interface.
 
+## Before continuing
+
+If you are looking for something more **Pyadntic** oriented where you can take literally advantage
+of everything that Pydantic can offer, then instead of continuing with Saffier, have a look at
+its ***data ORM brother***, [Edgy](https://edgy.tarsild.io).
+
+**Edgy** its extremely powerful as well with a key difference that its **100% Pydantic** which means
+you can leverage the technology if you already familiar with it.
+
+No worries, it is not completely different from Saffier, in fact, it was designed with the same principles and what it changes for you
+are essentially the ***imports***.
+
+### Thinking of moving to Edgy?
+
+If you are considering of moving to Edgy but you don't want to be bothered about learning a new
+tool and afraid of breaking changes, then fear not!
+
+Edgy was designed to also make your migration feel seemless, which means that essentially you would
+only need to install it and change the imports in your project from `saffier` to `edgy` and it should
+work automatically for you.
+
+Even the documentation structure its almost the same, intentionally, so what you already know with
+Saffier, you will know with **Edgy**.
+
+**This discards any custom code done by you, of course.**
+
 ## Why this ORM
 
 When investigating for a project different types of ORMs and compared them to each other,
@@ -97,6 +123,8 @@ specific queries and querysets at ease.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you
 need so we give you already one.
+* **Multi-tenancy** - Saffier supports multi-tenancy and even offers a possible solution to be used
+out of the box if you don't want to waste time.
 
 And a lot more you can do here.
 
