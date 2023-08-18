@@ -21,12 +21,12 @@ class SaffierLazySettings(LazyObject):
         )
         settings: Any = import_string(settings_module)
 
-        for setting, _ in settings().dict().items():
+        for setting, _ in settings().model_dump().items():
             assert setting.islower(), "%s should be in lowercase." % setting
 
         self._wrapped = settings()
 
-    def __repr__(self: "SaffierLazySettings"):
+    def __repr__(self: "SaffierLazySettings") -> str:
         # Hardcode the class name as otherwise it yields 'Settings'.
         if self._wrapped is empty:
             return "<SaffierLazySettings [Unevaluated]>"
@@ -35,9 +35,9 @@ class SaffierLazySettings(LazyObject):
         )
 
     @property
-    def configured(self):
+    def configured(self) -> Any:
         """Return True if the settings have already been configured."""
         return self._wrapped is not empty
 
 
-settings: DBSettings = SaffierLazySettings()
+settings: DBSettings = SaffierLazySettings()  # type: ignore

@@ -22,7 +22,7 @@ class TenantMixin(saffier.Model):
     tenant_name = saffier.CharField(max_length=100, unique=True, null=False)
     tenant_uuid = saffier.UUIDField(default=uuid.uuid4, null=False)
     paid_until = saffier.DateField(null=True)
-    on_trial = saffier.BooleanField(null=True)  # type: ignore
+    on_trial = saffier.BooleanField(null=True)
     created_on = saffier.DateField(auto_now_add=True)
 
     # Default True, the schema will be automatically created and synched when it is saved.
@@ -110,7 +110,7 @@ class DomainMixin(saffier.Model):
         abstract = True
 
     def __str__(self) -> str:
-        return self.domain
+        return cast("str", self.domain)
 
     async def save(
         self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
@@ -146,14 +146,12 @@ class TenantUserMixin(saffier.Model):
     user = saffier.ForeignKey(
         settings.auth_user_model,
         null=False,
-        blank=False,
         on_delete=saffier.CASCADE,
         related_name="tenant_user_users",
     )
     tenant = saffier.ForeignKey(
         settings.tenant_model,
         null=False,
-        blank=False,
         on_delete=saffier.CASCADE,
         related_name="tenant_users_tenant",
     )
@@ -167,10 +165,13 @@ class TenantUserMixin(saffier.Model):
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
     async def save(self, *args: Any, **kwargs: Any) -> Type["TenantUserMixin"]:
-        tenant_user = await super().save(*args, **kwargs)
+        tenant_user: Type["Model"] = await super().save(*args, **kwargs)
         if self.is_active:
             qs = (
-                await get_model(registry=tenant_user.meta.registry, model_name=self.tenant)
+                await get_model(
+                    registry=cast("saffier.Registry", tenant_user.meta.registry),
+                    model_name=settings.tenant_model,
+                )
                 .query.filter(is_active=True, user=self.user)
                 .exclude(pk=self.pk)
             )

@@ -1,14 +1,10 @@
 import typing
-from typing import Union
+from typing import Any, Type, Union
 
 from saffier.core.db.models.base import SaffierBaseModel, SaffierBaseReflectModel
-from saffier.core.db.models.managers import Manager
-from saffier.core.db.models.metaclasses import MetaInfo
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
 from saffier.core.utils.schemas import Schema
-
-M = typing.TypeVar("M", bound="Model")
 
 saffier_setattr = object.__setattr__
 
@@ -18,11 +14,6 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
     The models will always have an id attribute as primery key.
     The primary key can be whatever desired, from IntegerField, FloatField to UUIDField as long as the `id` field is explicitly declared or else it defaults to BigIntegerField.
     """
-
-    query = Manager()
-    meta = MetaInfo(None)
-    _db_model: bool = False
-    _raw_query: typing.Optional[str] = None
 
     def __init__(self, **kwargs: typing.Any) -> None:
         if "pk" in kwargs:
@@ -143,7 +134,7 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
         force_save: bool = False,
         values: typing.Any = None,
         **kwargs: typing.Any,
-    ) -> M:
+    ) -> Union[Type["Model"], Any]:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or

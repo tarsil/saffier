@@ -1,10 +1,10 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
 
 from saffier.core.db import fields
 
 if TYPE_CHECKING:
-    from saffier import Model, ReflectModel
+    from saffier import Manager, Model, QuerySet, ReflectModel
 
 
 class RelatedField:
@@ -26,25 +26,25 @@ class RelatedField:
         self.instance = instance
 
     @functools.cached_property
-    def manager(self):
+    def manager(self) -> "Manager":
         """Returns the manager class"""
-        return self.related_from.meta.manager
+        return cast("Manager", self.related_from.meta.manager)  # type: ignore
 
     @functools.cached_property
-    def queryset(self):
+    def queryset(self) -> "QuerySet":
         return self.manager.get_queryset()
 
-    def m2m_related(self):
+    def m2m_related(self) -> Any:
         """
         Guarantees the the m2m filter is done by the owner of the call
         and not by the children.
         """
-        if not self.related_from.meta.is_multi:
+        if not self.related_from.meta.is_multi:  # type: ignore
             return
 
         related = [
             key
-            for key, value in self.related_from.fields.items()
+            for key, value in self.related_from.fields.items()  # type: ignore
             if key != self.related_to.__name__.lower() and isinstance(value, fields.ForeignKey)
         ]
         return related
@@ -77,9 +77,9 @@ class RelatedField:
         If there is no field with the related_name declared, find the first field
         with the FK to the related_to.
         """
-        field_name: str = None
+        field_name: Optional[str] = None
 
-        for field, value in self.related_from.fields.items():
+        for field, value in self.related_from.fields.items():  # type: ignore
             if isinstance(value, (fields.ForeignKey, fields.OneToOneField)):
                 if value.related_name == self.related_name:
                     field_name = field
@@ -87,13 +87,13 @@ class RelatedField:
                 elif not value.related_name or value.related_name is None:
                     field_name = field
                     break
-        return field_name
+        return cast("str", field_name)
 
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             field = self.get_foreign_key_field_name()
-            kwargs[field] = self.instance.pk
+            kwargs[field] = self.instance.pk  # type: ignore
 
             related = self.m2m_related()
             if related:

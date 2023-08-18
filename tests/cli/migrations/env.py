@@ -1,27 +1,24 @@
+# Custom env template
 import asyncio
 import logging
-import os
 import sys
 from logging.config import fileConfig
-from typing import Any, Union
 
 from alembic import context
-from databasez import DatabaseURL
 from rich.console import Console
-from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from saffier import settings
 from saffier.cli.constants import APP_PARAMETER
 from saffier.cli.env import MigrationEnv
 from saffier.exceptions import SaffierException
+from tests.settings import TEST_DATABASE
 
 # The console used for the outputs
 console = Console()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-config: Any = context.config
+config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -29,7 +26,7 @@ fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
 
 
-def get_app_location(argv: Any) -> Any:
+def get_app_location(argv):
     """
     Manually checks for the --app parameter.
     """
@@ -41,7 +38,7 @@ def get_app_location(argv: Any) -> Any:
     return None
 
 
-def get_app() -> Any:
+def get_app():
     """
     Gets the app via environment variable or via console parameter.
     """
@@ -51,11 +48,11 @@ def get_app() -> Any:
     return app_env.app
 
 
-def get_engine_url() -> Union[str, None]:
-    return os.environ.get("SAFFIER_DATABASE_URL")
+def get_engine_url():
+    return TEST_DATABASE
 
 
-app: Any = get_app()
+app = get_app()
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -71,13 +68,13 @@ target_db = app._saffier_db["migrate"].registry
 # ... etc.
 
 
-def get_metadata() -> Any:
+def get_metadata():
     if hasattr(target_db, "metadatas"):
         return target_db.metadatas[None]
     return target_db.metadata
 
 
-def run_migrations_offline() -> Any:
+def run_migrations_offline():
     """Run migrations in 'offline' mode.
 
     This configures the context with just a URL
@@ -96,11 +93,11 @@ def run_migrations_offline() -> Any:
         context.run_migrations()
 
 
-def do_run_migrations(connection: Any) -> Any:
+def do_run_migrations(connection):
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
     # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
-    def process_revision_directives(context, revision, directives) -> Any:  # type: ignore
+    def process_revision_directives(context, revision, directives):
         if getattr(config.cmd_opts, "autogenerate", False):
             script = directives[0]
             if script.upgrade_ops.is_empty():
@@ -118,43 +115,17 @@ def do_run_migrations(connection: Any) -> Any:
         context.run_migrations()
 
 
-def is_async_connection(url: DatabaseURL) -> bool:
-    """
-    Verifies if is an async connection string.
-
-    Validates the type of driver against the ones supported by Saffier.
-    """
-    if not url.driver:
-        return False
-
-    if (
-        (url.driver in settings.postgres_drivers)
-        or (url.driver in settings.mysql_drivers)
-        or (url.driver in settings.sqlite_drivers)
-        or url.driver in settings.mssql_drivers
-    ):
-        return True
-    return False
-
-
-async def run_migrations_online() -> Any:
+async def run_migrations_online():
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine
     and associate a connection with the context.
 
     """
-    database_url = DatabaseURL(get_engine_url())
-    is_async = is_async_connection(database_url)
+    connectable = create_async_engine(get_engine_url())
 
-    if is_async:
-        connectable = create_async_engine(database_url._url)
-        async with connectable.connect() as connection:
-            await connection.run_sync(do_run_migrations)
-    else:
-        connectable = create_engine(database_url._url)  # type: ignore
-        with connectable.connect() as connection:
-            do_run_migrations(connection)
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
 
 
 if context.is_offline_mode():
