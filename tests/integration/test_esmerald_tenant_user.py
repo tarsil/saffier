@@ -86,7 +86,7 @@ class TenantMiddleware(MiddlewareProtocol):
         await self.app(scope, receive, send)
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     try:
         await models.create_all()
@@ -155,23 +155,21 @@ async def create_data():
     """
     saffier = await User.query.create(name="saffier", email="saffier@esmerald.dev")
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
-    edgy_tenant = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
+    edgy_tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
-    saffier = await User.query.using(edgy_tenant.schema_name).create(
-        name="saffier", email="saffier@esmerald.dev"
+    edgy = await User.query.using(edgy_tenant.schema_name).create(
+        name="edgy", email="edgy@esmerald.dev"
     )
 
-    await TenantUser.query.create(user=saffier, tenant=edgy_tenant)
+    await TenantUser.query.create(user=user, tenant=edgy_tenant)
 
     # Products for Edgy
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(
-            name=f"Product-{i}", user=saffier
-        )
+        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
 
     # Products for Saffier
     for i in range(25):
-        await Product.query.create(name=f"Product-{i}", user=user)
+        await Product.query.create(name=f"Product-{i}", user=saffier)
 
 
 async def test_user_query_tenant_data(async_client, async_cli):
@@ -179,7 +177,7 @@ async def test_user_query_tenant_data(async_client, async_cli):
 
     # Test Edgy Response intercepted in the
     response_edgy = await async_client.get(
-        "/products", headers={"tenant": "saffier", "email": "saffier@esmerald.dev"}
+        "/products", headers={"tenant": "edgy", "email": "edgy@esmerald.dev"}
     )
     assert response_edgy.status_code == 200
 
@@ -191,9 +189,9 @@ async def test_user_query_tenant_data(async_client, async_cli):
 
     assert len(response_saffier.json()) == 25
 
-    # Check saffier again
+    # Check edgy again
     response_edgy = await async_client.get(
-        "/products", headers={"tenant": "saffier", "email": "saffier@esmerald.dev"}
+        "/products", headers={"tenant": "edgy", "email": "edgy@esmerald.dev"}
     )
     assert response_edgy.status_code == 200
 
@@ -202,3 +200,57 @@ async def test_user_query_tenant_data(async_client, async_cli):
     response = await async_cli.get("/no-tenant/products")
     assert response.status_code == 200
     assert len(response.json()) == 25
+
+
+async def test_active_schema_user():
+    tenant = await Tenant.query.create(schema_name="saffier", tenant_name="Saffier")
+    user = await User.query.create(name="saffier", email="saffier@esmerald.dev")
+    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+
+    await tenant_user.tenant.load()
+
+    active_user_tenant = await TenantUser.get_active_user_tenant(user)
+    assert active_user_tenant.tenant_uuid == tenant_user.tenant.tenant_uuid
+    assert str(active_user_tenant.tenant_uuid) == str(tenant_user.tenant.tenant_uuid)
+
+
+async def test_can_be_tenant_of_multiple_users():
+    tenant = await Tenant.query.create(schema_name="saffier", tenant_name="Saffier")
+
+    for i in range(3):
+        user = await User.query.create(name=f"user-{i}", email=f"user-{i}@esmerald.dev")
+        await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+
+    total = await tenant.tenant_users_tenant_test.count()
+
+    assert total == 3
+
+
+async def test_multiple_tenants_one_active():
+    # Tenant 1
+    tenant = await Tenant.query.create(schema_name="saffier", tenant_name="Saffier")
+    user = await User.query.create(name="saffier", email="saffier@esmerald.dev")
+    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+
+    await tenant_user.tenant.load()
+
+    active_user_tenant = await TenantUser.get_active_user_tenant(user)
+    assert active_user_tenant.tenant_uuid == tenant_user.tenant.tenant_uuid
+
+    # Tenant 2
+    another_tenant = await Tenant.query.create(
+        schema_name="another_saffier", tenant_name="Another Saffier"
+    )
+    await TenantUser.query.create(user=user, tenant=another_tenant, is_active=True)
+
+    # Tenant 2
+    another_tenant_three = await Tenant.query.create(
+        schema_name="another_saffier_three", tenant_name="Another Saffier Three"
+    )
+    await TenantUser.query.create(user=user, tenant=another_tenant_three, is_active=True)
+
+    active_user_tenant = await TenantUser.get_active_user_tenant(user)
+
+    assert active_user_tenant.tenant_uuid == another_tenant_three.tenant_uuid
+    assert active_user_tenant.tenant_uuid != another_tenant.tenant_uuid
+    assert active_user_tenant.tenant_uuid != tenant.tenant_uuid

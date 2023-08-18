@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, Type, cast
+from typing import Any, Dict, Type, Union, cast
 
 from loguru import logger
 
@@ -9,6 +9,7 @@ from saffier.contrib.multi_tenancy.exceptions import ModelSchemaError
 from saffier.contrib.multi_tenancy.utils import create_tables
 from saffier.core.db.models import Model
 from saffier.core.db.models.utils import get_model
+from saffier.exceptions import ObjectNotFound
 
 
 class TenantMixin(saffier.Model):
@@ -164,16 +165,27 @@ class TenantUserMixin(saffier.Model):
     def __str__(self) -> str:
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
+    @classmethod
+    async def get_active_user_tenant(cls, user: Type["Model"]) -> Union[Type["Model"], None]:
+        """
+        Obtains the active user tenant.
+        """
+        try:
+            tenant = await get_model(
+                registry=cls.meta.registry, model_name=cls.__name__
+            ).query.get(user=user, is_active=True)
+            await tenant.tenant.load()
+
+        except ObjectNotFound:
+            return None
+        return cast("Type[Model]", tenant.tenant)
+
     async def save(self, *args: Any, **kwargs: Any) -> Type["TenantUserMixin"]:
-        tenant_user: Type["Model"] = await super().save(*args, **kwargs)
+        await super().save(*args, **kwargs)
         if self.is_active:
-            qs = (
-                await get_model(
-                    registry=cast("saffier.Registry", tenant_user.meta.registry),
-                    model_name=settings.tenant_model,
-                )
-                .query.filter(is_active=True, user=self.user)
-                .exclude(pk=self.pk)
+            await get_model(
+                registry=self.meta.registry, model_name=self.__class__.__name__
+            ).query.filter(is_active=True, user=self.user).exclude(pk=self.pk).update(
+                is_active=False
             )
-            qs.update(is_active=False)
-        return cast("Type[TenantUserMixin]", tenant_user)
+        return cast("Type[TenantUserMixin]", self)
