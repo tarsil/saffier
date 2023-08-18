@@ -75,7 +75,6 @@ class MetaInfo:
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = set()
-        self.related_fields: Dict[str, Any] = {}
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
