@@ -6,8 +6,8 @@ models = Registry(database=database)
 
 
 class User(saffier.Model):
-    id: int = saffier.IntegerField(primary_key=True)
-    is_active: bool = saffier.BooleanField(default=False)
+    id = saffier.IntegerField(primary_key=True)
+    is_active = saffier.BooleanField(default=False)
 
     class Meta:
         registry = models
