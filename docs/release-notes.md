@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.17.1
+
+### Fixed
+
+-  DeclarativeModel generating internal mappings names was breaking for class objects.
+
 ## 0.17.0
 
 ### Added
