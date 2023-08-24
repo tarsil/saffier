@@ -22,6 +22,7 @@ import saffier
 from saffier.conf import settings
 from saffier.core.db.fields import CharField, TextField
 from saffier.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
+from saffier.core.db.querysets.prefetch import PrefetchMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
 from saffier.core.utils.model import DateParser
 from saffier.core.utils.schemas import Schema
@@ -39,7 +40,9 @@ ReflectSaffierModel = TypeVar("ReflectSaffierModel", bound="ReflectModel")
 SaffierModel = Union[_SaffierModel, ReflectSaffierModel]
 
 
-class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[SaffierModel]):
+class BaseQuerySet(
+    TenancyMixin, QuerySetPropsMixin, PrefetchMixin, DateParser, AwaitableQuery[SaffierModel]
+):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -48,6 +51,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
         select_related: Any = None,
+        prefetch_related: Any = None,
         limit_count: Any = None,
         limit_offset: Any = None,
         order_by: Any = None,
@@ -62,6 +66,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
+        self._prefetch_related = [] if prefetch_related is None else prefetch_related
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
@@ -70,6 +75,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         self._cache = None
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
+        self.extra: Dict[str, Any] = {}
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
@@ -227,6 +233,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         clauses = []
         filter_clauses = self.filter_clauses
         select_related = list(self._select_related)
+        prefetch_related = list(self._prefetch_related)
 
         if kwargs.get("pk"):
             pk_name = self.model_class.pkname
@@ -311,6 +318,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
                 database=self._database,
                 filter_clauses=filter_clauses,
                 select_related=select_related,
+                prefetch_related=prefetch_related,
                 limit_count=self.limit_count,
                 limit_offset=self._offset,
                 order_by=self._order_by,
@@ -353,6 +361,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.limit_count = self.limit_count
         queryset._select_related = copy.copy(self._select_related)
+        queryset._prefetch_related = copy.copy(self._prefetch_related)
         queryset._offset = self._offset
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
@@ -362,6 +371,7 @@ class BaseQuerySet(TenancyMixin, QuerySetPropsMixin, DateParser, AwaitableQuery[
         queryset._m2m_related = self._m2m_related
         queryset._database = self.database
         queryset.table = self.table
+        queryset.extra = self.extra
         return queryset
 
 
@@ -622,7 +632,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows[0], select_related=queryset._select_related
         )
 
-    async def all(self, **kwargs: Any) -> List[SaffierModel]:
+    async def _all(self, **kwargs: Any) -> List[SaffierModel]:
         """
         Returns the queryset records based on specific filters
         """
@@ -643,7 +653,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.model_class.raw_query = queryset.sql
 
         results = [
-            queryset.model_class.from_query_result(row, select_related=queryset._select_related)
+            queryset.model_class.from_query_result(
+                row,
+                select_related=queryset._select_related,
+                prefetch_related=queryset._prefetch_related,
+            )
             for row in rows
         ]
 
@@ -651,6 +665,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return results
 
         return [getattr(result, queryset.m2m_related) for result in results]
+
+    def all(self, **kwargs: Any) -> "QuerySet":
+        """
+        Returns the queryset records based on specific filters
+        """
+        queryset: "QuerySet" = self.clone()
+        queryset.extra = kwargs
+        return queryset
 
     async def get(self, **kwargs: Any) -> SaffierModel:
         """
@@ -670,7 +692,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if len(rows) > 1:
             raise MultipleObjectsReturned()
         return queryset.model_class.from_query_result(
-            rows[0], select_related=queryset._select_related
+            rows[0],
+            select_related=queryset._select_related,
+            prefetch_related=queryset._prefetch_related,
         )
 
     async def first(self, **kwargs: Any) -> Union[SaffierModel, None]:
@@ -841,7 +865,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def execute(self) -> Any:
         queryset: "QuerySet" = self.clone()
-        return await queryset.all()
+        records = await queryset._all(**queryset.extra)
+        return records
 
     def __await__(
         self,

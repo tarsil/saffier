@@ -35,6 +35,7 @@ from .core.db.fields import (
 from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import Manager
 from .core.db.querysets.base import QuerySet
+from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
@@ -65,6 +66,7 @@ __all__ = [
     "OneToOne",
     "OneToOneField",
     "PasswordField",
+    "Prefetch",
     "QuerySet",
     "RESTRICT",
     "ReflectModel",
