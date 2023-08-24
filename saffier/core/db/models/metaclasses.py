@@ -52,6 +52,8 @@ class MetaInfo:
         "is_multi",
         "multi_related",
         "related_names",
+        "related_fields",
+        "related_names_mapping",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -75,6 +77,8 @@ class MetaInfo:
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = set()
+        self.related_fields: Dict[str, Any] = {}
+        self.related_names_mapping: Dict[str, Any] = {}
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
@@ -130,7 +134,7 @@ def _set_related_name_for_foreign_keys(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-    for foreign_key in foreign_keys:
+    for name, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
         if not default_related_name:
@@ -151,6 +155,10 @@ def _set_related_name_for_foreign_keys(
 
         # Set the related name
         setattr(foreign_key.target, default_related_name, related_field)
+        model_class.meta.related_fields[default_related_name] = related_field
+
+        # Set the fields mapping where a related name maps a specific foreign key
+        model_class.meta.related_names_mapping[default_related_name] = name
 
     return cast("str", default_related_name)
 
@@ -171,7 +179,7 @@ class BaseModelMeta(type):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, Field] = {}
         one_to_one_fields: Any = set()
-        foreign_key_fields: Any = set()
+        foreign_key_fields: Any = {}
         many_to_many_fields: Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
@@ -254,7 +262,7 @@ class BaseModelMeta(type):
                 elif isinstance(value, saffier_fields.ForeignKey) and not isinstance(
                     value, saffier_fields.ManyToManyField  # type: ignore
                 ):
-                    foreign_key_fields.add(value)
+                    foreign_key_fields[key] = value
                     continue
 
         for slot in fields:
