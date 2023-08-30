@@ -24,6 +24,7 @@ from saffier.core.db.fields import BigIntegerField, Field
 from saffier.core.db.models.managers import Manager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
+from saffier.core.signals import Broadcaster, Signal
 from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -54,6 +55,7 @@ class MetaInfo:
         "related_names",
         "related_fields",
         "related_names_mapping",
+        "signals",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -79,6 +81,7 @@ class MetaInfo:
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
         self.related_names_mapping: Dict[str, Any] = {}
+        self.signals: Optional[Broadcaster] = {}  # type: ignore
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
@@ -171,6 +174,20 @@ def _set_many_to_many_relation(
     m2m.create_through_model()
     relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
     setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
+
+
+def _register_model_signals(model_class: Type["Model"]) -> None:
+    """
+    Registers the signals in the model's Broadcaster and sets the defaults.
+    """
+    signals = Broadcaster()
+    signals.pre_save = Signal()
+    signals.pre_update = Signal()
+    signals.pre_delete = Signal()
+    signals.post_save = Signal()
+    signals.post_update = Signal()
+    signals.post_delete = Signal()
+    model_class.meta.signals = signals
 
 
 class BaseModelMeta(type):
@@ -381,6 +398,9 @@ class BaseModelMeta(type):
             if isinstance(value, Manager):
                 value.model_class = new_class
 
+        # Register the signals
+        _register_model_signals(new_class)
+
         return new_class
 
     def get_db_shema(cls) -> Union[str, None]:
@@ -423,6 +443,13 @@ class BaseModelMeta(type):
         a warning from `ruff` where lru can lead to memory leaks.
         """
         return cls.build(schema=schema)
+
+    @property
+    def signals(cls) -> "Broadcaster":
+        """
+        Returns the signals of a class
+        """
+        return cast("Broadcaster", cls.meta.signals)
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:

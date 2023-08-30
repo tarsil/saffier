@@ -65,7 +65,7 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
         """
         Dumps the model in a dict format.
         """
-        row_dict = dict(self.__dict__.items())
+        row_dict = {k: v for k, v in self.__dict__.items() if k in self.fields}
 
         if include is not None:
             row_dict = {k: v for k, v in row_dict.items() if k in include}
@@ -79,23 +79,31 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
         """
         Update operation of the database fields.
         """
+        await self.signals.pre_update.send(sender=self.__class__, instance=self)
+
         fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
         validator = Schema(fields=fields)
         kwargs = self.update_auto_now_fields(validator.check(kwargs), self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
+        await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        return self
+
     async def delete(self) -> None:
         """Delete operation from the database"""
+        await self.signals.pre_delete.send(sender=self.__class__, instance=self)
+
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.delete().where(pk_column == self.pk)
 
         await self.database.execute(expression)
+        await self.signals.post_delete.send(sender=self.__class__, instance=self)
 
     async def load(self) -> None:
         # Build the select expression.
@@ -140,6 +148,8 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
+        await self.signals.pre_save.send(sender=self.__class__, instance=self)
+
         extracted_fields = self.extract_db_fields()
 
         if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
@@ -160,7 +170,9 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
         if getattr(self, "pk", None) is None or force_save:
             await self._save(**kwargs)
         else:
+            await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
             await self._update(**kwargs)
+            await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Refresh the results
         if any(
@@ -169,6 +181,8 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
             if name not in extracted_fields
         ):
             await self.load()
+
+        await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
 
 

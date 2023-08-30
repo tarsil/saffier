@@ -1,4 +1,4 @@
-__version__ = "0.17.1"
+__version__ = "0.18.0"
 
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings
@@ -37,6 +37,7 @@ from .core.db.models.managers import Manager
 from .core.db.querysets.base import QuerySet
 from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
+from .core.signals import Signal
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
@@ -74,6 +75,7 @@ __all__ = [
     "SaffierExtra",
     "SaffierSettings",
     "SET_NULL",
+    "Signal",
     "TextField",
     "TimeField",
     "UniqueConstraint",
