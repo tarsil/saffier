@@ -1,5 +1,5 @@
 import functools
-from typing import Any, ClassVar, Dict, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, cast
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -12,6 +12,9 @@ from saffier.core.db.models.managers import Manager
 from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from saffier.core.utils.model import DateParser
 from saffier.exceptions import ImproperlyConfigured
+
+if TYPE_CHECKING:
+    from saffier.core.signals import Broadcaster
 
 
 class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
@@ -56,6 +59,16 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     @table.setter
     def table(self, value: sqlalchemy.Table) -> None:
         self._table = value
+
+    @functools.cached_property
+    def signals(self) -> "Broadcaster":
+        return self.__class__.signals  # type: ignore
+
+    def get_instance_name(self) -> str:
+        """
+        Returns the name of the class in lowercase.
+        """
+        return self.__class__.__name__.lower()
 
     @classmethod
     def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:

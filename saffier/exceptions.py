@@ -68,5 +68,9 @@ class SchemaError(SaffierException):
     ...
 
 
+class SignalError(SaffierException):
+    ...
+
+
 class CommandEnvironmentError(SaffierException):
     ...
