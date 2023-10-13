@@ -1,5 +1,15 @@
 # Release Notes
 
+## 1.0.0
+
+### Added
+
+- Support for Python 3.12
+
+### Changed
+
+- Update base requirements.
+
 ## 0.18.0
 
 ### Added
