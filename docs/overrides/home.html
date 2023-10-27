@@ -52,8 +52,8 @@
 <code class="language-python">
 import saffier
 
-database = Database("sqlite:///db.sqlite")
-registry = Registry(database=database)
+database = saffier.Database("sqlite:///db.sqlite")
+registry = saffier.Registry(database=database)
 
 class User(saffier.Model):
     id = saffier.IntegerField(primary_key=True)

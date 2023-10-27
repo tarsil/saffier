@@ -27,68 +27,114 @@ theme:
     - search.suggest
     - search.highlight
     - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+    - content.tooltips
+    - content.code.select
+    - navigation.indexes
+    - navigation.path
+    - navigation.tabs
 
 repo_name: tarsil/saffier
 repo_url: https://github.com/tarsil/saffier
 edit_uri: ""
 plugins:
   - search
+  - meta-descriptions:
+      export_csv: false
+      quiet: false
+      enable_checks: false
+      min_length: 50
+      max_length: 160
+      trim: false
   - markdownextradata:
       data: data
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            extensions:
+              - griffe_typingdoc
+            show_root_heading: true
+            show_if_no_docstring: true
+            preload_modules: [databasez]
+            inherited_members: true
+            members_order: source
+            separate_signature: true
+            unwrap_annotated: true
+            filters: ["!^_"]
+            merge_init_into_class: true
+            docstring_section_style: spacy
+            signature_crossrefs: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
 
 nav:
   - Home: "index.md"
   - Saffier: "saffier.md"
-  - Models: "models.md"
-  - Declarative Models: "declarative-models.md"
-  - Reflection: "reflection.md"
-  - Managers: "managers.md"
-  - Fields: "fields.md"
-  - Queries:
-      - Queries: "queries/queries.md"
-      - Related Name: "queries/related-name.md"
-      - ManyToMany: "queries/many-to-many.md"
-      - Prefetch Related: "queries/prefetch.md"
-  - Signals: "signals.md"
-  - Transactions: "transactions.md"
-  - Relationships: "relationships.md"
-  - Connection: "connection.md"
-  - Tenancy:
-      - Saffier: "tenancy/saffier.md"
-      - Contrib: "tenancy/contrib.md"
-  - Registry: "registry.md"
-  - Shell Support: "shell.md"
-  - Settings: "settings.md"
-  - Exceptions: "exceptions.md"
-  - Migrations:
-      - Discovery: "migrations/discovery.md"
-      - Migrations: "migrations/migrations.md"
-  - Tips and Tricks: "tips-and-tricks.md"
-  - Extras: "extras.md"
-  - Test Client: "test-client.md"
-  - Saffier People: "saffier-people.md"
-  - Contributing: "contributing.md"
-  - Sponsorship: "sponsorship.md"
+  - Core:
+      - Models: "models.md"
+      - Declarative Models: "declarative-models.md"
+      - Reflection: "reflection.md"
+      - Managers: "managers.md"
+      - Fields: "fields.md"
+      - Queries:
+          - Queries: "queries/queries.md"
+          - Related Name: "queries/related-name.md"
+          - ManyToMany: "queries/many-to-many.md"
+          - Prefetch Related: "queries/prefetch.md"
+      - Transactions: "transactions.md"
+  - Features:
+      - Signals: "signals.md"
+      - Relationships: "relationships.md"
+      - Connection: "connection.md"
+      - Tenancy:
+          - Saffier: "tenancy/saffier.md"
+          - Contrib: "tenancy/contrib.md"
+      - Registry: "registry.md"
+      - Shell Support: "shell.md"
+      - Migrations:
+          - Discovery: "migrations/discovery.md"
+          - Migrations: "migrations/migrations.md"
+      - Settings: "settings.md"
+  - Extras:
+      - Exceptions: "exceptions.md"
+      - Tips and Tricks: "tips-and-tricks.md"
+      - Extras: "extras.md"
+      - Test Client: "test-client.md"
+  - API Reference:
+      - "references/index.md"
+      - Model: "references/models.md"
+      - ReflectModel: "references/reflect-model.md"
+      - Manager: "references/manager.md"
+      - QuerySet: "references/queryset.md"
+      - Signals: "references/signals.md"
+      - Fields:
+          - Field: "references/fields.md"
+          - OneToOne: "references/one-to-one.md"
+          - ForeignKey: "references/foreignkey.md"
+          - ManyToMany: "references/many-to-many.md"
+      - Registry: "references/registry.md"
+      - Schema: "references/schemas.md"
+      - Database: "references/database.md"
+  - About:
+      - Saffier People: "saffier-people.md"
+      - Contributing: "contributing.md"
+      - Sponsorship: "sponsorship.md"
   - Release Notes: "release-notes.md"
 markdown_extensions:
   - attr_list
   - toc:
       permalink: true
-  - markdown.extensions.codehilite:
-      guess_lang: false
   - mdx_include:
       base_path: docs
   - admonition
-  - codehilite
   - extra
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format ""
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
   - pymdownx.tabbed:
       alternate_style: true
   - md_in_html
