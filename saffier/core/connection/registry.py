@@ -20,10 +20,6 @@ class Registry:
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
-        assert isinstance(
-            database, Database
-        ), "database must be an instance of saffier.core.connection.Database"
-
         self.database: Database = database
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
