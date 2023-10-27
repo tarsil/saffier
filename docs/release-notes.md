@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## 1.0.1
+
+### Changed
+
+- Add [API Reference](http://saffier.tarsild.io/references/).
+- Update base requirements.
+
+### Fixed
+
+- `Database` object docstring.
+
 ## 1.0.0
 
 ### Added
