@@ -18,6 +18,7 @@ from saffier.cli.operations import (
     heads,
     history,
     init,
+    inspect_db,
     list_templates,
     makemigrations,
     merge,
@@ -102,3 +103,4 @@ saffier_cli.add_command(current, name="current")
 saffier_cli.add_command(stamp, name="stamp")
 saffier_cli.add_command(check, name="check")
 saffier_cli.add_command(shell, name="shell")
+saffier_cli.add_command(inspect_db, name="inspectdb")
