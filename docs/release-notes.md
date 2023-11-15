@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## 1.0.2
+
+### Added
+
+- `inspectdb` allowing to generate `saffier.ReflectModel` from the database.
+
+### Changed
+
+- Added `name` for `edgy.UniqueConstraint` allowing unique custom names for the `unique_together`.
+- `max_name_length` in the datastuctures changed to `__max_name_length__` and `ClassVar`.
+
 ## 1.0.1
 
 ### Changed
