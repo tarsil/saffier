@@ -1,5 +1,3 @@
-import uuid
-
 import saffier
 from saffier import Database, Registry
 
@@ -8,9 +6,8 @@ models = Registry(database=database)
 
 
 class User(saffier.Model):
-    id = saffier.UUIDField(primary_key=True, default=uuid.uuid4)
-    age = saffier.IntegerField(minimum=18)
-    is_active = saffier.BooleanField(default=True)
+    first_name: str = saffier.CharField(max_length=50, null=True)
+    email: str = saffier.EmailField(max_lengh=100, null=True)
 
     class Meta:
         registry = models
