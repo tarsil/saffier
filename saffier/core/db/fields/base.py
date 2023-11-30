@@ -41,9 +41,10 @@ class Field:
         unique: bool = False,
         **kwargs: typing.Any,
     ) -> None:
+        self.server_default = kwargs.pop("server_default", None)
         if primary_key:
             default_value = kwargs.get("default", None)
-            self.raise_for_non_default(default=default_value)
+            self.raise_for_non_default(default=default_value, server_default=self.server_default)
             kwargs["read_only"] = True
 
         self.null = kwargs.get("null", False)
@@ -56,7 +57,6 @@ class Field:
         )
         self.comment = kwargs.get("comment", None)
         self.owner = kwargs.pop("owner", None)
-        self.server_default = kwargs.pop("server_default", None)
         self.server_onupdate = kwargs.pop("server_onupdate", None)
         self.autoincrement = kwargs.pop("autoincrement", False)
 
@@ -92,8 +92,20 @@ class Field:
     def expand_relationship(self, value: typing.Any) -> typing.Any:
         return value
 
-    def raise_for_non_default(self, default: typing.Any) -> typing.Any:
-        if not isinstance(self, (IntegerField, BigIntegerField)) and not default:
+    def raise_for_non_default(self, default: typing.Any, server_default: typing.Any) -> typing.Any:
+        has_default: bool = True
+        has_server_default: bool = True
+
+        if default is None or default is False:
+            has_default = False
+        if server_default is None or server_default is False:
+            has_server_default = False
+
+        if (
+            not isinstance(self, (IntegerField, BigIntegerField))
+            and not has_default
+            and not has_server_default
+        ):
             raise ValueError(
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
