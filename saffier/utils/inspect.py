@@ -239,7 +239,7 @@ class InspectDB:
         """
         Writes to stdout.
         """
-        yield f"# This is an auto-generated Edgy model module. Edgy version `{saffier.__version__}`.\n"
+        yield f"# This is an auto-generated Saffier model module. Saffier version `{saffier.__version__}`.\n"
         yield "#   * Rearrange models' order.\n"
         yield "#   * Make sure each model has one field with primary_key=True.\n"
         yield (
