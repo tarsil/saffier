@@ -5,6 +5,29 @@ hide:
 
 # Release Notes
 
+## 1.1.0
+
+### Added
+
+- Support for [`or_`, `and_` and `not_`](./queries/queries#saffier-style) for SQLAlchemy style queries and Edgy syntax sugar queries.
+
+### Changed
+
+- `inspectdb` is now handled by an independent isolated called `InspectDB`.
+- Updated internal support for `databasez` 0.7.0 and this fixes the URL parsing errors for complex passwords
+caused by the `urlsplit`.
+
+### Fixed
+
+- `server_default` does not raise a `ValueError`.
+- `server_default` added as validation for nullable.
+
+!!! Warning
+	This could impact your migrations, so the advise would be to generate a new migration
+	after upgrading to the new version of Edgy to make sure the database reflects the proper
+	nullables/non-nullable fields.
+
+
 ## 1.0.2
 
 ### Added
