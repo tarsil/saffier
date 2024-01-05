@@ -39,6 +39,7 @@ from .core.db.querysets import QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
 from .core.signals import Signal
+from .core.utils.sync import run_sync
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
@@ -87,4 +88,5 @@ __all__ = [
     "UUIDField",
     "settings",
     "fields",
+    "run_sync",
 ]
