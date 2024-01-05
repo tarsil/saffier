@@ -5,6 +5,19 @@ hide:
 
 # Release Notes
 
+## 1.2.0
+
+### Added
+
+- Support for `sync` queries. This will enable Edgy to run in blocking framworks like
+Flask, bottle or any other by using the newly added [run_sync](./queries/queries.md#blocking-queries).
+
+### Fixed
+
+- Fixed multi tenancy from contrib.
+- Fixed `using` where schema name was raising a not found reference for foreign key
+when querying the tenant.
+
 ## 1.1.0
 
 ### Added
