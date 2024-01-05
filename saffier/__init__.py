@@ -6,6 +6,7 @@ from saffier.conf.global_settings import SaffierSettings
 from .cli import Migrate
 from .core.connection.database import Database
 from .core.connection.registry import Registry
+from .core.db import fields
 from .core.db.constants import CASCADE, RESTRICT, SET_NULL
 from .core.db.datastructures import Index, UniqueConstraint
 from .core.db.fields import (
@@ -38,6 +39,7 @@ from .core.db.querysets import QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
 from .core.signals import Signal
+from .core.utils.sync import run_sync
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
@@ -85,4 +87,6 @@ __all__ = [
     "URLField",
     "UUIDField",
     "settings",
+    "fields",
+    "run_sync",
 ]

@@ -163,15 +163,17 @@ class BaseQuerySet(
         destination table, a lookup for the related field is made to understand
         from which foreign key the table is looked up from.
         """
-        tables = [self.table]
-        select_from = self.table
+        queryset: "QuerySet" = self.clone()
 
+        tables = [queryset.table]
+        select_from = queryset.table
         has_many_fk_same_table = False
 
-        for item in self._select_related:
+        # Select related
+        for item in queryset._select_related:
             # For m2m relationships
-            model_class = self.model_class
-            select_from = self.table
+            model_class = queryset.model_class
+            select_from = queryset.table
 
             for part in item.split("__"):
                 try:
@@ -204,41 +206,50 @@ class BaseQuerySet(
                     )
 
                 tables.append(table)
-
         return tables, select_from
 
     def build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
-        tables, select_from = self.build_tables_select_from_relationship()
+        queryset: "QuerySet" = self.clone()
+
+        tables, select_from = queryset.build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
 
-        if self.filter_clauses:
-            expression = self.build_filter_clauses_expression(
-                self.filter_clauses, expression=expression
+        if queryset.filter_clauses:
+            expression = queryset.build_filter_clauses_expression(
+                queryset.filter_clauses, expression=expression
             )
 
-        if self.or_clauses:
-            expression = self.build_or_clauses_expression(self.or_clauses, expression=expression)
+        if queryset.or_clauses:
+            expression = queryset.build_or_clauses_expression(
+                queryset.or_clauses, expression=expression
+            )
 
-        if self._order_by:
-            expression = self.build_order_by_expression(self._order_by, expression=expression)
+        if queryset._order_by:
+            expression = queryset.build_order_by_expression(
+                queryset._order_by, expression=expression
+            )
 
-        if self.limit_count:
-            expression = expression.limit(self.limit_count)
+        if queryset.limit_count:
+            expression = expression.limit(queryset.limit_count)
 
-        if self._offset:
-            expression = expression.offset(self._offset)
+        if queryset._offset:
+            expression = expression.offset(queryset._offset)
 
-        if self._group_by:
-            expression = self.build_group_by_expression(self._group_by, expression=expression)
+        if queryset._group_by:
+            expression = queryset.build_group_by_expression(
+                queryset._group_by, expression=expression
+            )
 
-        if self.distinct_on:
-            expression = self.build_select_distinct(self.distinct_on, expression=expression)
+        if queryset.distinct_on:
+            expression = queryset.build_select_distinct(
+                queryset.distinct_on, expression=expression
+            )
 
-        self._expression = expression  # type: ignore
+        queryset._expression = expression  # type: ignore
         return expression
 
     def filter_query(self, exclude: bool = False, or_: bool = False, **kwargs: Any) -> "QuerySet":
@@ -346,6 +357,7 @@ class BaseQuerySet(
                 order_by=self._order_by,
                 m2m_related=self.m2m_related,
                 table=self.table,
+                using_schema=self.using_schema,
             ),
         )
 
@@ -380,6 +392,12 @@ class BaseQuerySet(
         """
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
+
+        # Making sure the registry schema takes precendent with
+        # Any provided using
+        if not self.model_class.meta.registry.db_schema:
+            queryset.model_class.table = self.model_class.build(self.using_schema)
+
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
         queryset.limit_count = self.limit_count
@@ -395,6 +413,8 @@ class BaseQuerySet(
         queryset._database = self.database
         queryset.table = self.table
         queryset.extra = self.extra
+        queryset.using_schema = self.using_schema
+
         return queryset
 
 
@@ -690,7 +710,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if len(rows) > 1:
             raise MultipleObjectsReturned()
         return queryset.model_class.from_query_result(
-            rows[0], select_related=queryset._select_related
+            rows[0],
+            select_related=queryset._select_related,
+            using_schema=queryset.using_schema,
         )
 
     async def _all(self, **kwargs: Any) -> List[SaffierModel]:
@@ -718,6 +740,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 row,
                 select_related=queryset._select_related,
                 prefetch_related=queryset._prefetch_related,
+                using_schema=queryset.using_schema,
             )
             for row in rows
         ]
@@ -756,6 +779,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows[0],
             select_related=queryset._select_related,
             prefetch_related=queryset._prefetch_related,
+            using_schema=queryset.using_schema,
         )
 
     async def first(self, **kwargs: Any) -> Union[SaffierModel, None]:

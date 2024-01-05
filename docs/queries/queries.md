@@ -683,5 +683,44 @@ And you can do nested `querysets` like multiple [filters](#filter).
 Internally, the `not_` is calling the [exclude](#exclude) and applying the operators so this is
 more for *cosmetic* purposes than anything else, really.
 
+## Blocking Queries
+
+What happens if you want to use Saffier with a blocking operation? So by blocking means `sync`.
+For instance, Flask does not support natively `async` and Saffier is an async agnotic ORM and you
+probably would like to take advantage of Saffier but you want without doing a lot of magic behind.
+
+Well, Saffier also supports the `run_sync` functionality that allows you to run the queries in
+*blocking* mode with ease!
+
+### How to use
+
+You simply need to use the `run_sync` functionality from Saffier and make it happen almost immediatly.
+
+```python
+from saffier import run_sync
+```
+
+All the available functionalities of Saffier run within this wrapper without extra syntax.
+
+Let us see some examples.
+
+**Async mode**
+
+```python
+await User.query.all()
+await User.query.filter(name__icontains="example")
+await User.query.create(name="Saffier")
+```
+
+**With run_sync**
+
+```python
+from saffier import run_sync
+
+run_sync(User.query.all())
+run_sync(User.query.filter(name__icontains="example"))
+run_sync(User.query.create(name="Saffier"))
+```
+
 [model]: ../models.md
 [managers]: ../managers.md

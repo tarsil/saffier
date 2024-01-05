@@ -16,6 +16,7 @@ class ModelRow:
         row: Row,
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
+        using_schema: Union[str, None] = None,
     ) -> Optional[Type["Model"]]:
         """
         Instantiate a model instance, given a database row.
@@ -33,13 +34,15 @@ class ModelRow:
                 except KeyError:
                     model_cls = getattr(cls, first_part).related_from
 
-                item[first_part] = model_cls.from_query_result(row, select_related=[remainder])
+                item[first_part] = model_cls.from_query_result(
+                    row, select_related=[remainder], using_schema=using_schema
+                )
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls.from_query_result(row)
+                item[related] = model_cls.from_query_result(row, using_schema=using_schema)
 
         # Pull out the regular column values.
         for column in cls.table.columns:
@@ -54,9 +57,10 @@ class ModelRow:
         model = cls.handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
-        return model
 
-        # return cast("Type[Model]", cls(**item))
+        if using_schema is not None:
+            model.table = model.build(using_schema)  # type: ignore
+        return model
 
     @classmethod
     def handle_prefetch_related(
