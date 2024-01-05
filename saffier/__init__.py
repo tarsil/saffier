@@ -6,6 +6,7 @@ from saffier.conf.global_settings import SaffierSettings
 from .cli import Migrate
 from .core.connection.database import Database
 from .core.connection.registry import Registry
+from .core.db import fields
 from .core.db.constants import CASCADE, RESTRICT, SET_NULL
 from .core.db.datastructures import Index, UniqueConstraint
 from .core.db.fields import (
@@ -85,4 +86,5 @@ __all__ = [
     "URLField",
     "UUIDField",
     "settings",
+    "fields",
 ]

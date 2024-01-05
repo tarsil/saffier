@@ -434,6 +434,10 @@ class BaseModelMeta(type):
                 cls._table = cls.build(db_schema)
         return cls._table
 
+    @table.setter
+    def table(self, value: sqlalchemy.Table) -> None:
+        self._table = value
+
     def table_schema(cls, schema: str) -> Any:
         """
         Making sure the tables on inheritance state, creates the new
