@@ -3,7 +3,6 @@ from pydantic import __version__
 
 import saffier
 from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
-from saffier.contrib.multi_tenancy.models import TenantMixin
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -15,13 +14,8 @@ pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 
-class Tenant(TenantMixin):
-    class Meta:
-        registry = models
-
-
-class SaffierTenantBaseModel(TenantModel):
-    id = saffier.IntegerField(primary_key=True)
+class EdgyTenantBaseModel(TenantModel):
+    id: int = saffier.IntegerField(primary_key=True)
 
     class Meta:
         is_tenant = True
@@ -29,21 +23,21 @@ class SaffierTenantBaseModel(TenantModel):
         abstract = True
 
 
-class Designation(SaffierTenantBaseModel):
-    name = saffier.CharField(max_length=100)
+class Designation(EdgyTenantBaseModel):
+    name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_designation"
 
 
-class AppModule(SaffierTenantBaseModel):
-    name = saffier.CharField(max_length=100)
+class AppModule(EdgyTenantBaseModel):
+    name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_module"
 
 
-class Permission(SaffierTenantBaseModel):
+class Permission(EdgyTenantBaseModel):
     module = saffier.ForeignKey(AppModule)
     designation = saffier.ForeignKey("Designation")
     can_read = saffier.BooleanField(default=False)
@@ -70,17 +64,24 @@ async def rollback_connections():
             yield
 
 
-async def test_select_related_tenant():
-    tenant = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
-    designation = await Designation.query.using(tenant.schema_name).create(name="admin")
-    module = await AppModule.query.using(tenant.schema_name).create(name="payroll")
+async def test_select_related():
+    designation = await Designation.query.create(name="admin")
+    module = await AppModule.query.create(name="payroll")
 
-    await Permission.query.using(tenant.schema_name).create(designation=designation, module=module)
+    permission = await Permission.query.create(designation=designation, module=module)
 
-    query = await Permission.query.using(tenant.schema_name).first()
+    query = await Permission.query.all()
 
-    await query.designation.load()
-    await query.module.load()
+    assert len(query) == 1
 
-    assert query.designation.name == designation.name
-    assert query.module.name == module.name
+    query = await Permission.query.select_related("designation").all()
+
+    assert len(query) == 1
+    assert query[0].pk == permission.pk
+    assert query[0].designation.model_dump() == {"id": 1, "name": "admin"}
+
+    query = await Permission.query.select_related("module").all()
+
+    assert len(query) == 1
+    assert query[0].pk == permission.pk
+    assert query[0].module.model_dump() == {"id": 1, "name": "payroll"}
