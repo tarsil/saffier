@@ -14,7 +14,7 @@ class DateParser:
     Utils used by the Registry
     """
 
-    def update_auto_now_fields(self, values: Any, fields: Any) -> Any:
+    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
         Updates the auto fields
         """

@@ -29,9 +29,9 @@ class Tenant(TenantMixin):
 
 
 class User(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
-    name: str = fields.CharField(max_length=255)
-    email: str = fields.EmailField(max_length=255)
+    id = fields.IntegerField(primary_key=True)
+    name = fields.CharField(max_length=255)
+    email = fields.EmailField(max_length=255)
 
     class Meta:
         registry = models
@@ -39,8 +39,8 @@ class User(TenantModel):
 
 
 class Product(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
-    name: str = fields.CharField(max_length=255)
+    id = fields.IntegerField(primary_key=True)
+    name = fields.CharField(max_length=255)
     user: User = fields.ForeignKey(User, null=True)
 
     class Meta:

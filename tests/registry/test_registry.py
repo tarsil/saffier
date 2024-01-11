@@ -9,8 +9,8 @@ from tests.settings import DATABASE_URL
 
 
 def get_random_string(
-    length: int = 12,
-    allowed_chars: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+    length=12,
+    allowed_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
 ) -> str:
     """
     Returns a securely generated random string.

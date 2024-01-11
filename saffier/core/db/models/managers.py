@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Type, cast
 
 from saffier.core.db.context_vars import get_tenant, set_tenant
 from saffier.core.db.querysets.base import QuerySet
@@ -31,6 +31,9 @@ class Manager:
 
     def __init__(self, model_class: Any = None):
         self.model_class = model_class
+
+    def __get__(self, _: Any, owner: Any) -> Type["QuerySet"]:
+        return cast("Type[QuerySet]", self.__class__(model_class=owner))
 
     def get_queryset(self) -> "QuerySet":
         """

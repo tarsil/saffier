@@ -284,7 +284,7 @@ from `saffier`.
     from saffier import CASCADE, SET_NULL, RESTRICT
     ```
 
-#### ManyToManyField
+#### ManyToMany
 
 ```python
 import saffier
@@ -299,13 +299,13 @@ class Organisation(saffier.Model):
 
 
 class MyModel(saffier.Model):
-    users = saffier.ManyToManyField(User)
-    organisations = saffier.ManyToManyField(Organisation)
+    users = saffier.ManyToMany(User)
+    organisations = saffier.ManyToMany("Organisation")
 
 ```
 
 !!! Tip
-    You can use `saffier.ManyToMany` as alternative to `ManyToManyField` instead.
+    You can use `saffier.ManyToManyField` as alternative to `ManyToMany` instead.
 
 ##### Parameters
 
@@ -343,7 +343,7 @@ class MyModel(saffier.Model):
 
 Simple JSON representation object.
 
-#### OneToOneField
+#### OneToOne
 
 ```python
 import saffier
@@ -354,7 +354,7 @@ class User(saffier.Model):
 
 
 class MyModel(saffier.Model):
-    user = saffier.OneToOneField("User")
+    user = saffier.OneToOne("User")
     ...
 
 ```
@@ -362,7 +362,7 @@ class MyModel(saffier.Model):
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.
 
 !!! Tip
-    You can use `saffier.OneToOne` as alternative to `OneToOneField` instead.
+    You can use `saffier.OneToOneField` as alternative to `OneToOne` instead.
 
 #### TextField
 

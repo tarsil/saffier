@@ -33,7 +33,7 @@ async def rollback_connections():
 
 
 class User(saffier.Model):
-    name: str = saffier.CharField(max_length=255, null=True)
+    name = saffier.CharField(max_length=255, null=True)
 
     class Meta:
         registry = registry

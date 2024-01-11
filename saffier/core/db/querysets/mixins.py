@@ -1,12 +1,17 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, Union, cast
 
 import sqlalchemy
 
 from saffier.core.connection.database import Database
-from saffier.core.db.context_vars import set_queryset_database, set_queryset_schema
+from saffier.core.db.context_vars import set_queryset_database, set_queryset_schema, set_schema
 
 if TYPE_CHECKING:
-    from saffier import QuerySet, Registry
+    from saffier import Model, QuerySet, ReflectModel, Registry
+
+_SaffierModel = TypeVar("_SaffierModel", bound="Model")
+ReflectSaffierModel = TypeVar("ReflectSaffierModel", bound="ReflectModel")
+
+SaffierModel = Union[_SaffierModel, ReflectSaffierModel]
 
 
 class QuerySetPropsMixin:
@@ -83,3 +88,17 @@ class TenancyMixin:
             return set_queryset_database(self, self.model_class, connection, schema)
         queryset = set_queryset_database(self, self.model_class, connection)
         return queryset
+
+
+def activate_schema(schema: str) -> None:
+    """
+    Activates the schema for the context of the query.
+    """
+    set_schema(schema)
+
+
+def deativate_schema() -> None:
+    """
+    Deactivates the schema for the context of the query.
+    """
+    set_schema(None)

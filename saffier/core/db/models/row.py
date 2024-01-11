@@ -54,7 +54,12 @@ class ModelRow:
                 item[column.name] = row[column]
 
         model = cast("Type[Model]", cls(**item))
-        model = cls.handle_prefetch_related(
+
+        # Apply the schema to the model
+        model = cls.__apply_schema(model, using_schema)
+
+        # Handle prefetch related fields.
+        model = cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
 
@@ -63,7 +68,14 @@ class ModelRow:
         return model
 
     @classmethod
-    def handle_prefetch_related(
+    def __apply_schema(cls, model: Type["Model"], schema: Optional[str] = None) -> Type["Model"]:
+        # Apply the schema to the model
+        if schema is not None:
+            model.table = model.build(schema)  # type: ignore
+        return model
+
+    @classmethod
+    def __handle_prefetch_related(
         cls,
         row: Row,
         model: Type["Model"],
@@ -107,7 +119,7 @@ class ModelRow:
 
                 # Recursively continue the process of handling the
                 # new prefetch
-                model_cls.handle_prefetch_related(
+                model_cls.__handle_prefetch_related(
                     row,
                     model,
                     prefetch_related=[remainder_prefetch],
@@ -124,12 +136,12 @@ class ModelRow:
 
                 # Execute the queryset
                 records = asyncio.get_event_loop().run_until_complete(
-                    cls.run_query(queryset=related.queryset)
+                    cls.__run_query(queryset=related.queryset)
                 )
                 setattr(model, related.to_attr, records)
             else:
                 model_cls = getattr(cls, related.related_name).related_from
-                records = cls.process_nested_prefetch_related(
+                records = cls.__process_nested_prefetch_related(
                     row,
                     prefetch_related=related,
                     original_prefetch=original_prefetch,
@@ -141,7 +153,7 @@ class ModelRow:
         return model
 
     @classmethod
-    def process_nested_prefetch_related(
+    def __process_nested_prefetch_related(
         cls,
         row: Row,
         prefetch_related: "Prefetch",
@@ -174,12 +186,12 @@ class ModelRow:
         extra = {f"{query}__id": filter_by_pk}
 
         records = asyncio.get_event_loop().run_until_complete(
-            cls.run_query(model_class, extra, queryset)
+            cls.__run_query(model_class, extra, queryset)
         )
         return records
 
     @classmethod
-    async def run_query(
+    async def __run_query(
         cls,
         model: Optional[Type["Model"]] = None,
         extra: Optional[Dict[str, Any]] = None,

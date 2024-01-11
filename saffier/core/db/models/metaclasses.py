@@ -60,14 +60,14 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.pk: Optional[Field] = None
+        self.pk: Optional[Field] = getattr(meta, "pk", None)
         self.pk_attribute: Union[Field, str] = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
-        self.fields: Set[Any] = set()
-        self.fields_mapping: Dict[str, Field] = {}
+        self.fields: Set[Any] = getattr(meta, "fields", set())
+        self.fields_mapping: Dict[str, Field] = getattr(meta, "fields_mapping", {})
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
-        self.parents: Any = getattr(meta, "parents", None) or []
+        self.parents: Any = getattr(meta, "parents", [])
         self.many_to_many_fields: Set[str] = set()
         self.foreign_key_fields: Dict[str, Any] = {}
         self.model: Optional[Type["Model"]] = None
@@ -78,10 +78,10 @@ class MetaInfo:
         self.managers: List[Manager] = getattr(meta, "managers", [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
-        self.related_names: Set[str] = set()
-        self.related_fields: Dict[str, Any] = {}
-        self.related_names_mapping: Dict[str, Any] = {}
-        self.signals: Optional[Broadcaster] = {}  # type: ignore
+        self.related_names: Set[str] = getattr(meta, "related_names", set())
+        self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
+        self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
+        self.signals: Optional[Broadcaster] = getattr(meta, "signals", {})  # type: ignore
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
@@ -141,7 +141,7 @@ def _set_related_name_for_foreign_keys(
         default_related_name = getattr(foreign_key, "related_name", None)
 
         if not default_related_name:
-            default_related_name = f"{model_class.__name__.lower()}s_set"  # type: ignore
+            default_related_name = f"{model_class.__name__.lower()}s_set"
 
         elif hasattr(foreign_key.target, default_related_name):
             raise ForeignKeyBadConfigured(
