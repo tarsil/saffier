@@ -5,6 +5,7 @@ from saffier.core.db.models.base import SaffierBaseModel, SaffierBaseReflectMode
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
 from saffier.core.utils.schemas import Schema
+from saffier.core.utils.sync import run_sync
 
 saffier_setattr = object.__setattr__
 
@@ -83,7 +84,7 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
 
         fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
         validator = Schema(fields=fields)
-        kwargs = self.update_auto_now_fields(validator.check(kwargs), self.fields)
+        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
@@ -161,10 +162,10 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
             key: field.validator for key, field in self.fields.items() if key in extracted_fields
         }
         if values:
-            kwargs = self.update_auto_now_fields(values, self.fields)
+            kwargs = self._update_auto_now_fields(values, self.fields)
         else:
             validator = Schema(fields=fields)
-            kwargs = self.update_auto_now_fields(validator.check(extracted_fields), self.fields)
+            kwargs = self._update_auto_now_fields(validator.check(extracted_fields), self.fields)
 
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None or force_save:
@@ -184,6 +185,16 @@ class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
 
         await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Run an one off query to populate any foreign key making sure
+        it runs only once per foreign key avoiding multiple database calls.
+        """
+        if name not in self.__dict__ and name in self.fields and name != self.pkname:
+            run_sync(self.load())
+            return self.__dict__[name]
+        return super().__getattr__(name)
 
 
 class ReflectModel(Model, SaffierBaseReflectModel):

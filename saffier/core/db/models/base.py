@@ -1,5 +1,5 @@
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Set, cast
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -151,12 +151,20 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
         super().__setattr__(key, value)
 
+    def __get_instance_values(self, instance: Any) -> Set[Any]:
+        return {
+            v
+            for k, v in instance.__dict__.items()
+            if k in instance.fields.keys() and v is not None
+        }
+
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
             return False
-        for key in self.fields.keys():
-            if getattr(self, key, None) != getattr(other, key, None):
-                return False
+        original = self.__get_instance_values(instance=self)
+        other_values = self.__get_instance_values(instance=other)
+        if original != other_values:
+            return False
         return True
 
 

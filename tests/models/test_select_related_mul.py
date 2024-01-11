@@ -2,7 +2,7 @@ import pytest
 from pydantic import __version__
 
 import saffier
-from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
+from saffier.contrib.multi_tenancy import TenantRegistry
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -14,11 +14,10 @@ pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 
-class EdgyTenantBaseModel(TenantModel):
+class EdgyTenantBaseModel(saffier.Model):
     id: int = saffier.IntegerField(primary_key=True)
 
     class Meta:
-        is_tenant = True
         registry = models
         abstract = True
 
