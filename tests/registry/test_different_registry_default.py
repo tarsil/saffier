@@ -24,8 +24,8 @@ class StatusEnum(Enum):
 
 
 class Product(saffier.Model):
-    id: int = fields.IntegerField(primary_key=True)
-    name: str = fields.CharField(max_length=255)
+    id = fields.IntegerField(primary_key=True)
+    name = fields.CharField(max_length=255)
 
     class Meta:
         registry = models

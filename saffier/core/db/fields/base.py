@@ -26,6 +26,7 @@ if typing.TYPE_CHECKING:
     from saffier import Model
 
 terminal = Print()
+CHAR_LIMIT = 63
 
 
 class Field:
@@ -330,7 +331,7 @@ class ManyToManyField(Field):
 
     def __init__(
         self,
-        to: typing.Type["Model"],
+        to: typing.Union[typing.Type["Model"], str],
         through: typing.Optional[typing.Type["Model"]] = None,
         **kwargs: typing.Any,
     ):
@@ -353,8 +354,8 @@ class ManyToManyField(Field):
             if isinstance(self.to, str):
                 self._target = self.registry.models[self.to]  # type: ignore
             else:
-                self._target = self.to  # type: ignore
-        return self._target  # type: ignore
+                self._target = self.to
+        return self._target
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         target = self.target
@@ -366,8 +367,7 @@ class ManyToManyField(Field):
                 f"{target.meta.tablename}.{target.pkname}",
                 ondelete=saffier.CASCADE,
                 onupdate=saffier.CASCADE,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+                name=self.get_fk_name(name=name),
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
@@ -378,6 +378,18 @@ class ManyToManyField(Field):
         """
         self.registry.models[model.__name__] = model
 
+    def get_fk_name(self, name: str) -> str:
+        """
+        Builds the fk name for the engine.
+        Engines have a limitation of the foreign key being bigger than 63
+        characters.
+        if that happens, we need to assure it is small.
+        """
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
+        if not len(fk_name) > CHAR_LIMIT:
+            return fk_name
+        return fk_name[:CHAR_LIMIT]
+
     def create_through_model(self) -> typing.Any:
         """
         Creates the default empty through model.
@@ -385,6 +397,8 @@ class ManyToManyField(Field):
         Generates a middle model based on the owner of the field and the field itself and adds
         it to the main registry to make sure it generates the proper models and migrations.
         """
+        self.to = typing.cast(typing.Type["Model"], self.target)
+
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.owner.meta.registry.models[self.through]  # type: ignore

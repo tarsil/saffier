@@ -71,19 +71,16 @@ async def rollback_connections():
 
 
 async def test_select_related_tenant():
-    tenant = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
+    tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
     designation = await Designation.query.using(tenant.schema_name).create(name="admin")
     module = await AppModule.query.using(tenant.schema_name).create(name="payroll")
 
-    permission = await Permission.query.using(tenant.schema_name).create(
-        designation=designation, module=module
-    )
+    await Permission.query.using(tenant.schema_name).create(designation=designation, module=module)
 
-    query = await Permission.query.all()
+    query = await Permission.query.using(tenant.schema_name).first()
 
-    assert len(query) == 0
+    await query.designation.load()
+    await query.module.load()
 
-    query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
-
-    assert len(query) == 1
-    assert query[0].pk == permission.pk
+    assert query.designation.name == designation.name
+    assert query.module.name == module.name

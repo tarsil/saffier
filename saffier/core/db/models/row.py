@@ -54,12 +54,24 @@ class ModelRow:
                 item[column.name] = row[column]
 
         model = cast("Type[Model]", cls(**item))
+
+        # Apply the schema to the model
+        model = cls.apply_schema(model, using_schema)
+
+        # Handle prefetch related fields.
         model = cls.handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
 
         if using_schema is not None:
             model.table = model.build(using_schema)  # type: ignore
+        return model
+
+    @classmethod
+    def apply_schema(cls, model: Type["Model"], schema: Optional[str] = None) -> Type["Model"]:
+        # Apply the schema to the model
+        if schema is not None:
+            model.table = model.build(schema)  # type: ignore
         return model
 
     @classmethod

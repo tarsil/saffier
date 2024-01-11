@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 from pydantic import __version__
 
@@ -23,7 +21,7 @@ class Tenant(TenantMixin):
         registry = models
 
 
-class EdgyTenantBaseModel(TenantModel):
+class SaffierTenantBaseModel(TenantModel):
     id = saffier.IntegerField(primary_key=True)
 
     class Meta:
@@ -32,28 +30,28 @@ class EdgyTenantBaseModel(TenantModel):
         abstract = True
 
 
-class Designation(EdgyTenantBaseModel):
+class Designation(SaffierTenantBaseModel):
     name = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_designation"
 
 
-class AppModule(EdgyTenantBaseModel):
+class AppModule(SaffierTenantBaseModel):
     name = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_module"
 
 
-class Permission(EdgyTenantBaseModel):
-    module: Optional[AppModule] = saffier.ForeignKey(AppModule)
-    designation: Optional[Designation] = saffier.ForeignKey("Designation")
-    can_read: bool = saffier.BooleanField(default=False)
-    can_write: bool = saffier.BooleanField(default=False)
-    can_update: bool = saffier.BooleanField(default=False)
-    can_delete: bool = saffier.BooleanField(default=False)
-    can_approve: bool = saffier.BooleanField(default=False)
+class Permission(SaffierTenantBaseModel):
+    module = saffier.ForeignKey(AppModule)
+    designation = saffier.ForeignKey("Designation")
+    can_read = saffier.BooleanField(default=False)
+    can_write = saffier.BooleanField(default=False)
+    can_update = saffier.BooleanField(default=False)
+    can_delete = saffier.BooleanField(default=False)
+    can_approve = saffier.BooleanField(default=False)
 
     class Meta:
         tablename = "ut_permission"
