@@ -11,7 +11,6 @@ from typing import (
     Set,
     Tuple,
     Type,
-    TypeVar,
     Union,
     cast,
 )
@@ -20,8 +19,9 @@ import sqlalchemy
 
 import saffier
 from saffier.conf import settings
+from saffier.core.db.context_vars import get_schema
 from saffier.core.db.fields import CharField, TextField
-from saffier.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
+from saffier.core.db.querysets.mixins import QuerySetPropsMixin, SaffierModel, TenancyMixin
 from saffier.core.db.querysets.prefetch import PrefetchMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
 from saffier.core.utils.model import DateParser
@@ -32,12 +32,6 @@ from saffier.protocols.queryset import QuerySetProtocol
 if TYPE_CHECKING:  # pragma: no cover
     from saffier import Database
     from saffier.core.db.models.model import Model, ReflectModel
-
-
-_SaffierModel = TypeVar("_SaffierModel", bound="Model")
-ReflectSaffierModel = TypeVar("ReflectSaffierModel", bound="ReflectModel")
-
-SaffierModel = Union[_SaffierModel, ReflectSaffierModel]
 
 
 class BaseQuerySet(
@@ -396,6 +390,9 @@ class BaseQuerySet(
         # Making sure the registry schema takes precendent with
         # Any provided using
         if not self.model_class.meta.registry.db_schema:
+            schema = get_schema()
+            if self.using_schema is None and schema is not None:
+                self.using_schema = schema
             queryset.model_class.table = self.model_class.build(self.using_schema)
 
         queryset.filter_clauses = copy.copy(self.filter_clauses)
@@ -600,7 +597,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not isinstance(related, (list, tuple)):
             related = [related]
 
-        related = list(self._select_related) + related
+        related = list(queryset._select_related) + related
         queryset._select_related = related
         return queryset
 
