@@ -64,6 +64,35 @@ class ModelRow(SaffierBaseModel):
                     model_cls = getattr(cls, related).related_from
                 item[related] = model_cls.from_query_result(row, using_schema=using_schema)
 
+        # Populate the related names
+        # Making sure if the model being queried is not inside a select related
+        # This way it is not overritten by any value
+        for related, foreign_key in cls.meta.foreign_key_fields.items():
+            ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
+            if ignore_related:
+                continue
+
+            model_related = foreign_key.target
+
+            # Apply the schema to the model
+            model_related = cls.__apply_schema(model_related, using_schema)
+
+            child_item = {}
+            for column in model_related.table.columns:
+                if column.name in secret_fields or related in secret_fields:
+                    continue
+                if column.name not in cls.fields.keys():
+                    continue
+                elif related not in child_item:
+                    if row[related] is not None:
+                        child_item[column.name] = row[related]
+
+            # Make sure we generate a temporary reduced model
+            # For the related fields. We simply chnage the structure of the model
+            # and rebuild it with the new fields.
+            if related not in secret_fields:
+                item[related] = model_related.proxy_model(**child_item)
+
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
             mapping_fields = (
@@ -125,6 +154,19 @@ class ModelRow(SaffierBaseModel):
         if schema is not None:
             model.table = model.build(schema)  # type: ignore
         return model
+
+    @classmethod
+    def __should_ignore_related_name(
+        cls, related_name: str, select_related: Sequence[str]
+    ) -> bool:
+        """
+        Validates if it should populate the related field if select related is not considered.
+        """
+        for related_field in select_related:
+            fields = related_field.split("__")
+            if related_name in fields:
+                return True
+        return False
 
     @classmethod
     def __handle_prefetch_related(

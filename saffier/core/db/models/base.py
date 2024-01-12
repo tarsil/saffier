@@ -36,18 +36,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
 
     def __init__(self, **kwargs: Any) -> None:
-        if "pk" in kwargs:
-            kwargs[self.pkname] = kwargs.pop("pk")
-
-        for k, v in kwargs.items():
-            if k not in self.fields:
-                if not hasattr(self, k):
-                    raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
-            setattr(self, k, v)
-
-    # def __init__(self, **kwargs: Any) -> None:
-    #     values = self.setup_model_fields_from_kwargs(kwargs)
-    #     self.__dict__ = values
+        self.setup_model_fields_from_kwargs(kwargs)
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """
@@ -55,8 +44,6 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         """
         if "pk" in kwargs:
             kwargs[self.pkname] = kwargs.pop("pk")
-
-        kwargs = {k: v for k, v in kwargs.items() if k in self.meta.fields_mapping}
 
         for key, value in kwargs.items():
             if key not in self.fields:
@@ -70,7 +57,10 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @property
     def pk(self) -> Any:
-        return getattr(self, self.pkname)
+        attr = getattr(self, self.pkname, None)
+        if hasattr(attr, "__db_model__"):
+            return getattr(attr, attr.pkname, None)  # type: ignore[union-attr]
+        return attr
 
     @pk.setter
     def pk(self, value: Any) -> Any:

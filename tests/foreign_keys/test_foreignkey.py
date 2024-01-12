@@ -245,6 +245,7 @@ async def test_on_delete_set_null():
     await team.delete()
 
     member = await Member.query.first()
+
     assert member.team.pk is None
 
 
@@ -273,6 +274,8 @@ async def test_one_to_one_crud():
     await AnotherPerson.query.create(email="info@saffier.com", profile=profile)
 
     person = await AnotherPerson.query.get(email="info@saffier.com")
+
+    # breakpoint()
     assert person.profile.pk == profile.pk
 
     await person.profile.load()

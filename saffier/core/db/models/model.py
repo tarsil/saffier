@@ -186,6 +186,12 @@ class Model(ModelRow, DeclarativeMixin):
             return self.__dict__[name]
         return super().__getattr__(name)
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self}>"
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
+
 
 class ReflectModel(Model, SaffierBaseReflectModel):
     """
