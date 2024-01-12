@@ -60,6 +60,7 @@ class Field:
         self.owner = kwargs.pop("owner", None)
         self.server_onupdate = kwargs.pop("server_onupdate", None)
         self.autoincrement = kwargs.pop("autoincrement", False)
+        self.secret = kwargs.pop("secret", False)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """

@@ -47,7 +47,7 @@ module of **Saffier** which means you would only needed to override the needed v
 Every model that required to be applied on a `tenant` (schema) level, you require to inherit from
 the [TenantModel](#tenantmodel) and pass the `is_tenant=True` parameter in the `Meta` class.
 
-To use this module, you will need to have your [SAFFIER_SETTINGS_MODULE](../settings.md#saffier_settings_module)
+To use this module, you will need to have your [SETTINGS_MODULE](../settings.md#settings_module)
 set as well. More on this in the [TenancySettings](#tenancysettings).
 
 More on this in the [example](#example) provided.
@@ -108,7 +108,7 @@ Now there are two ways that you can approach this.
     * `domain_name: str = "localhost"` - Used by the [Domain](#domain) model.
     * `auth_user_model: Optional[str] = None` - Used by the [TenantUser](#tenantuser) model.
 
-2. **You inherit the `TenancySettings` object and override the values needed and use it as your [SAFFIER_SETTINGS_MODULE](../settings.md#saffier_settings_module)**.
+2. **You inherit the `TenancySettings` object and override the values needed and use it as your [SETTINGS_MODULE](../settings.md#settings_module)**.
 
     ```python
     from saffier.contrib.multi_tenancy import TenancySettings
@@ -265,7 +265,7 @@ The settings can be stored in a location like `myapp/configs/saffier/settings.py
 **Make the settings globally available to Saffier**.
 
 ```shell
-$ export SAFFIER_SETTINGS_MODULE=myapp.configs.saffier.settings.EdgySettings
+$ export SETTINGS_MODULE=myapp.configs.saffier.settings.EdgySettings
 ```
 
 Exporting as an environment variable will make sure Saffier will use your settings instead of the

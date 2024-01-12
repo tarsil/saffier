@@ -304,7 +304,7 @@ class BaseModelMeta(type):
             return model_class(cls, name, bases, attrs)
 
         meta.parents = parents
-        new_class = model_class(cls, name, bases, attrs)
+        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if meta.abstract:
@@ -376,8 +376,7 @@ class BaseModelMeta(type):
 
         new_class.__db_model__ = True
         new_class.fields = meta.fields_mapping
-
-        meta.model = new_class  # type: ignore
+        meta.model = new_class
         meta.manager.model_class = new_class
 
         # Set the owner of the field
@@ -385,7 +384,7 @@ class BaseModelMeta(type):
             value.owner = new_class
 
         # Sets the foreign key fields
-        if meta.foreign_key_fields:
+        if meta.foreign_key_fields and not new_class.is_proxy_model:
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
@@ -400,6 +399,17 @@ class BaseModelMeta(type):
 
         # Register the signals
         _register_model_signals(new_class)
+
+        # Update the model references with the validations of the model
+        # Being done by the Edgy fields instead.
+        # Generates a proxy model for each model created
+        # Making sure the core model where the fields are inherited
+        # And mapped contains the main proxy_model
+        if not new_class.is_proxy_model and not new_class.meta.abstract:
+            proxy_model = new_class.generate_proxy_model()
+            new_class.__proxy_model__ = proxy_model
+            new_class.__proxy_model__.parent = new_class
+            meta.registry.models[new_class.__name__] = new_class  # type: ignore
 
         return new_class
 
@@ -454,6 +464,13 @@ class BaseModelMeta(type):
         Returns the signals of a class
         """
         return cast("Broadcaster", cls.meta.signals)
+
+    @property
+    def proxy_model(cls) -> Any:
+        """
+        Returns the proxy_model from the Model when called using the cache.
+        """
+        return cls.__proxy_model__
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:

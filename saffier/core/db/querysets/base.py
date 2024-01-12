@@ -19,12 +19,13 @@ import sqlalchemy
 
 import saffier
 from saffier.conf import settings
+from saffier.core.db import fields as saffier_fields
 from saffier.core.db.context_vars import get_schema
 from saffier.core.db.fields import CharField, TextField
 from saffier.core.db.querysets.mixins import QuerySetPropsMixin, SaffierModel, TenancyMixin
 from saffier.core.db.querysets.prefetch import PrefetchMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
-from saffier.core.utils.model import DateParser
+from saffier.core.utils.models import DateParser
 from saffier.core.utils.schemas import Schema
 from saffier.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol
@@ -41,7 +42,7 @@ class BaseQuerySet(
 
     def __init__(
         self,
-        model_class: Any = None,
+        model_class: Union[Type["Model"], None] = None,
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
         or_clauses: Any = None,
@@ -52,9 +53,12 @@ class BaseQuerySet(
         order_by: Any = None,
         group_by: Any = None,
         distinct_on: Any = None,
+        only_fields: Any = None,
+        defer_fields: Any = None,
         m2m_related: Any = None,
         using_schema: Any = None,
         table: Any = None,
+        exclude_secrets: Any = False,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("Type[Model]", model_class)
@@ -67,10 +71,13 @@ class BaseQuerySet(
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
+        self._only = [] if only_fields is None else only_fields
+        self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
+        self._exclude_secrets = exclude_secrets or False
         self.extra: Dict[str, Any] = {}
 
         if self.is_m2m and not self._m2m_related:
@@ -202,15 +209,58 @@ class BaseQuerySet(
                 tables.append(table)
         return tables, select_from
 
+    def _validate_only_and_defer(self) -> None:
+        if self._only and self._defer:
+            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
+
+    def _secret_recursive_names(
+        self, model_class: Any, columns: Union[List[str], None] = None
+    ) -> List[str]:
+        """
+        Recursively gets the names of the fields excluding the secrets.
+        """
+        if columns is None:
+            columns = []
+
+        for name, field in model_class.fields.items():
+            if isinstance(field, saffier_fields.ForeignKey):
+                # Making sure the foreign key is always added unless is a secret
+                if not field.secret:
+                    columns.append(name)
+                    columns.extend(
+                        self._secret_recursive_names(model_class=field.target, columns=columns)
+                    )
+                continue
+            if not field.secret:
+                columns.append(name)
+
+        columns = list(set(columns))
+        return columns
+
     def _build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
         queryset: "QuerySet" = self._clone()
 
+        queryset._validate_only_and_defer()
         tables, select_from = queryset._build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
+
+        if queryset._only:
+            expression = expression.with_only_columns(*queryset._only)
+
+        if queryset._defer:
+            columns = [
+                column for column in select_from.columns if column.name not in queryset._defer
+            ]
+            expression = expression.with_only_columns(*columns)
+
+        if queryset._exclude_secrets:
+            model_columns = queryset._secret_recursive_names(model_class=queryset.model_class)
+            columns = [column for column in select_from.columns if column.name in model_columns]
+            expression = expression.with_only_columns(*columns)
 
         if queryset.filter_clauses:
             expression = queryset._build_filter_clauses_expression(
@@ -258,6 +308,11 @@ class BaseQuerySet(
         if kwargs.get("pk"):
             pk_name = self.model_class.pkname
             kwargs[pk_name] = kwargs.pop("pk")
+
+        # Making sure for queries we use the main class and not the proxy
+        # And enable the parent
+        if self.model_class.is_proxy_model:
+            self.model_class = self.model_class.parent
 
         for key, value in kwargs.items():
             if "__" in key:
@@ -349,7 +404,10 @@ class BaseQuerySet(
                 limit_count=self.limit_count,
                 limit_offset=self._offset,
                 order_by=self._order_by,
+                only_fields=self._only,
+                defer_fields=self._defer,
                 m2m_related=self.m2m_related,
+                exclude_secrets=self._exclude_secrets,
                 table=self.table,
                 using_schema=self.using_schema,
             ),
@@ -407,9 +465,12 @@ class BaseQuerySet(
         queryset._expression = self._expression
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
+        queryset._only = copy.copy(self._only)
+        queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
         queryset.table = self.table
         queryset.extra = self.extra
+        queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
 
         return queryset
@@ -420,7 +481,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     QuerySet object used for query retrieving.
     """
 
-    def __get__(self, instance: Any, owner: Any) -> Any:
+    def __get__(self, instance: Any, owner: Any) -> "QuerySet":
         return self.__class__(model_class=owner)
 
     @property
@@ -519,6 +580,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset = self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
         return queryset
 
+    def exclude_secrets(
+        self,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Excludes any field that contains the `secret=True` declared from being leaked.
+        """
+        queryset: "QuerySet" = self._clone()
+        queryset._exclude_secrets = True
+        queryset = queryset.filter(clause=clause, **kwargs)
+        return queryset
+
     def lookup(self, term: Any) -> "QuerySet":
         """
         Broader way of searching for a given term
@@ -582,6 +656,28 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
         queryset.distinct_on = distinct_on
+        return queryset
+
+    def only(self, *fields: Sequence[str]) -> "QuerySet":
+        """
+        Returns a list of models with the selected only fields and always the primary
+        key.
+        """
+        only_fields = [sqlalchemy.text(field) for field in fields]
+        if self.model_class.pkname not in fields:
+            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+
+        queryset: "QuerySet" = self._clone()
+        queryset._only = only_fields
+        return queryset
+
+    def defer(self, *fields: Sequence[str]) -> "QuerySet":
+        """
+        Returns a list of models with the selected only fields and always the primary
+        key.
+        """
+        queryset: "QuerySet" = self._clone()
+        queryset._defer = fields
         return queryset
 
     def select_related(self, related: Any) -> "QuerySet":
@@ -710,6 +806,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows[0],
             select_related=queryset._select_related,
             using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
         )
 
     async def _all(self, **kwargs: Any) -> List[SaffierModel]:
@@ -729,6 +826,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         rows = await queryset.database.fetch_all(expression)
 
+        is_only_fields = True if queryset._only else False
+        is_defer_fields = True if queryset._defer else False
+
         # Attach the raw query to the object
         queryset.model_class.raw_query = queryset.sql
 
@@ -737,7 +837,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 row,
                 select_related=queryset._select_related,
                 prefetch_related=queryset._prefetch_related,
+                is_only_fields=is_only_fields,
+                only_fields=queryset._only,
+                is_defer_fields=is_defer_fields,
                 using_schema=queryset.using_schema,
+                exclude_secrets=queryset._exclude_secrets,
             )
             for row in rows
         ]
@@ -768,6 +872,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await queryset.database.fetch_all(expression)
         queryset._set_query_expression(expression)
 
+        is_only_fields = True if queryset._only else False
+        is_defer_fields = True if queryset._defer else False
+
         if not rows:
             raise ObjectNotFound()
         if len(rows) > 1:
@@ -775,8 +882,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset.model_class.from_query_result(
             rows[0],
             select_related=queryset._select_related,
+            is_only_fields=is_only_fields,
+            only_fields=queryset._only,
+            is_defer_fields=is_defer_fields,
             prefetch_related=queryset._prefetch_related,
             using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
         )
 
     async def first(self, **kwargs: Any) -> Union[SaffierModel, None]:
