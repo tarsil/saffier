@@ -17,14 +17,31 @@ class ModelRow(SaffierBaseModel):
         row: Row,
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
+        is_only_fields: bool = False,
+        only_fields: Sequence[str] = None,
+        is_defer_fields: bool = False,
+        exclude_secrets: bool = False,
         using_schema: Union[str, None] = None,
     ) -> Optional[Type["Model"]]:
         """
-        Instantiate a model instance, given a database row.
+        Class method to convert a SQLAlchemy Row result into a SaffierModel row type.
+
+        Looping through select_related fields if the query comes from a select_related operation.
+        Validates if exists the select_related and related_field inside the models.
+
+        When select_related and related_field exist for the same field being validated, the related
+        field is ignored as it won't override the value already collected from the select_related.
+
+        If there is no select_related, then goes through the related field where it **should**
+        only return the instance of the the ForeignKey with the ID, making it lazy loaded.
+
+        :return: Model class.
         """
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
+
+        ([name for name, field in cls.fields.items() if field.secret] if exclude_secrets else [])
 
         # Instantiate any child instances first.
         for related in select_related:
