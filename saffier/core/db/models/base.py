@@ -1,5 +1,6 @@
+import copy
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Set, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Set, Type, Union, cast
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -10,11 +11,15 @@ from saffier.conf import settings
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.models.managers import Manager
 from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
-from saffier.core.utils.models import DateParser
+from saffier.core.db.models.model_proxy import ProxyModel
+from saffier.core.utils.models import DateParser, generify_model_fields
 from saffier.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
+    from saffier import Model
     from saffier.core.signals import Broadcaster
+
+saffier_setattr = object.__setattr__
 
 
 class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
@@ -23,10 +28,45 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     a common mixin.
     """
 
+    is_proxy_model: ClassVar[bool] = False
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
+    __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
+
+    def __init__(self, **kwargs: Any) -> None:
+        if "pk" in kwargs:
+            kwargs[self.pkname] = kwargs.pop("pk")
+
+        for k, v in kwargs.items():
+            if k not in self.fields:
+                if not hasattr(self, k):
+                    raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
+            setattr(self, k, v)
+
+    # def __init__(self, **kwargs: Any) -> None:
+    #     values = self.setup_model_fields_from_kwargs(kwargs)
+    #     self.__dict__ = values
+
+    def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
+        """
+        Loops and setup the kwargs of the model
+        """
+        if "pk" in kwargs:
+            kwargs[self.pkname] = kwargs.pop("pk")
+
+        kwargs = {k: v for k, v in kwargs.items() if k in self.meta.fields_mapping}
+
+        for key, value in kwargs.items():
+            if key not in self.fields:
+                if not hasattr(self, key):
+                    raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
+
+            # Set model field and add to the kwargs dict
+            setattr(self, key, value)
+            kwargs[key] = value
+        return kwargs
 
     @property
     def pk(self) -> Any:
@@ -61,6 +101,10 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         self._table = value
 
     @functools.cached_property
+    def proxy_model(self) -> Any:
+        return self.__class__.proxy_model
+
+    @functools.cached_property
     def signals(self) -> "Broadcaster":
         return self.__class__.signals  # type: ignore
 
@@ -69,6 +113,27 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Returns the name of the class in lowercase.
         """
         return self.__class__.__name__.lower()
+
+    @classmethod
+    def generate_proxy_model(cls) -> Type["Model"]:
+        """
+        Generates a proxy model for each model. This proxy model is a simple
+        shallow copy of the original model being generated.
+        """
+        if cls.__proxy_model__:
+            return cls.__proxy_model__
+
+        fields = {key: copy.copy(field) for key, field in cls.fields.items()}
+        proxy_model = ProxyModel(
+            name=cls.__name__,
+            module=cls.__module__,
+            metadata=cls.meta,
+            definitions=fields,
+        )
+
+        proxy_model.build()
+        generify_model_fields(proxy_model.model)
+        return proxy_model.model
 
     @classmethod
     def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
@@ -148,7 +213,6 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
             else:
                 value = self.fields[key].expand_relationship(value)
-
         super().__setattr__(key, value)
 
     def __get_instance_values(self, instance: Any) -> Set[Any]:

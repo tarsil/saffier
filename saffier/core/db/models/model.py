@@ -1,7 +1,7 @@
 import typing
 from typing import Any, Type, Union
 
-from saffier.core.db.models.base import SaffierBaseModel, SaffierBaseReflectModel
+from saffier.core.db.models.base import SaffierBaseReflectModel
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
 from saffier.core.utils.schemas import Schema
@@ -10,21 +10,11 @@ from saffier.core.utils.sync import run_sync
 saffier_setattr = object.__setattr__
 
 
-class Model(SaffierBaseModel, ModelRow, DeclarativeMixin):
+class Model(ModelRow, DeclarativeMixin):
     """
     The models will always have an id attribute as primery key.
     The primary key can be whatever desired, from IntegerField, FloatField to UUIDField as long as the `id` field is explicitly declared or else it defaults to BigIntegerField.
     """
-
-    def __init__(self, **kwargs: typing.Any) -> None:
-        if "pk" in kwargs:
-            kwargs[self.pkname] = kwargs.pop("pk")
-
-        for k, v in kwargs.items():
-            if k not in self.fields:
-                if not hasattr(self, k):
-                    raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
-            setattr(self, k, v)
 
     class Meta:
         """

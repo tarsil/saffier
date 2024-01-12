@@ -3,13 +3,14 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Uni
 
 from sqlalchemy.engine.result import Row
 
+from saffier.core.db.models.base import SaffierBaseModel
 from saffier.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
     from saffier import Model, Prefetch, QuerySet
 
 
-class ModelRow:
+class ModelRow(SaffierBaseModel):
     @classmethod
     def from_query_result(
         cls,
