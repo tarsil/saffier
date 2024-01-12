@@ -5,6 +5,50 @@ hide:
 
 # Release Notes
 
+## 1.3.0
+
+### Added
+
+- Added new experimental [activate_schema](./tenancy/saffier.md#using-with-activate_schema) for tenant models using the `using` queryset operator.
+- Support for ManyToMany to accept strings to the `to` attribute.
+- Support for new queryset operations [only()](./queries/queries.md#only) and [defer](./queries/queries.md#defer).
+- Intenal `ModelProxy` allowing to manipulate objects querysets such as `only` and `defer`.
+- Support for [secrets](./queries/secrets.md) and secret queryset.
+
+### Changed
+
+- Increased maximum of 63 characters the name of the index/unique.
+- ModelRow now contains private methods.
+- Updated documentation with missing [select_related](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
+- Updated documentation for [access of data via foreign keys](./relationships.md#access-the-foreign-key-values-directly-from-the-model).
+- Deprecating internal settings from Pydantic in favour of [Dymmond Settings](https://settings.dymmond.com).
+
+#### Breaking changes
+
+Saffier now uses  [Dymmond Settings](https://settings.dymmond.com) which this simlpy affects the way the
+settings module is loaded. Prior to version 1.3.0 it was like this:
+
+```python
+SAFFIER_SETTINGS_MODULE=...
+```
+
+**From version 1.3.0 is**:
+
+```python
+SETTINGS_MODULE=...
+```
+
+The rest remains as it. More information about [how to use it in the official documentation](https://settings.dymmond.com/#how-to-use-it_1).
+
+### Fixed
+
+- Multiple join tables were not generating the complete join statement when using `select_related`.
+- Fixed metaclass for TenantMixin making sure all the queries are correctly pointing
+to the right tenant.
+- When generating a many to many through model, the maximum length is enforced to be 63 characters.
+- Object discovery for intellisense.
+- Allow `ManyToMany` to also accept a string as a parameter for the `to`.
+
 ## 1.2.0
 
 ### Added
