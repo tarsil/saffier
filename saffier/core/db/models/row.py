@@ -55,14 +55,19 @@ class ModelRow(SaffierBaseModel):
                     model_cls = getattr(cls, first_part).related_from
 
                 item[first_part] = model_cls.from_query_result(
-                    row, select_related=[remainder], using_schema=using_schema
+                    row,
+                    select_related=[remainder],
+                    using_schema=using_schema,
+                    exclude_secrets=exclude_secrets,
                 )
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls.from_query_result(row, using_schema=using_schema)
+                item[related] = model_cls.from_query_result(
+                    row, using_schema=using_schema, exclude_secrets=exclude_secrets
+                )
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
@@ -123,10 +128,11 @@ class ModelRow(SaffierBaseModel):
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:
+                if column.name in secret_fields:
+                    continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
                 if column.name not in cls.fields.keys():
                     continue
-
                 elif column.name not in item:
                     item[column.name] = row[column]
 

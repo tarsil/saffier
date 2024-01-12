@@ -580,6 +580,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset = self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
         return queryset
 
+    def exclude_secrets(
+        self,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Excludes any field that contains the `secret=True` declared from being leaked.
+        """
+        queryset: "QuerySet" = self._clone()
+        queryset._exclude_secrets = True
+        queryset = queryset.filter(clause=clause, **kwargs)
+        return queryset
+
     def lookup(self, term: Any) -> "QuerySet":
         """
         Broader way of searching for a given term
@@ -793,6 +806,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows[0],
             select_related=queryset._select_related,
             using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
         )
 
     async def _all(self, **kwargs: Any) -> List[SaffierModel]:
@@ -827,6 +841,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
                 using_schema=queryset.using_schema,
+                exclude_secrets=queryset._exclude_secrets,
             )
             for row in rows
         ]
@@ -872,6 +887,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_defer_fields=is_defer_fields,
             prefetch_related=queryset._prefetch_related,
             using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
         )
 
     async def first(self, **kwargs: Any) -> Union[SaffierModel, None]:
