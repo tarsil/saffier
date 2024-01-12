@@ -41,7 +41,9 @@ class ModelRow(SaffierBaseModel):
         select_related = select_related or []
         prefetch_related = prefetch_related or []
 
-        ([name for name, field in cls.fields.items() if field.secret] if exclude_secrets else [])
+        secret_fields = (
+            [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
+        )
 
         # Instantiate any child instances first.
         for related in select_related:
@@ -62,16 +64,48 @@ class ModelRow(SaffierBaseModel):
                     model_cls = getattr(cls, related).related_from
                 item[related] = model_cls.from_query_result(row, using_schema=using_schema)
 
-        # Pull out the regular column values.
-        for column in cls.table.columns:
-            # Making sure when a table is reflected, maps the right fields of the ReflectModel
-            if column.name not in cls.fields.keys():
-                continue
+        # Check for the only_fields
+        if is_only_fields or is_defer_fields:
+            mapping_fields = (
+                [str(field) for field in only_fields] if is_only_fields else list(row.keys())  # type: ignore
+            )
 
-            elif column.name not in item:
-                item[column.name] = row[column]
+            for column, value in row._mapping.items():
+                if column in secret_fields:
+                    continue
+                # Making sure when a table is reflected, maps the right fields of the ReflectModel
+                if column not in mapping_fields:
+                    continue
 
-        model = cast("Type[Model]", cls(**item))
+                if column not in item:
+                    item[column] = value
+
+            # We need to generify the model fields to make sure we can populate the
+            # model without mandatory fields
+            model = cast("Type[Model]", cls.proxy_model(**item))
+
+            # Apply the schema to the model
+            model = cls.__apply_schema(model, using_schema)
+
+            model = cls.__handle_prefetch_related(
+                row=row, model=model, prefetch_related=prefetch_related
+            )
+            return model
+        else:
+            # Pull out the regular column values.
+            for column in cls.table.columns:
+                # Making sure when a table is reflected, maps the right fields of the ReflectModel
+                if column.name not in cls.fields.keys():
+                    continue
+
+                elif column.name not in item:
+                    item[column.name] = row[column]
+
+        model = (
+            cast("Type[Model]", cls(**item))
+            if not exclude_secrets
+            else cast("Type[Model]", cls.proxy_model(**item))
+        )
 
         # Apply the schema to the model
         model = cls.__apply_schema(model, using_schema)
