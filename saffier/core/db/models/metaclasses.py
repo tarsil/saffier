@@ -68,8 +68,8 @@ class MetaInfo:
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", [])
-        self.many_to_many_fields: Set[str] = set()
-        self.foreign_key_fields: Dict[str, Any] = {}
+        self.many_to_many_fields: Set[str] = getattr(meta, "many_to_many_fields", set())
+        self.foreign_key_fields: Dict[str, Any] = getattr(meta, "foreign_key_fields", {})
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -454,6 +454,13 @@ class BaseModelMeta(type):
         Returns the signals of a class
         """
         return cast("Broadcaster", cls.meta.signals)
+
+    @property
+    def proxy_model(cls) -> Any:
+        """
+        Returns the proxy_model from the Model when called using the cache.
+        """
+        return cls.__proxy_model__
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
