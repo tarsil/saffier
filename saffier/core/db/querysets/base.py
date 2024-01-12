@@ -259,6 +259,9 @@ class BaseQuerySet(
             pk_name = self.model_class.pkname
             kwargs[pk_name] = kwargs.pop("pk")
 
+        if self.model_class.is_proxy_model:
+            self.model_class = self.model_class.parent
+
         for key, value in kwargs.items():
             if "__" in key:
                 parts = key.split("__")
