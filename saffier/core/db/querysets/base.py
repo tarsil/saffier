@@ -481,7 +481,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     QuerySet object used for query retrieving.
     """
 
-    def __get__(self, instance: Any, owner: Any) -> Any:
+    def __get__(self, instance: Any, owner: Any) -> "QuerySet":
         return self.__class__(model_class=owner)
 
     @property

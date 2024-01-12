@@ -16,16 +16,15 @@ class Base(saffier.Model):
         registry = models
 
 
-class Profile(Base):
-    is_enabled = saffier.BooleanField(default=True, secret=True)
-    name = saffier.CharField(max_length=1000, secret=True)
-
-
 class User(Base):
     name = saffier.CharField(max_length=50)
     email = saffier.EmailField(max_length=100)
     password = saffier.CharField(max_length=1000, secret=True)
-    profile = saffier.ForeignKey(Profile, on_delete=saffier.CASCADE)
+
+
+class Profile(Base):
+    is_valid = saffier.BooleanField(default=True)
+    access = saffier.CharField(max_length=255, secret=True)
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -43,11 +42,26 @@ async def rollback_connections():
 
 
 async def test_exclude_secrets_query():
-    profile = await Profile.query.create(is_enabled=False, name="saffier")
-    await User.query.create(
-        profile=profile, email="user@dev.com", password="dasrq3213", name="saffier"
-    )
+    await User.query.create(email="user@dev.com", password="dasrq3213", name="saffier")
 
     user = await User.query.exclude_secrets(id=1).get()
 
     assert user.pk == 1
+    assert user.__dict__ == {"id": 1, "name": "saffier", "email": "user@dev.com"}
+
+
+async def test_exclude_secrets():
+    await Profile.query.create(access="admin")
+
+    profile = await Profile.query.exclude_secrets(id=1).get()
+
+    assert profile.pk == 1
+    assert profile.model_dump() == {"id": 1, "is_valid": True}
+
+    profile.access  # noqa
+
+    assert profile.model_dump() == {"id": 1, "is_valid": True, "access": "admin"}
+
+    profile = await Profile.query.exclude_secrets(id=1).get()
+
+    assert profile.model_dump() == {"id": 1, "is_valid": True}
