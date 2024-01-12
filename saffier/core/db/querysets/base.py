@@ -24,7 +24,7 @@ from saffier.core.db.fields import CharField, TextField
 from saffier.core.db.querysets.mixins import QuerySetPropsMixin, SaffierModel, TenancyMixin
 from saffier.core.db.querysets.prefetch import PrefetchMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
-from saffier.core.utils.model import DateParser
+from saffier.core.utils.models import DateParser
 from saffier.core.utils.schemas import Schema
 from saffier.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from saffier.protocols.queryset import QuerySetProtocol

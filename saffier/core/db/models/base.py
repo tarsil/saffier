@@ -10,7 +10,7 @@ from saffier.conf import settings
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.models.managers import Manager
 from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
-from saffier.core.utils.model import DateParser
+from saffier.core.utils.models import DateParser
 from saffier.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
