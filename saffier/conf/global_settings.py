@@ -1,25 +1,24 @@
-from functools import cached_property
-from typing import Dict, List, Set
+from dataclasses import dataclass
+from typing import ClassVar, Dict, List, Set
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from dymmond_settings import Settings
 
 
-class SaffierSettings(BaseSettings):
-    model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
-
-    ipython_args: List[str] = ["--no-banner"]
+@dataclass
+class SaffierSettings(Settings):
+    ipython_args: ClassVar[List[str]] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 
     # Dialects
-    postgres_dialects: Set[str] = {"postgres", "postgresql"}
-    mysql_dialects: Set[str] = {"mysql"}
-    sqlite_dialects: Set[str] = {"sqlite"}
-    mssql_dialects: Set[str] = {"mssql"}
+    postgres_dialects: ClassVar[Set[str]] = {"postgres", "postgresql"}
+    mysql_dialects: ClassVar[Set[str]] = {"mysql"}
+    sqlite_dialects: ClassVar[Set[str]] = {"sqlite"}
+    mssql_dialects: ClassVar[Set[str]] = {"mssql"}
 
     # Drivers
-    postgres_drivers: Set[str] = {"aiopg", "asyncpg"}
-    mysql_drivers: Set[str] = {"aiomysql", "asyncmy"}
-    sqlite_drivers: Set[str] = {"aiosqlite"}
+    postgres_drivers: ClassVar[Set[str]] = {"aiopg", "asyncpg"}
+    mysql_drivers: ClassVar[Set[str]] = {"aiomysql", "asyncmy"}
+    sqlite_drivers: ClassVar[Set[str]] = {"aiosqlite"}
 
     @property
     def mssql_drivers(self) -> Set[str]:
@@ -30,7 +29,7 @@ class SaffierSettings(BaseSettings):
 
     # General settings
     default_related_lookup_field: str = "id"
-    filter_operators: Dict[str, str] = {
+    filter_operators: ClassVar[Dict[str, str]] = {
         "exact": "__eq__",
         "iexact": "ilike",
         "contains": "like",
@@ -41,4 +40,5 @@ class SaffierSettings(BaseSettings):
         "lt": "__lt__",
         "lte": "__le__",
     }
+
     many_to_many_relation: str = "relation_{key}"

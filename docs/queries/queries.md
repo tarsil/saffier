@@ -462,6 +462,32 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 * **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
 * **flat** - Boolean flag indicating the results should be flattened.
 
+### Only
+
+Returns the results containing **only** the fields in the query and nothing else.
+
+```python
+await User.query.create(name="John" email="foo@bar.com")
+
+user = await User.query.only("name")
+```
+
+!!! Warning
+    You can only use `only()` or `defer()` but not both combined or a `QuerySetError` is raised.
+
+### Defer
+
+Returns the results containing all the fields **but the ones you want to exclude**.
+
+```python
+await User.query.create(name="John" email="foo@bar.com")
+
+user = await User.query.defer("name")
+```
+
+!!! Warning
+    You can only use `only()` or `defer()` but not both combined or a `QuerySetError` is raised.
+
 ### Get or none
 
 When querying a model and do not want to raise a [ObjectNotFound](../exceptions.md#doesnotfound) and

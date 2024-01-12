@@ -25,7 +25,7 @@ build-docs: ## Runs the local docs
 
 .PHONY: test
 test: ## Runs the tests
-	pytest $(TESTONLY) --disable-pytest-warnings -s -vv && scripts/clean
+	pytest $(TESTONLY) --disable-pytest-warnings -s -vv
 
 .PHONY: coverage
 coverage: ## Run tests and coverage
