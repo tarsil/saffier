@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 1.3.1
+
+### Fixed
+
+- Fix default for `SETTINGS_MODULE` if nothing is provided.
+
 ## 1.3.0
 
 ### Added
