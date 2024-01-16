@@ -51,10 +51,7 @@ async def test_improperly_configured_for_primary_key():
             class Meta:
                 registry = models
 
-    assert (
-        raised.value.args[0]
-        == "Cannot create model BaseModel without explicit primary key if field 'id' is already present."
-    )
+    assert raised.value.args[0] == "Table has to have a primary key."
 
 
 async def test_improperly_configured_for_multiple_primary_keys():
@@ -62,6 +59,7 @@ async def test_improperly_configured_for_multiple_primary_keys():
 
         class BaseModel(saffier.Model):
             name = saffier.IntegerField(primary_key=True)
+            id = saffier.IntegerField(primary_key=True)
             query = ObjectsManager()
             languages = ObjectsManager()
 
