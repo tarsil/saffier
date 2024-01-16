@@ -250,9 +250,7 @@ class BaseModelMeta(type):
                     if value.primary_key:
                         pk_name_list.append(key)
             if not pk_name_list:
-                raise ImproperlyConfigured(
-                    f"Table has to have a primary key."
-                )
+                raise ImproperlyConfigured("Table has to have a primary key.")
             if len(pk_name_list) > 1:
                 raise ImproperlyConfigured(
                     f"Cannot create model {name} with multiple primary keys."
