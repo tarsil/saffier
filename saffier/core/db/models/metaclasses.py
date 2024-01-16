@@ -20,7 +20,7 @@ from saffier.conf import settings
 from saffier.core.connection.registry import Registry
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.datastructures import Index, UniqueConstraint
-from saffier.core.db.fields import BigIntegerField, Field
+from saffier.core.db.fields import Field
 from saffier.core.db.models.managers import Manager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
