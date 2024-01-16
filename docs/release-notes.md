@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 1.3.2
+
+### Fixed
+
+- The way settings default is loaded. [#124](https://github.com/tarsil/saffier/pull/124) by [@vvanglro](https://github.com/vvanglro)
+
 ## 1.3.1
 
 ### Fixed
