@@ -24,12 +24,14 @@ class StatusEnum(Enum):
 
 
 class BaseModel(saffier.Model):
+    id = fields.IntegerField(primary_key=True)
+
     class Meta:
         registry = models
+        abstract = True
 
 
 class Product(BaseModel):
-    id = fields.IntegerField(primary_key=True)
     uuid = fields.UUIDField(null=True)
     created = fields.DateTimeField(default=datetime.now)
     created_day = fields.DateField(default=date.today)

@@ -16,6 +16,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class AppUser(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255)
 
     class Meta:

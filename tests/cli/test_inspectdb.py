@@ -12,6 +12,7 @@ models = saffier.Registry(database=database)
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255, index=True)
     title = saffier.CharField(max_length=255, null=True)
 
@@ -21,6 +22,7 @@ class User(saffier.Model):
 
 
 class HubUser(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255)
     title = saffier.CharField(max_length=255, null=True)
     description = saffier.CharField(max_length=255, null=True)
@@ -34,6 +36,7 @@ class HubUser(saffier.Model):
 
 
 class Transaction(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     amount = saffier.DecimalField(max_digits=9, decimal_places=2)
     total = saffier.FloatField()
 
