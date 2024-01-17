@@ -28,6 +28,7 @@ class User(saffier.Model):
 
 
 class Product(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     active = ActiveManager()
 
     name = saffier.CharField(max_length=100)

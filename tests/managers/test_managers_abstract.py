@@ -25,6 +25,7 @@ class LanguageManager(Manager):
 
 
 class BaseModel(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     query = ObjectsManager()
 
     class Meta:
@@ -33,7 +34,6 @@ class BaseModel(saffier.Model):
 
 
 class HubUser(BaseModel):
-    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
