@@ -71,10 +71,10 @@ async def rollback_connections():
 
 
 async def test_inherited_base_model_managers():
-    await User.query.create(name="test", language="EN")
-    await User.query.create(name="test2", language="EN")
-    await User.query.create(name="test3", language="PT")
-    await User.query.create(name="test4", language="PT")
+    await User.query.create(name="test", language="EN", is_active=True)
+    await User.query.create(name="test2", language="EN", is_active=True)
+    await User.query.create(name="test3", language="PT", is_active=True)
+    await User.query.create(name="test4", language="PT", is_active=True)
 
     users = await User.query.all()
     assert len(users) == 4
