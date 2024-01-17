@@ -37,6 +37,7 @@ class Album(saffier.Model):
 
 
 class Studio(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255)
     users = saffier.ManyToMany(User, related_name="studio_users")
     albums = saffier.ManyToMany(Album, related_name="studio_albums")

@@ -31,6 +31,7 @@ class RatingManager(Manager):
 
 
 class BaseModel(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     query = ObjectsManager()
     languages = LanguageManager()
     ratings = RatingManager()

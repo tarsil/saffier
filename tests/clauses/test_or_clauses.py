@@ -22,6 +22,7 @@ class User(saffier.Model):
 
 
 class Product(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     user = saffier.ForeignKey(User, related_name="products")
 
     class Meta:

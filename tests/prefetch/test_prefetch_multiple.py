@@ -12,6 +12,7 @@ models = saffier.Registry(database=database)
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
 
     class Meta:
@@ -19,6 +20,7 @@ class User(saffier.Model):
 
 
 class Post(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     user = saffier.ForeignKey(User, related_name="posts")
     comment = saffier.CharField(max_length=255)
 
@@ -27,6 +29,7 @@ class Post(saffier.Model):
 
 
 class Article(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     user = saffier.ForeignKey(User, related_name="articles")
     content = saffier.CharField(max_length=255)
 

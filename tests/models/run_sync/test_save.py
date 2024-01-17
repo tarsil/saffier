@@ -11,6 +11,7 @@ pytestmark = pytest.mark.anyio
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
@@ -19,6 +20,7 @@ class User(saffier.Model):
 
 
 class Profile(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     user = saffier.ForeignKey(User, related_name="profiles", on_delete=saffier.CASCADE)
     name = saffier.CharField(max_length=100)
 

@@ -25,6 +25,7 @@ class EdgyTenantBaseModel(saffier.Model):
 
 
 class Profle(saffier.Model):
+    id: int = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
 
     class Meta:
