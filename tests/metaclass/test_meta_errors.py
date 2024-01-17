@@ -74,6 +74,7 @@ async def test_improperly_configured_for_unique_together(_type, value):
     with pytest.raises(ImproperlyConfigured) as raised:
 
         class BaseModel(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.IntegerField()
             query = ObjectsManager()
             languages = ObjectsManager()
@@ -101,6 +102,7 @@ async def test_value_error_for_unique_together(value):
     with pytest.raises(ValueError) as raised:
 
         class BaseModel(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.IntegerField()
             query = ObjectsManager()
             languages = ObjectsManager()
@@ -119,6 +121,7 @@ def test_raises_value_error_on_wrong_type():
     with pytest.raises(ValueError) as raised:
 
         class User(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.CharField(max_length=255)
 
             class Meta:
@@ -134,12 +137,14 @@ def test_raises_ForeignKeyBadConfigured():
     with pytest.raises(ForeignKeyBadConfigured) as raised:
 
         class User(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.CharField(max_length=255)
 
             class Meta:
                 registry = models
 
         class Profile(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             user = saffier.ForeignKey(
                 User, null=False, on_delete=saffier.CASCADE, related_name=name
             )

@@ -36,7 +36,7 @@ class BaseModel(saffier.Model):
 class HubUser(BaseModel):
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
-
+    is_active = saffier.BooleanField(default=False)
     languages = LanguageManager()
 
     class Meta:

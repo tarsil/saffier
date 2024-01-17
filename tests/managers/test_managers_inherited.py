@@ -43,6 +43,7 @@ class BaseModel(saffier.Model):
 class User(BaseModel):
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
+    is_active = saffier.BooleanField(default=False)
 
     class Meta:
         registry = models
@@ -84,12 +85,12 @@ async def test_inherited_base_model_managers():
 
 @pytest.mark.parametrize("manager,total", [("query", 6), ("ratings", 3)])
 async def test_inherited_base_model_managers_product(manager, total):
-    await Product.query.create(name="test", rating=5)
-    await Product.query.create(name="test2", rating=4)
-    await Product.query.create(name="test3", rating=3)
-    await Product.query.create(name="test4", rating=2)
-    await Product.query.create(name="test5", rating=2)
-    await Product.query.create(name="test6", rating=1)
+    await Product.query.create(name="test", rating=5, is_active=True)
+    await Product.query.create(name="test2", rating=4, is_active=True)
+    await Product.query.create(name="test3", rating=3, is_active=True)
+    await Product.query.create(name="test4", rating=2, is_active=True)
+    await Product.query.create(name="test5", rating=2, is_active=True)
+    await Product.query.create(name="test6", rating=1, is_active=True)
 
     products = await getattr(Product, manager).all()
     assert len(products) == total
