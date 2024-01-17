@@ -21,6 +21,7 @@ def get_random_string(length):
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255, index=True)
     title = saffier.CharField(max_length=255, null=True)
 
@@ -30,6 +31,7 @@ class User(saffier.Model):
 
 
 class HubUser(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255)
     title = saffier.CharField(max_length=255, null=True)
     description = saffier.CharField(max_length=255, null=True)

@@ -24,6 +24,7 @@ def test_raises_value_error_on_wrong_max_length():
     with pytest.raises(ValueError):
 
         class User(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.CharField(max_length=255)
             title = saffier.CharField(max_length=255)
 
@@ -36,6 +37,7 @@ def test_raises_value_error_on_wrong_type_passed_fields():
     with pytest.raises(ValueError):
 
         class User(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.CharField(max_length=255)
             title = saffier.CharField(max_length=255)
 

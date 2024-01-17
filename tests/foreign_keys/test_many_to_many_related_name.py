@@ -11,6 +11,7 @@ models = saffier.Registry(database=database)
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
 
     class Meta:
