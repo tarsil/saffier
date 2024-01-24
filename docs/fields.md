@@ -181,7 +181,7 @@ class MyModel(saffier.Model):
 ##### Parameters
 
 * **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that its
+* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
 only added once.
 
 #### DateTimeField
@@ -200,7 +200,7 @@ class MyModel(saffier.Model):
 ##### Parameters
 
 * **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that its
+* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
 only added once.
 
 #### DecimalField

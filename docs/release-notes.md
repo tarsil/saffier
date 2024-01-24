@@ -5,6 +5,18 @@ hide:
 
 # Release Notes
 
+## 1.3.3
+
+### Changed
+
+- Upgrade internal requirements.
+
+### Fixed
+
+- `auto_now` and `auto_now_add` on `save()` and `update()` wasn't only updating the
+field with `auto_now`.
+- Extraction of the default field for `date` and `datetime`.
+
 ## 1.3.2
 
 ### Fixed
