@@ -119,17 +119,8 @@ class Model(ModelRow, DeclarativeMixin):
         saffier_setattr(self, self.pkname, awaitable)
         return self
 
-    async def _update(self, **kwargs: typing.Any) -> typing.Any:
-        """
-        Performs the save instruction.
-        """
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-        awaitable = await self.database.execute(expression)
-        return awaitable
-
     async def save(
-        self: typing.Any,
+        self,
         force_save: bool = False,
         values: typing.Any = None,
         **kwargs: typing.Any,
@@ -162,7 +153,7 @@ class Model(ModelRow, DeclarativeMixin):
             await self._save(**kwargs)
         else:
             await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
-            await self._update(**kwargs)
+            await self.update(**kwargs)
             await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Refresh the results
