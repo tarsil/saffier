@@ -1,6 +1,7 @@
 """
 Client to interact with Saffier models and migrations.
 """
+
 import inspect
 import sys
 import typing
