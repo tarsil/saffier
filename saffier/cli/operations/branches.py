@@ -2,7 +2,6 @@
 Client to interact with Saffier models and migrations.
 """
 
-
 import click
 
 from saffier.cli.base import branches as _branches

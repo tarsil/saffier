@@ -1,5 +1,4 @@
 from saffier.exceptions import SaffierException
 
 
-class ModelSchemaError(SaffierException):
-    ...
+class ModelSchemaError(SaffierException): ...
