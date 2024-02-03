@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 1.3.4
+
+### Changed
+
+- Update internal anyio dependency.
+
 ## 1.3.3
 
 ### Changed
