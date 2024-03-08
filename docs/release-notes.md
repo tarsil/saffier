@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## 1.3.5
+
+### Changed
+
+**BREAKING CHANGE**
+
+Due to some internal compatibilities, Saffier is rolling back to `SAFFIER_SETTINGS_MODULE`
+from `SETTINGS_MODULE`
+
+- `SETTINGS_MODULE` was renamed to `SAFFIER_SETTINGS_MODULE`.
+
 ## 1.3.4
 
 ### Changed
