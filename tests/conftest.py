@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-os.environ.setdefault("SETTINGS_MODULE", "tests.settings.TestSettings")
+os.environ.setdefault("SAFFIER_SETTINGS_MODULE", "tests.settings.TestSettings")
 
 
 @pytest.fixture(scope="module")
