@@ -1,4 +1,4 @@
-__version__ = "1.3.5"
+__version__ = "1.3.6"
 
 from saffier.conf import settings
 from saffier.conf.global_settings import SaffierSettings

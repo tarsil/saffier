@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 1.3.6
+
+### Changed
+
+- Update internal `dymmond-settings` minimum requirement.
+
 ## 1.3.5
 
 ### Changed
