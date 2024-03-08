@@ -10,17 +10,17 @@ This is exactly what happened.
 
 The way of using the settings object within a Saffier use of the ORM is via:
 
-* **SETTINGS_MODULE** environment variable.
+* **SAFFIER_SETTINGS_MODULE** environment variable.
 
 All the settings are **[pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects which makes it easier to use and override
 when needed.
 
-### SETTINGS_MODULE
+### SAFFIER_SETTINGS_MODULE
 
-Saffier by default uses is looking for a `SETTINGS_MODULE` environment variable to run and
+Saffier by default uses is looking for a `SAFFIER_SETTINGS_MODULE` environment variable to run and
 apply the given settings to your instance.
 
-If no `SETTINGS_MODULE` is found, Saffier then uses its own internal settings which are
+If no `SAFFIER_SETTINGS_MODULE` is found, Saffier then uses its own internal settings which are
 widely applied across the system.
 
 #### Custom settings
@@ -88,7 +88,7 @@ Using the example [above](#custom-settings) and the location `myproject/configs/
 settings should be called like this:
 
 ```shell
-$ SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier <COMMAND>
+$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier <COMMAND>
 ```
 
 Example:
@@ -96,31 +96,31 @@ Example:
 **Starting the default shell**
 
 ```shell
-$ SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier shell
+$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier shell
 ```
 
 **Starting the PTPython shell**
 
 ```shell
-$ SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier shell --kernel ptpython
+$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier shell --kernel ptpython
 ```
 
 **Creating the migrations folder**
 
 ```shell
-$ SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier init
+$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier init
 ```
 
 **Generating migrations**
 
 ```shell
-$ SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier makemigrations
+$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier makemigrations
 ```
 
 **Appying migrations**
 
 ```shell
-$ SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier migrate
+$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings saffier migrate
 ```
 
 And the list goes on and on, you get the gist. To understand which commands are available, check

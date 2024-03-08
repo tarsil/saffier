@@ -33,7 +33,7 @@ field with `auto_now`.
 
 ### Fixed
 
-- Fix default for `SETTINGS_MODULE` if nothing is provided.
+- Fix default for `SAFFIER_SETTINGS_MODULE` if nothing is provided.
 
 ## 1.3.0
 
@@ -65,7 +65,7 @@ SAFFIER_SETTINGS_MODULE=...
 **From version 1.3.0 is**:
 
 ```python
-SETTINGS_MODULE=...
+SAFFIER_SETTINGS_MODULE=...
 ```
 
 The rest remains as it. More information about [how to use it in the official documentation](https://settings.dymmond.com/#how-to-use-it_1).
