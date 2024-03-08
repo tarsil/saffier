@@ -5,6 +5,13 @@ hide:
 
 # Release Notes
 
+## 1.3.7
+
+### Changed
+
+- New lazy loading settings system making it more unique and dynamic working side by side
+with `dymmond-settings`.
+
 ## 1.3.6
 
 ### Changed
