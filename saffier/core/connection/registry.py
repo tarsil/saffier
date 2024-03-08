@@ -55,7 +55,7 @@ class Registry:
                 url = url.replace(driver="aiosqlite")
             elif url.dialect in settings.mssql_dialects:
                 raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
-        elif url.driver in settings.mssql_drivers:
+        elif url.driver in settings.mssql_drivers:  # type: ignore
             raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
         return str(url)
 
