@@ -44,7 +44,7 @@ are done into a more common and familiar interface.
 
 ## Before continuing
 
-If you are looking for something more **Pyadntic** oriented where you can take literally advantage
+If you are looking for something more **Pydantic** oriented where you can take literally advantage
 of everything that Pydantic can offer, then instead of continuing with Saffier, have a look at
 its ***data ORM brother***, [Edgy](https://edgy.tarsild.io).
 
