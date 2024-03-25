@@ -18,6 +18,15 @@ class User(saffier.Model):
         registry = models
 
 
+class Address(saffier.Model):
+    # issues #123
+    customize_id = saffier.IntegerField(primary_key=True)
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()

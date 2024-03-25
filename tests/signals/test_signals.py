@@ -22,6 +22,7 @@ pytestmark = pytest.mark.anyio
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
@@ -30,6 +31,7 @@ class User(saffier.Model):
 
 
 class Profile(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
 
     class Meta:
@@ -37,6 +39,7 @@ class Profile(saffier.Model):
 
 
 class Log(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     signal = saffier.CharField(max_length=255)
     instance = saffier.JSONField()
 

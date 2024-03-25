@@ -12,6 +12,7 @@ pytestmark = pytest.mark.anyio
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
@@ -20,6 +21,7 @@ class User(saffier.Model):
 
 
 class Product(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     rating = saffier.IntegerField(minimum=1, maximum=5)
     in_stock = saffier.BooleanField(default=False)
