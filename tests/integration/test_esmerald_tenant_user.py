@@ -5,8 +5,8 @@ from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, JSONResponse, Request, get
 from esmerald.protocols.middleware import MiddlewareProtocol
 from httpx import AsyncClient
+from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
 from saffier.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
@@ -50,7 +50,7 @@ class Product(TenantModel):
 
 class TenantUser(TenantUserMixin):
     user = fields.ForeignKey(
-        "User", null=False, blank=False, related_name="tenant_user_users_test"
+        "User", null=False, blank=False, related_name="tenant_user_users_test_esmerald"
     )
     tenant = fields.ForeignKey(
         "Tenant", null=False, blank=False, related_name="tenant_users_tenant_test"
