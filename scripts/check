@@ -11,6 +11,5 @@ export EXCLUDE=__init__.py
 export MAIN="saffier"
 
 ${PREFIX}mypy $MAIN
-${PREFIX}ruff $SOURCE_FILES --line-length 99
+${PREFIX}ruff check $SOURCE_FILES --line-length 99
 ${PREFIX}black $SOURCE_FILES --check --diff --check --line-length 99
-${PREFIX}isort $SOURCE_FILES --check --diff --project=saffier --line-length 99
