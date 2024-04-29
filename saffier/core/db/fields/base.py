@@ -17,9 +17,12 @@ from saffier.core.db.fields._internal import (
     Email,
     Float,
     Integer,
+    Password,
+    SaffierField,
+    String,
+    Time,
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
-from saffier.core.db.fields._internal import Password, SaffierField, String, Time
 from saffier.core.terminal import Print
 
 if typing.TYPE_CHECKING:
