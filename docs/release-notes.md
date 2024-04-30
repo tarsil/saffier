@@ -9,7 +9,7 @@ hide:
 
 ### Added
 
-- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations#using-the-model_apps).
+- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations.md#using-the-model_apps).
 
 ## 1.4.0
 
@@ -18,7 +18,7 @@ hide:
 - Support for `model_apps` inside the `Migrate` object allowing
 global discovery by application. This will make sure all apps will be properly
 inspected.
-- Add documentation about the new [model_apps](./migrations/migrations#using-the-model_apps).
+- Add documentation about the new [model_apps](./migrations/migrations.md#using-the-model_apps).
 
 ### Changed
 
