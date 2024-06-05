@@ -13,6 +13,7 @@ pytestmark = pytest.mark.anyio
 
 
 class BaseUser(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
@@ -29,6 +30,7 @@ class Profile(BaseUser):
 
 
 class Address(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     line_one = saffier.CharField(max_length=255, null=True)
     post_code = saffier.CharField(max_length=255, null=True)
 

@@ -31,7 +31,7 @@ Let us also assume we want to create a `user` and a `profile` for that user in a
 This is probably one of the less common ways of using transactions but still very useful if you
 want all of your endpoint to be atomic.
 
-We want to create an endpoint where we save the `user` and the `profile` in one go. Since the 
+We want to create an endpoint where we save the `user` and the `profile` in one go. Since the
 author of Saffier is the same as [Esmerald](https://esmerald.dymmond.com), it makes sense to use
 it as example.
 
