@@ -30,6 +30,17 @@
 
 ---
 
+## Announcement
+
+Saffier is and always will be free and belongs to the community but due to the advancement of the [Dymmond](https://github.com/dymmond)
+ecosystem, it was decided to persue the continuation of a more customisable, versatile, modular and faster tool
+to maintain and grow, [Edgy](https://edgy.dymmond.com). This does not mean Saffier will be forgotte, quite the opposite but the main
+efforts are focused on the open source of the ecosystem of Dymmond as there is a lot of work to carry on and the community is driven
+by that.
+
+**If you would like to continue with Saffier and also maintain it, I'm more than happy to pass it on to you as Saffier can grow in so many**
+other possible ways that we can't even quantify it here.
+
 ## Motivation
 
 Almost every project, in one way or another uses one (or many) databases. An ORM is simply an mapping
