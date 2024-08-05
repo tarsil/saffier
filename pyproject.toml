@@ -115,7 +115,7 @@ doc = [
 ]
 
 testing = ["sqlalchemy_utils>=0.40.0"]
-postgres = ["databasez[postgresql]==0.7.2"]
+postgres = ["databasez[postgresql]==0.8.1"]
 mysql = ["databasez[mysql]==0.7.2"]
 sqlite = ["databasez[sqlite]==0.7.2"]
 
