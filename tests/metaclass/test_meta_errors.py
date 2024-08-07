@@ -51,10 +51,7 @@ async def test_improperly_configured_for_primary_key():
             class Meta:
                 registry = models
 
-    assert (
-        raised.value.args[0]
-        == "Cannot create model BaseModel without explicit primary key if field 'id' is already present."
-    )
+    assert raised.value.args[0] == "Table has to have a primary key."
 
 
 async def test_improperly_configured_for_multiple_primary_keys():
@@ -62,6 +59,7 @@ async def test_improperly_configured_for_multiple_primary_keys():
 
         class BaseModel(saffier.Model):
             name = saffier.IntegerField(primary_key=True)
+            id = saffier.IntegerField(primary_key=True)
             query = ObjectsManager()
             languages = ObjectsManager()
 
@@ -76,6 +74,7 @@ async def test_improperly_configured_for_unique_together(_type, value):
     with pytest.raises(ImproperlyConfigured) as raised:
 
         class BaseModel(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.IntegerField()
             query = ObjectsManager()
             languages = ObjectsManager()
@@ -103,6 +102,7 @@ async def test_value_error_for_unique_together(value):
     with pytest.raises(ValueError) as raised:
 
         class BaseModel(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.IntegerField()
             query = ObjectsManager()
             languages = ObjectsManager()
@@ -121,6 +121,7 @@ def test_raises_value_error_on_wrong_type():
     with pytest.raises(ValueError) as raised:
 
         class User(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.CharField(max_length=255)
 
             class Meta:
@@ -136,12 +137,14 @@ def test_raises_ForeignKeyBadConfigured():
     with pytest.raises(ForeignKeyBadConfigured) as raised:
 
         class User(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.CharField(max_length=255)
 
             class Meta:
                 registry = models
 
         class Profile(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             user = saffier.ForeignKey(
                 User, null=False, on_delete=saffier.CASCADE, related_name=name
             )

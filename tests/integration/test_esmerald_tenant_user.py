@@ -49,6 +49,7 @@ class Product(TenantModel):
 
 
 class TenantUser(TenantUserMixin):
+    id = fields.IntegerField(primary_key=True)
     user = fields.ForeignKey(
         "User", null=False, blank=False, related_name="tenant_user_users_test_esmerald"
     )

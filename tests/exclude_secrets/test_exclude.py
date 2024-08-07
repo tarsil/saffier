@@ -11,6 +11,8 @@ pytestmark = pytest.mark.anyio
 
 
 class Base(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
+
     class Meta:
         abstract = True
         registry = models

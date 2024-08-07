@@ -60,6 +60,7 @@ class User(saffier.Model):
 
 
 class Customer(saffier.Model):
+    id = fields.IntegerField(primary_key=True)
     name = fields.CharField(null=True, max_length=16)
 
     class Meta:

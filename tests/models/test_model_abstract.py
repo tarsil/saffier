@@ -22,6 +22,7 @@ class User(saffier.Model):
 
 
 class Profile(User):
+    id: int = saffier.IntegerField(primary_key=True)
     age = saffier.IntegerField()
 
     class Meta:
