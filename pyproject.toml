@@ -116,15 +116,15 @@ doc = [
 ]
 
 testing = ["sqlalchemy_utils>=0.40.0"]
-postgres = ["databasez[postgresql]>=0.8.2"]
-mysql = ["databasez[mysql]>=0.8.2"]
-sqlite = ["databasez[sqlite]>=0.8.2"]
+postgres = ["databasez[postgresql]"]
+mysql = ["databasez[mysql]"]
+sqlite = ["databasez[sqlite]"]
 
 ptpython = ["ptpython>=3.0.23,<4.0.0"]
 ipython = ["ipython>=8.10.0,<9.0.0"]
 
 all = [
-    "databasez[postgresql,mysql,sqlite]>=0.8.2",
+    "databasez[postgresql,mysql,sqlite]",
     "orjson>=3.8.5,<4.0.0",
     "ptpython>=3.0.23,<4.0.0",
     "ipython>=8.10.0,<9.0.0",

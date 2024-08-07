@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## 1.4.2
+
+### Changed
+
+- Add integration with the newly `databasez` 0.8.5+.
+- Internal refactor of the registry.
+
+### Fixed
+
+- CI integration.
+
 ## 1.4.1
 
 ### Added
