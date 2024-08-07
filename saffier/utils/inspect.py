@@ -74,6 +74,7 @@ class InspectDB:
         Starts the InspectDB and passes all the configurations.
         """
         registry = Registry(database=self.database)
+        execsync(registry.database.connect)()
 
         # Get the engine to connect
         engine: AsyncEngine = registry.engine
@@ -91,6 +92,7 @@ class InspectDB:
 
         for line in self.write_output(tables, self.database.url._url):
             sys.stdout.writelines(line)  # type: ignore
+        execsync(registry.database.disconnect)()
 
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData

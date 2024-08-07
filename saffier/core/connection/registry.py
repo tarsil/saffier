@@ -2,15 +2,12 @@ from functools import cached_property
 from typing import Any, Dict, Mapping, Type
 
 import sqlalchemy
-from sqlalchemy import Engine, create_engine
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
-from saffier.conf import settings
 from saffier.core.connection.database import Database
 from saffier.core.connection.schemas import Schema
-from saffier.exceptions import ImproperlyConfigured
 
 
 class Registry:
@@ -44,27 +41,6 @@ class Registry:
     def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
 
-    def _get_database_url(self) -> str:
-        url = self.database.url
-        if not url.driver:
-            if url.dialect in settings.postgres_dialects:
-                url = url.replace(driver="asyncpg")
-            elif url.dialect in settings.mysql_dialects:
-                url = url.replace(driver="aiomysql")
-            elif url.dialect in settings.sqlite_dialects:
-                url = url.replace(driver="aiosqlite")
-            elif url.dialect in settings.mssql_dialects:
-                raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
-        elif url.driver in settings.mssql_drivers:  # type: ignore
-            raise ImproperlyConfigured("Saffier does not support MSSQL at the moment.")
-        return str(url)
-
-    @cached_property
-    def _get_engine(self) -> AsyncEngine:
-        url = self._get_database_url()
-        engine = create_async_engine(url)
-        return engine
-
     @cached_property
     def declarative_base(self) -> Any:
         if self.db_schema:
@@ -75,30 +51,23 @@ class Registry:
 
     @property
     def engine(self) -> AsyncEngine:
-        return self._get_engine
-
-    @cached_property
-    def _get_sync_engine(self) -> Engine:
-        url = self._get_database_url()
-        engine = create_engine(url)
-        return engine
+        assert self.database.engine, "database not started, no engine found."
+        return self.database.engine
 
     @property
     def sync_engine(self) -> Engine:
-        return self._get_sync_engine
+        return self.engine.sync_engine
 
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
-        async with self.database:
-            async with self.engine.begin() as connection:
-                await connection.run_sync(self.metadata.create_all)
-        await self.engine.dispose()
+        async with Database(self.database, force_rollback=False) as database:
+            async with database.transaction():
+                await database.create_all(self.metadata)
 
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
-        async with self.database:
-            async with self.engine.begin() as conn:
-                await conn.run_sync(self.metadata.drop_all)
-        await self.engine.dispose()
+        async with Database(self.database, force_rollback=False) as database:
+            async with database.transaction():
+                await database.drop_all(self.metadata)

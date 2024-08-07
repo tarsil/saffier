@@ -1,6 +1,8 @@
 import typing
 from typing import Any, Type, Union
 
+from sqlalchemy.engine.result import Row
+
 from saffier.core.db.models.base import SaffierBaseReflectModel
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
@@ -113,10 +115,16 @@ class Model(ModelRow, DeclarativeMixin):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        awaitable = await self.database.execute(expression)
-        if not awaitable:
-            awaitable = kwargs.get(self.pkname)
-        saffier_setattr(self, self.pkname, awaitable)
+        autoincrement_value = await self.database.execute(expression)
+        # sqlalchemy supports only one autoincrement column
+        if autoincrement_value:
+            if isinstance(autoincrement_value, Row):
+                assert len(autoincrement_value) == 1
+                autoincrement_value = autoincrement_value[0]
+            column = self.table.autoincrement_column
+            # can be explicit set, which causes an invalid value returned
+            if column is not None and column.key not in kwargs:
+                saffier_setattr(self, column.key, autoincrement_value)
         return self
 
     async def save(

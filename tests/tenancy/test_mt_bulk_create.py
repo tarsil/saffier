@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 
 import pytest
-from asyncpg.exceptions import UndefinedTableError
+from sqlalchemy.exc import ProgrammingError
 
 import saffier
 from saffier.core.db import fields
@@ -49,7 +49,7 @@ async def rollback_transactions():
 
 
 async def test_bulk_create_another_tenant():
-    with pytest.raises(UndefinedTableError):
+    with pytest.raises(ProgrammingError):
         await Product.query.using("another").bulk_create(
             [
                 {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
