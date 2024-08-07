@@ -3,10 +3,10 @@ import os
 import sys
 from pathlib import Path
 
-from lilya.apps import Lilya
 from my_project.utils import get_db_connection
 
-from saffier.cli import Migrate
+from esmerald import Esmerald, Include
+from saffier import Migrate
 
 
 def build_path():
@@ -28,9 +28,15 @@ def get_application():
     build_path()
     database, registry = get_db_connection()
 
-    app = Lilya(__name__)
+    app = Esmerald(
+        routes=[Include(namespace="my_project.urls")],
+    )
 
-    Migrate(app=app, registry=registry)
+    Migrate(
+        app=app,
+        registry=registry,
+        model_apps=["accounts.models"],
+    )
     return app
 
 

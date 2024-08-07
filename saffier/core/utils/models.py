@@ -2,9 +2,11 @@ import typing
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
-from orjson import OPT_OMIT_MICROSECONDS  # noqa
-from orjson import OPT_SERIALIZE_NUMPY  # noqa
-from orjson import dumps
+from orjson import (
+    OPT_OMIT_MICROSECONDS,  # noqa
+    OPT_SERIALIZE_NUMPY,  # noqa
+    dumps,
+)
 
 import saffier
 from saffier.core.db.fields import DateField, DateTimeField

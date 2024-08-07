@@ -89,8 +89,8 @@ class ModelRow(SaffierBaseModel):
                 if column.name not in cls.fields.keys():
                     continue
                 elif related not in child_item:
-                    if row[related] is not None:
-                        child_item[column.name] = row[related]
+                    if getattr(row, related) is not None:
+                        child_item[column.name] = getattr(row, related)
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -101,7 +101,7 @@ class ModelRow(SaffierBaseModel):
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
             mapping_fields = (
-                [str(field) for field in only_fields] if is_only_fields else list(row.keys())  # type: ignore
+                [str(field) for field in only_fields] if is_only_fields else list(row._mapping.keys())  # type: ignore
             )
 
             for column, value in row._mapping.items():
@@ -128,13 +128,16 @@ class ModelRow(SaffierBaseModel):
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:
-                if column.name in secret_fields:
+                if column.key in secret_fields:
                     continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column.name not in cls.fields.keys():
+                if column.key not in cls.fields:
                     continue
-                elif column.name not in item:
-                    item[column.name] = row[column]
+                elif column.key not in item:
+                    if column in row._mapping:
+                        item[column.key] = row._mapping[column]
+                    elif column.key in row._mapping:
+                        item[column.key] = row._mapping[column.key]
 
         model = (
             cast("Type[Model]", cls(**item))
@@ -230,7 +233,7 @@ class ModelRow(SaffierBaseModel):
 
             # Check for individual not nested querysets
             elif related.queryset is not None and not is_nested:
-                filter_by_pk = row[cls.pkname]
+                filter_by_pk = getattr(row, cls.pkname)
                 extra = {f"{related.related_name}__id": filter_by_pk}
                 related.queryset.extra = extra
 
@@ -281,7 +284,7 @@ class ModelRow(SaffierBaseModel):
         query = "__".join(query_split)
 
         # Extact foreign key value
-        filter_by_pk = row[parent_cls.pkname]
+        filter_by_pk = getattr(row, parent_cls.pkname)
 
         extra = {f"{query}__id": filter_by_pk}
 

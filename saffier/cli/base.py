@@ -1,7 +1,10 @@
 import argparse
+import inspect
 import os
 import typing
-from typing import TYPE_CHECKING, Any, Callable, Optional
+import warnings
+from importlib import import_module
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -10,6 +13,7 @@ from alembic.config import Config as AlembicConfig
 from saffier.cli.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
 from saffier.cli.decorators import catch_errors
 from saffier.core.extras.base import BaseExtra
+from saffier.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
     from saffier.core.connection.registry import Registry
@@ -59,6 +63,7 @@ class Migrate(BaseExtra):
         self,
         app: typing.Any,
         registry: "Registry",
+        model_apps: Union[Dict[str, str], Tuple[str], List[str], None] = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
@@ -68,12 +73,58 @@ class Migrate(BaseExtra):
         self.app = app
         self.configure_callbacks: typing.List[Callable] = []
         self.registry = registry
+        self.model_apps = model_apps or {}
+
+        assert isinstance(
+            self.model_apps, (dict, tuple, list)
+        ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+
+        if isinstance(self.model_apps, dict):
+            self.model_apps = cast(Dict[str, str], self.model_apps.values())
+
+        models = self.check_db_models(self.model_apps)
+
+        for name, _ in models.items():
+            if name in self.registry.models:
+                warnings.warn(
+                    f"There is already a model with the name {name} declared. Overriding the model will occur unless you rename it.",
+                    stacklevel=2,
+                )
+
+        if self.registry.models:
+            self.registry.models = {**models, **self.registry.models}
+        else:
+            self.registry.models = models
+
         self.directory = "migrations"
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
 
         self.set_saffier_extension(app)
+
+    def check_db_models(
+        self, model_apps: Union[Dict[str, str], Tuple[str], List[str]]
+    ) -> Dict[str, Any]:
+        """
+        Goes through all the model applications declared in the migrate and
+        adds them into the registry.
+        """
+        from saffier.core.db.models import Model, ReflectModel
+
+        models: Dict[str, Any] = {}
+
+        for location in model_apps:
+            module = import_module(location)
+            members = inspect.getmembers(
+                module,
+                lambda attr: is_class_and_subclass(attr, Model)
+                and not attr.meta.abstract
+                and not is_class_and_subclass(attr, ReflectModel),
+            )
+            for name, model in members:
+                models[name] = model
+        return models
 
     def set_saffier_extension(self, app: Any) -> None:
         """
@@ -290,7 +341,7 @@ def show(
 ) -> None:
     """Show the revision denoted by the given symbol."""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.show(config, revision)  # type: ignore
+    command.show(config, revision)
 
 
 @catch_errors
@@ -315,7 +366,7 @@ def heads(
 ) -> None:
     """Show current available heads in the script directory"""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)  # type: ignore
+    command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
 @catch_errors
@@ -324,7 +375,7 @@ def branches(
 ) -> None:
     """Show current branch points"""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.branches(config, verbose=verbose)  # type: ignore
+    command.branches(config, verbose=verbose)
 
 
 @catch_errors

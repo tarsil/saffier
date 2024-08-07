@@ -5,6 +5,78 @@ hide:
 
 # Release Notes
 
+## 1.4.2
+
+### Changed
+
+- Add integration with the newly `databasez` 0.8.5+.
+- Internal refactor of the registry.
+
+### Fixed
+
+- CI integration.
+
+## 1.4.1
+
+### Added
+
+- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations.md#using-the-model_apps).
+
+## 1.4.0
+
+### Added
+
+- Support for `model_apps` inside the `Migrate` object allowing
+global discovery by application. This will make sure all apps will be properly
+inspected.
+- Add documentation about the new [model_apps](./migrations/migrations.md#using-the-model_apps).
+
+### Changed
+
+- Upgrade internal requirements.
+
+## 1.3.7
+
+### Changed
+
+- New lazy loading settings system making it more unique and dynamic working side by side
+with `dymmond-settings`.
+
+## 1.3.6
+
+### Changed
+
+- Update internal `dymmond-settings` minimum requirement.
+
+## 1.3.5
+
+### Changed
+
+**BREAKING CHANGE**
+
+Due to some internal compatibilities, Saffier is rolling back to `SAFFIER_SETTINGS_MODULE`
+from `SETTINGS_MODULE`
+
+- `SETTINGS_MODULE` was renamed to `SAFFIER_SETTINGS_MODULE`.
+
+## 1.3.4
+
+### Changed
+
+- Update internal anyio dependency.
+
+## 1.3.3
+
+### Changed
+
+- Upgrade internal requirements.
+
+### Fixed
+
+- `auto_now` and `auto_now_add` on `save()` and `update()` wasn't only updating the
+field with `auto_now`.
+- Extraction of the default field for `date` and `datetime`.
+
 ## 1.3.2
 
 ### Fixed
@@ -15,7 +87,7 @@ hide:
 
 ### Fixed
 
-- Fix default for `SETTINGS_MODULE` if nothing is provided.
+- Fix default for `SAFFIER_SETTINGS_MODULE` if nothing is provided.
 
 ## 1.3.0
 
@@ -47,7 +119,7 @@ SAFFIER_SETTINGS_MODULE=...
 **From version 1.3.0 is**:
 
 ```python
-SETTINGS_MODULE=...
+SAFFIER_SETTINGS_MODULE=...
 ```
 
 The rest remains as it. More information about [how to use it in the official documentation](https://settings.dymmond.com/#how-to-use-it_1).

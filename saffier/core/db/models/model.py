@@ -1,6 +1,8 @@
 import typing
 from typing import Any, Type, Union
 
+from sqlalchemy.engine.result import Row
+
 from saffier.core.db.models.base import SaffierBaseReflectModel
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
@@ -113,23 +115,20 @@ class Model(ModelRow, DeclarativeMixin):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        awaitable = await self.database.execute(expression)
-        if not awaitable:
-            awaitable = kwargs.get(self.pkname)
-        saffier_setattr(self, self.pkname, awaitable)
+        autoincrement_value = await self.database.execute(expression)
+        # sqlalchemy supports only one autoincrement column
+        if autoincrement_value:
+            if isinstance(autoincrement_value, Row):
+                assert len(autoincrement_value) == 1
+                autoincrement_value = autoincrement_value[0]
+            column = self.table.autoincrement_column
+            # can be explicit set, which causes an invalid value returned
+            if column is not None and column.key not in kwargs:
+                saffier_setattr(self, column.key, autoincrement_value)
         return self
 
-    async def _update(self, **kwargs: typing.Any) -> typing.Any:
-        """
-        Performs the save instruction.
-        """
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-        awaitable = await self.database.execute(expression)
-        return awaitable
-
     async def save(
-        self: typing.Any,
+        self,
         force_save: bool = False,
         values: typing.Any = None,
         **kwargs: typing.Any,
@@ -162,7 +161,7 @@ class Model(ModelRow, DeclarativeMixin):
             await self._save(**kwargs)
         else:
             await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
-            await self._update(**kwargs)
+            await self.update(**kwargs)
             await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Refresh the results

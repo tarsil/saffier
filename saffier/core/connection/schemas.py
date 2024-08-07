@@ -50,9 +50,9 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with self.registry.engine.begin() as connection:
-            await connection.run_sync(execute_create)
-        await self.registry.engine.dispose()
+        async with Database(self.registry.database, force_rollback=False) as database:
+            async with database.transaction():
+                await database.run_sync(execute_create)
 
     async def drop_schema(
         self, schema: str, cascade: bool = False, if_exists: bool = False
@@ -69,6 +69,6 @@ class Schema:
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with self.registry.engine.begin() as connection:
-            await connection.run_sync(execute_drop)
-        await self.registry.engine.dispose()
+        async with Database(self.registry.database, force_rollback=False) as database:
+            async with database.transaction():
+                await database.run_sync(execute_drop)
