@@ -961,7 +961,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             new_obj = {}
             for key, value in obj.__dict__.items():
                 if key in fields:
-                    new_obj[key] = queryset._resolve_value(value)
+                    new_obj[key] = value
             new_objs.append(new_obj)
 
         new_objs = [
@@ -970,11 +970,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         ]
 
         pk = getattr(queryset.table.c, queryset.pkname)
-        expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
+        expression = queryset.table.update().where(
+            pk == sqlalchemy.bindparam("__id" if queryset.pkname == "id" else queryset.pkname)
+        )
         kwargs: Dict[str, Any] = {
             field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
         }
-        pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
+        pks = [
+            {"__id" if queryset.pkname == "id" else queryset.pkname: getattr(obj, queryset.pkname)}
+            for obj in objs
+        ]
 
         query_list = []
         for pk, value in zip(pks, new_objs):  # noqa
@@ -982,7 +987,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         expression = expression.values(kwargs)
         queryset._set_query_expression(expression)
-        await queryset.database.execute_many(str(expression), query_list)
+        await queryset.database.execute(expression, query_list)
 
     async def delete(self) -> None:
         queryset: "QuerySet" = self._clone()

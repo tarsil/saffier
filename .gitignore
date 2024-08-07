@@ -16,6 +16,7 @@ node_modules/
 results/
 site/
 target/
+venv
 
 # files
 **/*.so

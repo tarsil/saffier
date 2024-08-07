@@ -1,14 +1,14 @@
 import os
-import shlex
 import subprocess
 
 
 def run_cmd(app, cmd, is_app=True):
+    env = dict(os.environ)
     if is_app:
-        os.environ["SAFFIER_DEFAULT_APP"] = app
-    process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (stdout, stderr) = process.communicate()
+        env["SAFFIER_DEFAULT_APP"] = app
+    cmd = f"{env['PWD']}/venv/bin/{cmd}"
+    result = subprocess.run(cmd, capture_output=True, env=env, shell=True)
     print("\n$ " + cmd)
-    print(stdout.decode("utf-8"))
-    print(stderr.decode("utf-8"))
-    return stdout, stderr, process.wait()
+    print(result.stdout.decode("utf-8"))
+    print(result.stderr.decode("utf-8"))
+    return result.stdout, result.stderr, result.returncode
