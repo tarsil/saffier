@@ -936,7 +936,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         expression = queryset.table.insert().values(new_objs)
         queryset._set_query_expression(expression)
-        await queryset.database.execute(expression)
+        await queryset.database.execute_many(expression)
 
     async def bulk_update(self, objs: List[SaffierModel], fields: List[str]) -> None:
         """
@@ -987,7 +987,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         expression = expression.values(kwargs)
         queryset._set_query_expression(expression)
-        await queryset.database.execute(expression, query_list)
+        await queryset.database.execute_many(expression, query_list)
 
     async def delete(self) -> None:
         queryset: "QuerySet" = self._clone()

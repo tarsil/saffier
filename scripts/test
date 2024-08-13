@@ -6,6 +6,7 @@ if [ "$VIRTUAL_ENV" != '' ]; then
 elif [ -d 'venv' ] ; then
     export PREFIX="venv/bin/"
 fi
+export SAFFIER_TESTCLIENT_TEST_PREFIX=""
 
 set -ex
 

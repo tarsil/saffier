@@ -1,10 +1,14 @@
+import asyncio
 import os
 import shutil
 
 import pytest
+import sqlalchemy
 from esmerald import Esmerald
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.cli.utils import run_cmd
+from tests.settings import DATABASE_URL
 
 app = Esmerald(routes=[])
 
@@ -50,7 +54,19 @@ def test_alembic_version():
         assert isinstance(v, int)
 
 
+async def cleanup_prepare_db():
+    engine = create_async_engine(DATABASE_URL, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(sqlalchemy.text("DROP DATABASE test_saffier"))
+    except Exception:
+        pass
+    async with engine.connect() as conn:
+        await conn.execute(sqlalchemy.text("CREATE DATABASE test_saffier"))
+
+
 def test_migrate_upgrade(create_folders):
+    asyncio.run(cleanup_prepare_db())
     (o, e, ss) = run_cmd("tests.cli.main:app", "saffier init -t ./custom")
     assert ss == 0
 

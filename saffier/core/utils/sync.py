@@ -3,6 +3,10 @@ from concurrent import futures
 from concurrent.futures import Future
 from typing import Any, Awaitable
 
+import nest_asyncio
+
+nest_asyncio.apply()
+
 
 def run_sync(async_function: Awaitable) -> Any:
     """
