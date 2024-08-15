@@ -70,6 +70,7 @@ class User(saffier.Model):
 
 
 class Profile(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     user = saffier.ForeignKey(User, on_delete=saffier.CASCADE, null=False, related_name="profiles")
     profile_type = saffier.CharField(max_length=255, null=False)
 

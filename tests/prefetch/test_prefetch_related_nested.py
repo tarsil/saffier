@@ -30,6 +30,7 @@ class Track(saffier.Model):
 
 
 class Studio(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     album = saffier.ForeignKey("Album", related_name="studios")
     name = saffier.CharField(max_length=255)
 
@@ -38,6 +39,7 @@ class Studio(saffier.Model):
 
 
 class Company(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     studio = saffier.ForeignKey(Studio, related_name="companies")
 
     class Meta:

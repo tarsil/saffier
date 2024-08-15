@@ -20,7 +20,7 @@ from saffier.conf import settings
 from saffier.core.connection.registry import Registry
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.datastructures import Index, UniqueConstraint
-from saffier.core.db.fields import BigIntegerField, Field
+from saffier.core.db.fields import Field
 from saffier.core.db.models.managers import Manager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
@@ -241,27 +241,21 @@ class BaseModelMeta(type):
             # Making sure the inherited fields are before the new defined.
             attrs = {**inherited_fields, **attrs}
 
-        # Handle with multiple primary keys and auto generated field if no primary key is provided
-        if name != "Model":
-            is_pk_present = False
+        # Check that the user-defined table has 1 and only 1 primary key.
+        meta = MetaInfo(meta_class)
+        pk_name_list = []
+        if meta.registry and not meta.abstract:
             for key, value in attrs.items():
                 if isinstance(value, Field):
                     if value.primary_key:
-                        if is_pk_present:
-                            raise ImproperlyConfigured(
-                                f"Cannot create model {name} with multiple primary keys."
-                            )
-                        is_pk_present = True
-                        pk_attribute = key
-
-            if not is_pk_present and not getattr(meta_class, "abstract", None):
-                if "id" not in attrs:
-                    attrs = {"id": BigIntegerField(primary_key=True, autoincrement=True), **attrs}
-
-                if not isinstance(attrs["id"], Field) or not attrs["id"].primary_key:
-                    raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
-                    )
+                        pk_name_list.append(key)
+            if not pk_name_list:
+                raise ImproperlyConfigured("Table has to have a primary key.")
+            if len(pk_name_list) > 1:
+                raise ImproperlyConfigured(
+                    f"Cannot create model {name} with multiple primary keys."
+                )
+            pk_attribute = pk_name_list.pop()
 
         for key, value in attrs.items():
             if isinstance(value, Field):

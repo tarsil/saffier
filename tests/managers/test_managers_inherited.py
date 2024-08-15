@@ -31,6 +31,7 @@ class RatingManager(Manager):
 
 
 class BaseModel(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     query = ObjectsManager()
     languages = LanguageManager()
     ratings = RatingManager()
@@ -42,6 +43,7 @@ class BaseModel(saffier.Model):
 class User(BaseModel):
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
+    is_active = saffier.BooleanField(default=False)
 
     class Meta:
         registry = models
@@ -69,10 +71,10 @@ async def rollback_connections():
 
 
 async def test_inherited_base_model_managers():
-    await User.query.create(name="test", language="EN")
-    await User.query.create(name="test2", language="EN")
-    await User.query.create(name="test3", language="PT")
-    await User.query.create(name="test4", language="PT")
+    await User.query.create(name="test", language="EN", is_active=True)
+    await User.query.create(name="test2", language="EN", is_active=True)
+    await User.query.create(name="test3", language="PT", is_active=True)
+    await User.query.create(name="test4", language="PT", is_active=True)
 
     users = await User.query.all()
     assert len(users) == 4
@@ -83,12 +85,12 @@ async def test_inherited_base_model_managers():
 
 @pytest.mark.parametrize("manager,total", [("query", 6), ("ratings", 3)])
 async def test_inherited_base_model_managers_product(manager, total):
-    await Product.query.create(name="test", rating=5)
-    await Product.query.create(name="test2", rating=4)
-    await Product.query.create(name="test3", rating=3)
-    await Product.query.create(name="test4", rating=2)
-    await Product.query.create(name="test5", rating=2)
-    await Product.query.create(name="test6", rating=1)
+    await Product.query.create(name="test", rating=5, is_active=True)
+    await Product.query.create(name="test2", rating=4, is_active=True)
+    await Product.query.create(name="test3", rating=3, is_active=True)
+    await Product.query.create(name="test4", rating=2, is_active=True)
+    await Product.query.create(name="test5", rating=2, is_active=True)
+    await Product.query.create(name="test6", rating=1, is_active=True)
 
     products = await getattr(Product, manager).all()
     assert len(products) == total

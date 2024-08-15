@@ -25,6 +25,8 @@ class StatusEnum(Enum):
 
 
 class BaseModel(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
+
     class Meta:
         registry = models
 

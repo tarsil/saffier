@@ -25,6 +25,7 @@ class LanguageManager(Manager):
 
 
 class BaseModel(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     query = ObjectsManager()
 
     class Meta:
@@ -35,7 +36,7 @@ class BaseModel(saffier.Model):
 class HubUser(BaseModel):
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
-
+    is_active = saffier.BooleanField(default=False)
     languages = LanguageManager()
 
     class Meta:
@@ -65,10 +66,10 @@ async def rollback_connections():
 
 @pytest.mark.parametrize("manager,total", [("query", 4), ("languages", 2)])
 async def test_inherited_abstract_base_model_managers(manager, total):
-    await HubUser.query.create(name="test", language="EN")
-    await HubUser.query.create(name="test2", language="EN")
-    await HubUser.query.create(name="test3", language="PT")
-    await HubUser.query.create(name="test4", language="PT")
+    await HubUser.query.create(name="test", language="EN", is_active=True)
+    await HubUser.query.create(name="test2", language="EN", is_active=True)
+    await HubUser.query.create(name="test3", language="PT", is_active=True)
+    await HubUser.query.create(name="test4", language="PT", is_active=True)
 
     users = await getattr(HubUser, manager).all()
     assert len(users) == total

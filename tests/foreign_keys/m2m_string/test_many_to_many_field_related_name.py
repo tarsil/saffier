@@ -11,6 +11,7 @@ models = saffier.Registry(database=database)
 
 
 class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=100)
 
     class Meta:
@@ -36,6 +37,7 @@ class Album(saffier.Model):
 
 
 class Studio(saffier.Model):
+    id = saffier.IntegerField(primary_key=True)
     name = saffier.CharField(max_length=255)
     users = saffier.ManyToManyField("User", related_name="studio_users")
     albums = saffier.ManyToManyField("Album", related_name="studio_albums")

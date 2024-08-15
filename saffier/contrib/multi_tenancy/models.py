@@ -18,6 +18,7 @@ class TenantMixin(saffier.Model):
     the tenants with saffier contrib.
     """
 
+    id = saffier.BigIntegerField(primary_key=True)
     schema_name = saffier.CharField(max_length=63, unique=True, index=True)
     domain_url = saffier.URLField(null=True, default=settings.domain, max_length=2048)
     tenant_name = saffier.CharField(max_length=100, unique=True, null=False)
@@ -101,6 +102,7 @@ class DomainMixin(saffier.Model):
     All models that store the domains must use this class
     """
 
+    id = saffier.BigIntegerField(primary_key=True)
     domain = saffier.CharField(max_length=253, unique=True, db_index=True)
     tenant = saffier.ForeignKey(
         settings.tenant_model, index=True, on_delete=saffier.CASCADE, related_name="domains"
@@ -144,6 +146,7 @@ class TenantUserMixin(saffier.Model):
     Mapping between user and a client (tenant).
     """
 
+    id = saffier.BigIntegerField(primary_key=True)
     user = saffier.ForeignKey(
         settings.auth_user_model,
         null=False,
