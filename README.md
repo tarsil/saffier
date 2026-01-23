@@ -30,6 +30,16 @@
 
 ---
 
+## Open to donate
+
+Saffier is and always will be a very important part of the open source in Python but with the maintaince of its sibling [Edgy](https://edgy.dymmond.com)
+Saffier no longer follows the same lines.
+
+If you are interested in continuing maintaining it or would like to do something else and grow Saffier in another way, I am more than happy to
+donate this amaing ORM to you as well as the Python Pypi package.
+
+If you are interested, please get in touch with me. The contacts are inside the `pyproject.toml`.
+
 ## Announcement
 
 Saffier is and always will be free and belongs to the community but due to the advancement of the [Dymmond](https://github.com/dymmond)
