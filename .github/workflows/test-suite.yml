@@ -73,4 +73,4 @@ jobs:
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/saffier"
           TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/saffier_alt"
-        run: "scripts/test"
+        run: "hatch run test:test"
