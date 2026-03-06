@@ -80,7 +80,7 @@ saffier = "saffier.__main__:run_cli"
 test = [
     "asyncpg>=0.27.0,<1",
     "asyncmy>=0.2.7,<0.3.0",
-    "ravyn[standard,test]==0.3.9",
+    "ravyn==0.3.9",
     "httpx>=0.25.0,<0.30.0",
     "pytest>=8.3.5,<9.0.0",
     "pytest-cov>=6.0.0,<7.0.0",
@@ -126,6 +126,36 @@ all = [
     "ptpython>=3.0.23,<4.0.0",
     "ipython>=8.10.0,<9.0.0",
 ]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pre-commit>=4.0.0,<5.0.0",
+    "saffier[test,doc,postgres,mysql,sqlite,testing]",
+]
+
+[tool.hatch.envs.default.scripts]
+clean_pyc = "find . -type f -name \"*.pyc\" -delete"
+clean_pycache = "find . -type d -name \"*__pycache__*\" -delete"
+lint = "scripts/lint"
+check = "scripts/check"
+
+[tool.hatch.envs.docs]
+features = ["doc"]
+
+[tool.hatch.envs.docs.scripts]
+prepare = "python scripts/docs.py prepare"
+clean = "python scripts/docs.py clean"
+build = "python scripts/docs.py build --clean {args}"
+serve = "python scripts/docs.py serve {args}"
+dev = "python scripts/docs.py serve {args}"
+
+[tool.hatch.envs.test]
+features = ["test", "postgres", "mysql", "sqlite", "testing"]
+
+[tool.hatch.envs.test.scripts]
+test = "pytest {args}"
+test_man = "pytest {args} -s -vv"
+check_types = "mypy saffier {args}"
 
 [tool.hatch.version]
 path = "saffier/__init__.py"

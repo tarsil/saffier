@@ -1,17 +1,11 @@
-import click
+from sayer import command
 
 from saffier.cli.base import edit as _edit
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, RevisionHeadArgument
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.command()
-@click.argument("revision", default="head")
-def edit(env: MigrationEnv, directory: str, revision: str) -> None:
+@command
+def edit(revision: RevisionHeadArgument, directory: DirectoryOption) -> None:
     """Edit a revision file"""
-    _edit(env.app, directory, revision)
+    _edit(get_migration_app(), directory, revision)

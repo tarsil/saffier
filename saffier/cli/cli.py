@@ -4,10 +4,8 @@ Client to interact with Saffier models and migrations.
 
 from __future__ import annotations
 
-import inspect
 import sys
 import typing
-from functools import wraps
 
 import click
 from sayer import Sayer, error
@@ -39,6 +37,7 @@ from saffier.cli.operations import (
     show,
     stamp,
 )
+from saffier.cli.state import clear_migration_env, set_migration_env
 from saffier.exceptions import CommandEnvironmentError
 
 help_text = """
@@ -55,30 +54,6 @@ saffier_cli = Sayer(
     add_version_option=True,
     version=saffier.__version__,
 )
-
-
-def _wrap_command_with_env(cmd: click.Command) -> click.Command:
-    """
-    Preserve backward compatibility for operation handlers that still
-    expect an injected `env: MigrationEnv` positional argument.
-    """
-    callback = cmd.callback
-    if callback is None:
-        return cmd
-
-    params = inspect.signature(callback).parameters
-    if "env" not in params:
-        return cmd
-
-    @wraps(callback)
-    @click.pass_context
-    def wrapped(ctx: click.Context, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        scaffold = ctx.ensure_object(MigrationEnv)
-        kwargs["env"] = scaffold
-        return callback(*args, **kwargs)
-
-    cmd.callback = wrapped
-    return cmd
 
 
 @saffier_cli.callback(invoke_without_command=True)
@@ -101,11 +76,13 @@ def saffier_callback(
         return
 
     if any(value in sys.argv for value in EXCLUDED_COMMANDS):
+        clear_migration_env()
         return
 
     try:
         migration = MigrationEnv()
         app_env = migration.load_from_env(path=app)
+        set_migration_env(app_env)
         ctx.obj = app_env
     except CommandEnvironmentError as exc:
         if not any(value in sys.argv for value in IGNORE_COMMANDS):
@@ -114,7 +91,7 @@ def saffier_callback(
 
 
 def _add_command(command: click.Command, name: str | None = None) -> None:
-    saffier_cli.add_command(_wrap_command_with_env(command), name=name)
+    saffier_cli.add_command(command, name=name)
 
 
 _add_command(list_templates)

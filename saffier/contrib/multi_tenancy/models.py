@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, Type, Union, cast
+from typing import Any, cast
 
 from loguru import logger
 
@@ -45,8 +45,8 @@ class TenantMixin(saffier.Model):
         return f"{self.tenant_name} - {self.schema_name}"
 
     async def save(
-        self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
-    ) -> Type["TenantMixin"]:
+        self: Any, force_save: bool = False, values: dict[str, Any] = None, **kwargs: Any
+    ) -> type["TenantMixin"]:
         """
         Creates a tenant record and generates a schema in the database.
 
@@ -71,7 +71,7 @@ class TenantMixin(saffier.Model):
                 % current_schema
             )
 
-        tenant: Type["Model"] = await super().save(force_save, values, **kwargs)
+        tenant: type[Model] = await super().save(force_save, values, **kwargs)
         try:
             await self.meta.registry.schema.create_schema(
                 schema=tenant.schema_name, if_not_exists=True
@@ -83,7 +83,7 @@ class TenantMixin(saffier.Model):
             message = f"Rolling back... {str(e)}"
             logger.error(message)
             await self.delete()
-        return cast("Type[TenantMixin]", tenant)
+        return cast("type[TenantMixin]", tenant)
 
     async def delete(self, force_drop: bool = False) -> None:
         """
@@ -114,8 +114,8 @@ class DomainMixin(saffier.Model):
         return cast("str", self.domain)
 
     async def save(
-        self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
-    ) -> Type[Model]:
+        self: Any, force_save: bool = False, values: dict[str, Any] = None, **kwargs: Any
+    ) -> type[Model]:
         async with self.meta.registry.database.transaction():
             domains = self.__class__.query.filter(tenant=self.tenant, is_priamry=True).exclude(
                 id=self.pk
@@ -166,7 +166,7 @@ class TenantUserMixin(saffier.Model):
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
     @classmethod
-    async def get_active_user_tenant(cls, user: Type["Model"]) -> Union[Type["Model"], None]:
+    async def get_active_user_tenant(cls, user: type["Model"]) -> type["Model"] | None:
         """
         Obtains the active user tenant.
         """
@@ -178,9 +178,9 @@ class TenantUserMixin(saffier.Model):
 
         except ObjectNotFound:
             return None
-        return cast("Type[Model]", tenant.tenant)
+        return cast("type[Model]", tenant.tenant)
 
-    async def save(self, *args: Any, **kwargs: Any) -> Type["TenantUserMixin"]:
+    async def save(self, *args: Any, **kwargs: Any) -> type["TenantUserMixin"]:
         await super().save(*args, **kwargs)
         if self.is_active:
             await get_model(  # type: ignore
@@ -188,4 +188,4 @@ class TenantUserMixin(saffier.Model):
             ).query.filter(is_active=True, user=self.user).exclude(pk=self.pk).update(
                 is_active=False
             )
-        return cast("Type[TenantUserMixin]", self)
+        return cast("type[TenantUserMixin]", self)

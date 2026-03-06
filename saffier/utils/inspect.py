@@ -1,12 +1,12 @@
 import inspect
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from collections.abc import Callable
+from typing import Any, NoReturn
 
 import sqlalchemy
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql import schema, sqltypes
-from typing_extensions import NoReturn
 
 import saffier
 from saffier import Database, Registry
@@ -54,7 +54,7 @@ class InspectDB:
     Class that builds the inspection of a database.
     """
 
-    def __init__(self, database: str, schema: Optional[str]) -> None:
+    def __init__(self, database: str, schema: str | None) -> None:
         """
         Creates an instance of an InspectDB and triggers the proccess.
         """
@@ -66,7 +66,7 @@ class InspectDB:
         return Database(self._database)
 
     @property
-    def schema(self) -> Optional[str]:
+    def schema(self) -> str | None:
         return self._schema
 
     def inspect(self) -> None:
@@ -96,16 +96,16 @@ class InspectDB:
 
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, str]]:
         """
         Generates the tables from the reflection and maps them into the
         `reflected` dictionary of the `Registry`.
         """
         tables_dict = dict(metadata.tables.items())
         tables = []
-        models: Dict[str, str] = {}
+        models: dict[str, str] = {}
         for key, table in tables_dict.items():
-            table_details: Dict[str, Any] = {}
+            table_details: dict[str, Any] = {}
             table_details["tablename"] = key
             table_details["class_name"] = key.replace("_", "").capitalize()
             table_details["class"] = None
@@ -123,15 +123,15 @@ class InspectDB:
         return tables, models
 
     def get_foreign_keys(
-        self, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]
-    ) -> List[Dict[str, Any]]:
+        self, table_or_column: sqlalchemy.Table | sqlalchemy.Column
+    ) -> list[dict[str, Any]]:
         """
         Extracts all the information needed of the foreign keys.
         """
-        details: List[Dict[str, Any]] = []
+        details: list[dict[str, Any]] = []
 
         for foreign_key in table_or_column.foreign_keys:
-            fk: Dict[str, Any] = {}
+            fk: dict[str, Any] = {}
             fk["column"] = foreign_key.column
             fk["column_name"] = foreign_key.column.name
             fk["tablename"] = foreign_key.column.table.name
@@ -159,7 +159,7 @@ class InspectDB:
             )
             field_type = "TextField"
 
-        field_params: Dict[str, Any] = {}
+        field_params: dict[str, Any] = {}
 
         if field_type == "CharField":
             field_params["max_length"] = real_field.length
@@ -178,13 +178,13 @@ class InspectDB:
         return field_type, field_params
 
     def get_meta(
-        self, table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]
+        self, table: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
     ) -> NoReturn:
         """
         Produces the Meta class.
         """
-        unique_together: List[saffier.UniqueConstraint] = []
-        unique_indexes: List[saffier.Index] = []
+        unique_together: list[saffier.UniqueConstraint] = []
+        unique_indexes: list[saffier.Index] = []
         indexes = list(table["indexes"])
         constraints = list(table["constraints"])
 
@@ -237,7 +237,7 @@ class InspectDB:
             await connection.run_sync(metadata.reflect)
         return metadata
 
-    def write_output(self, tables: List[Any], connection_string: str) -> NoReturn:
+    def write_output(self, tables: list[Any], connection_string: str) -> NoReturn:
         """
         Writes to stdout.
         """
@@ -262,13 +262,13 @@ class InspectDB:
 
         yield "\n"
         yield "\n"
-        yield "database = {}.Database('{}')\n".format(DB_MODULE, connection_string)
+        yield f"database = {DB_MODULE}.Database('{connection_string}')\n"
         yield "registry = %s.Registry(database=database)\n" % DB_MODULE
 
         # Start writing the classes
         for table in tables:
-            unique_constraints: Set[str] = set()
-            indexes: Set[str] = set()
+            unique_constraints: set[str] = set()
+            indexes: set[str] = set()
 
             yield "\n"
             yield "\n"
@@ -325,7 +325,7 @@ class InspectDB:
                     if not field_description.endswith("("):
                         field_description += ", "
                     field_description += ", ".join(
-                        "{}={!r}".format(k, v) for k, v in field_params.items()
+                        f"{k}={v!r}" for k, v in field_params.items()
                     )
                 field_description += ")\n"
                 yield "    %s" % field_description

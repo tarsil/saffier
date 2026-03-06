@@ -28,28 +28,31 @@
 
 **Source Code**: [https://github.com/tarsil/saffier](https://github.com/tarsil/saffier)
 
+**The official supported version is always the latest released**.
 ---
 
-## Open to donate
+## Saffier 2.0+
 
-Saffier is and always will be a very important part of the open source in Python but with the maintaince of its sibling [Edgy](https://edgy.dymmond.com)
-Saffier no longer follows the same lines.
+Saffier is currently revamped to be more powerful and flexible, while maintaining the same familiar interface.
+The new version will be released as **Saffier 2.0** and the versioning will grow from there. The supported version will always be the latest released,
+so if you are using Saffier, make sure to keep it updated to the latest version to get the best experience and all the new features.
 
-If you are interested in continuing maintaining it or would like to do something else and grow Saffier in another way, I am more than happy to
-donate this amaing ORM to you as well as the Python Pypi package.
+Why this now? Saffier plays an important role in the ecosystem of tools I am building and I want to make sure it is the best it can be for everyone. 
+The new version will be more powerful, flexible and easier to use, while maintaining the same familiar interface.
 
-If you are interested, please get in touch with me. The contacts are inside the `pyproject.toml`.
+Saffier was never neglected, or at least intentionally neglected, but it was always a challenge to maintain
+it while also working on other projects and tools.
 
-## Announcement
+This will no longer be the case and Saffier will come to stay.
 
-Saffier is and always will be free and belongs to the community but due to the advancement of the [Dymmond](https://github.com/dymmond)
-ecosystem, it was decided to persue the continuation of a more customisable, versatile, modular and faster tool
-to maintain and grow, [Edgy](https://edgy.dymmond.com). This does not mean Saffier will be forgotten, quite the opposite but the main
-efforts are focused on the open source of the ecosystem of Dymmond as there is a lot of work to carry on and the community is driven
-by that.
+Where is different from its sibling [Edgy](https://edgy.dymmond.com)? Well, for starters, Saffier is not Pydantic oriented,
+in fact, it is 100% independent and pure Python.
 
-**If you would like to continue with Saffier and also maintain it, I'm more than happy to pass it on to you as Saffier can grow in so many**
-other possible ways that we can't even quantify it here.
+Edgy is part of Dymmond ecosystem and Saffier is more "rebel" and independent and lives under the heart of [tarsil](https://github.com/tarsil).
+
+Saffier has the same feel, same look as Edgy and that is intentional but **Saffier was the first** not the way around.
+
+Now, if you are interested in helping and maintaining Saffier, please don't hesitate to reach out and contribute, it is always welcome and appreciated.
 
 ## Motivation
 

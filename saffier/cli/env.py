@@ -34,12 +34,12 @@ class MigrationEnv:
     and returns the App.
     """
 
-    path: typing.Optional[str] = None
-    app: typing.Optional[typing.Any] = None
-    command_path: typing.Optional[str] = None
+    path: str | None = None
+    app: typing.Any | None = None
+    command_path: str | None = None
 
     def load_from_env(
-        self, path: typing.Optional[str] = None, enable_logging: bool = True
+        self, path: str | None = None, enable_logging: bool = True
     ) -> "MigrationEnv":
         """
         Loads the environment variables into the scaffold.
@@ -62,7 +62,7 @@ class MigrationEnv:
 
         return MigrationEnv(path=_app.path, app=_app.app)
 
-    def import_app_from_string(cls, path: typing.Optional[str] = None) -> Scaffold:
+    def import_app_from_string(cls, path: str | None = None) -> Scaffold:
         if path is None:
             raise CommandEnvironmentError(
                 detail="Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
@@ -72,7 +72,7 @@ class MigrationEnv:
         app = getattr(module, app_name)
         return Scaffold(path=path, app=app)
 
-    def _get_folders(self, path: Path) -> typing.List[str]:
+    def _get_folders(self, path: Path) -> list[str]:
         """
         Lists all the folders and checks if there is any file from the DISCOVERY_FILES available
         """
@@ -80,7 +80,7 @@ class MigrationEnv:
 
     def _find_app_in_folder(  # type: ignore
         self, path: Path, cwd: Path
-    ) -> typing.Union[typing.NoReturn, typing.Callable[..., typing.Any], Scaffold, None]:
+    ) -> typing.NoReturn | typing.Callable[..., typing.Any] | Scaffold | None:
         """
         Iterates inside the folder and looks up to the DISCOVERY_FILES.
         """
@@ -112,7 +112,7 @@ class MigrationEnv:
                     if hasattr(fn, SAFFIER_DB) or hasattr(fn, SAFFIER_EXTRA):
                         return Scaffold(app=fn, path=app_path)
 
-    def find_app(self, path: typing.Optional[str], cwd: Path) -> Scaffold:
+    def find_app(self, path: str | None, cwd: Path) -> Scaffold:
         """
         Loads the application based on the path provided via env var.
 
@@ -122,7 +122,7 @@ class MigrationEnv:
         if path:
             return self.import_app_from_string(path)
 
-        scaffold: typing.Optional[Scaffold] = None
+        scaffold: Scaffold | None = None
 
         # Check current folder
         scaffold = self._find_app_in_folder(cwd, cwd)  # type: ignore

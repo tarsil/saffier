@@ -1,5 +1,5 @@
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Type, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from saffier import Database, Model, QuerySet
@@ -8,14 +8,14 @@ TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 SHEMA: ContextVar[str] = ContextVar("SHEMA", default=None)
 
 
-def get_tenant() -> Union[str, None]:
+def get_tenant() -> str | None:
     """
     Gets the current active tenant in the context.
     """
     return TENANT.get()
 
 
-def set_tenant(value: Union[str, None]) -> None:
+def set_tenant(value: str | None) -> None:
     """
     Sets the global tenant for the context of the queries.
     When a global tenant is set the `get_context_schema` -> `SCHEMA` is ignored.
@@ -23,18 +23,18 @@ def set_tenant(value: Union[str, None]) -> None:
     TENANT.set(value)
 
 
-def get_schema() -> Union[str, None]:
+def get_schema() -> str | None:
     return SHEMA.get()
 
 
-def set_schema(value: Union[str, None]) -> None:
+def set_schema(value: str | None) -> None:
     SHEMA.set(value)
 
 
 def set_queryset_schema(
     queryset: "QuerySet",
-    model_class: Type["Model"],
-    value: Union[str, None],
+    model_class: type["Model"],
+    value: str | None,
 ) -> "QuerySet":
     """
     Returns a new queryset object pointing to the desired schema of the
@@ -49,9 +49,9 @@ def set_queryset_schema(
 
 def set_queryset_database(
     queryset: "QuerySet",
-    model_class: Type["Model"],
-    database: Type["Database"],
-    schema: Union[str, None] = None,
+    model_class: type["Model"],
+    database: type["Database"],
+    schema: str | None = None,
 ) -> "QuerySet":
     """
     Returns a new queryset object pointing to the desired schema of the

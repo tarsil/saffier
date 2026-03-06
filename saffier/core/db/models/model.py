@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Type, Union
+from typing import Any
 
 from sqlalchemy.engine.result import Row
 
@@ -39,22 +39,10 @@ class Model(ModelRow, DeclarativeMixin):
 
     def model_dump(
         self,
-        include: Union[
-            typing.Set[int],
-            typing.Set[str],
-            typing.Dict[int, typing.Any],
-            typing.Dict[str, typing.Any],
-            None,
-        ] = None,
-        exclude: Union[
-            typing.Set[int],
-            typing.Set[str],
-            typing.Dict[int, typing.Any],
-            typing.Dict[str, typing.Any],
-            None,
-        ] = None,
+        include: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
+        exclude: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
         exclude_none: bool = False,
-    ) -> typing.Dict[str, typing.Any]:
+    ) -> dict[str, typing.Any]:
         """
         Dumps the model in a dict format.
         """
@@ -131,7 +119,7 @@ class Model(ModelRow, DeclarativeMixin):
         force_save: bool = False,
         values: typing.Any = None,
         **kwargs: typing.Any,
-    ) -> Union[Type["Model"], Any]:
+    ) -> type["Model"] | Any:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or

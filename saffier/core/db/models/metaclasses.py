@@ -1,15 +1,9 @@
 import copy
 import inspect
+from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -21,7 +15,7 @@ from saffier.core.connection.registry import Registry
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.fields import BigIntegerField, Field
-from saffier.core.db.models.managers import Manager
+from saffier.core.db.models.managers import Manager, RedirectManager
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.relation import Relation
 from saffier.core.signals import Broadcaster, Signal
@@ -60,38 +54,38 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.pk: Optional[Field] = getattr(meta, "pk", None)
-        self.pk_attribute: Union[Field, str] = getattr(meta, "pk_attribute", "")
+        self.pk: Field | None = getattr(meta, "pk", None)
+        self.pk_attribute: Field | str = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
-        self.fields: Set[Any] = getattr(meta, "fields", set())
-        self.fields_mapping: Dict[str, Field] = getattr(meta, "fields_mapping", {})
-        self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
-        self.tablename: Optional[str] = getattr(meta, "tablename", None)
+        self.fields: set[Any] = getattr(meta, "fields", set())
+        self.fields_mapping: dict[str, Field] = getattr(meta, "fields_mapping", {})
+        self.registry: type[Registry] | None = getattr(meta, "registry", None)
+        self.tablename: str | None = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", [])
-        self.many_to_many_fields: Set[str] = set()
-        self.foreign_key_fields: Dict[str, Any] = {}
-        self.model: Optional[Type["Model"]] = None
-        self.manager: "Manager" = getattr(meta, "manager", Manager())
+        self.many_to_many_fields: set[str] = set()
+        self.foreign_key_fields: dict[str, Any] = {}
+        self.model: type[Model] | None = None
+        self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
-        self.managers: List[Manager] = getattr(meta, "managers", [])
+        self.managers: list[Manager] = getattr(meta, "managers", [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
-        self.related_names: Set[str] = getattr(meta, "related_names", set())
-        self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
-        self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
-        self.signals: Optional[Broadcaster] = getattr(meta, "signals", {})  # type: ignore
+        self.related_names: set[str] = getattr(meta, "related_names", set())
+        self.related_fields: dict[str, Any] = getattr(meta, "related_fields", {})
+        self.related_names_mapping: dict[str, Any] = getattr(meta, "related_names_mapping", {})
+        self.signals: Broadcaster | None = getattr(meta, "signals", {})  # type: ignore
 
 
-def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
+def _check_model_inherited_registry(bases: tuple[type, ...]) -> type[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
 
     If not found, then a ImproperlyConfigured exception is raised.
     """
-    found_registry: Optional[Type[Registry]] = None
+    found_registry: type[Registry] | None = None
 
     for base in bases:
         meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
@@ -110,9 +104,9 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
 
 
 def _check_manager_for_bases(
-    base: Tuple[Type, ...],
+    base: tuple[type, ...],
     attrs: Any,
-    meta: Optional[MetaInfo] = None,
+    meta: MetaInfo | None = None,
 ) -> None:
     """
     When an abstract class is declared, we must treat the manager's value coming from the top.
@@ -120,16 +114,16 @@ def _check_manager_for_bases(
     if not meta:
         for key, value in inspect.getmembers(base):
             if isinstance(value, Manager) and key not in attrs:
-                attrs[key] = value.__class__()
+                attrs[key] = copy.copy(value)
     else:
         if not meta.abstract:
             for key, value in inspect.getmembers(base):
                 if isinstance(value, Manager) and key not in attrs:
-                    attrs[key] = value.__class__()
+                    attrs[key] = copy.copy(value)
 
 
 def _set_related_name_for_foreign_keys(
-    foreign_keys: Set[Union[saffier_fields.OneToOneField, saffier_fields.ForeignKey]],
+    foreign_keys: set[saffier_fields.OneToOneField | saffier_fields.ForeignKey],
     model_class: Union["Model", "ReflectModel"],
 ) -> str:
     """
@@ -176,7 +170,7 @@ def _set_many_to_many_relation(
     setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
 
 
-def _register_model_signals(model_class: Type["Model"]) -> None:
+def _register_model_signals(model_class: type["Model"]) -> None:
     """
     Registers the signals in the model's Broadcaster and sets the defaults.
     """
@@ -193,17 +187,17 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
 class BaseModelMeta(type):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
-        fields: Dict[str, Field] = {}
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: Any) -> Any:
+        fields: dict[str, Field] = {}
         one_to_one_fields: Any = set()
         foreign_key_fields: Any = {}
         many_to_many_fields: Any = set()
-        meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
+        meta_class: Model.Meta = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
 
         # Searching for fields "Field" in the class hierarchy.
-        def __search_for_fields(base: Type, attrs: Any) -> None:
+        def __search_for_fields(base: type, attrs: Any) -> None:
             """
             Search for class attributes of the type fields.Field in the given class.
 
@@ -216,7 +210,7 @@ class BaseModelMeta(type):
             for parent in base.__mro__[1:]:
                 __search_for_fields(parent, attrs)
 
-            meta: Union[MetaInfo, None] = getattr(base, "meta", None)
+            meta: MetaInfo | None = getattr(base, "meta", None)
             if not meta:
                 # Mixins and other classes
                 for key, value in inspect.getmembers(base):
@@ -245,14 +239,13 @@ class BaseModelMeta(type):
         if name != "Model":
             is_pk_present = False
             for key, value in attrs.items():
-                if isinstance(value, Field):
-                    if value.primary_key:
-                        if is_pk_present:
-                            raise ImproperlyConfigured(
-                                f"Cannot create model {name} with multiple primary keys."
-                            )
-                        is_pk_present = True
-                        pk_attribute = key
+                if isinstance(value, Field) and value.primary_key:
+                    if is_pk_present:
+                        raise ImproperlyConfigured(
+                            f"Cannot create model {name} with multiple primary keys."
+                        )
+                    is_pk_present = True
+                    pk_attribute = key
 
             if not is_pk_present and not getattr(meta_class, "abstract", None):
                 if "id" not in attrs:
@@ -304,12 +297,16 @@ class BaseModelMeta(type):
             return model_class(cls, name, bases, attrs)
 
         meta.parents = parents
-        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
+        new_class = cast("type[Model]", model_class(cls, name, bases, attrs))
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if meta.abstract:
-            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
-            if len(managers) > 1:
+            base_managers = [
+                key
+                for key, value in attrs.items()
+                if isinstance(value, Manager) and not isinstance(value, RedirectManager)
+            ]
+            if len(base_managers) > 1:
                 raise ImproperlyConfigured(
                     "Multiple managers are not allowed in abstract classes."
                 )
@@ -413,7 +410,7 @@ class BaseModelMeta(type):
 
         return new_class
 
-    def get_db_shema(cls) -> Union[str, None]:
+    def get_db_shema(cls) -> str | None:
         """
         Returns a db_schema from registry if any is passed.
         """
@@ -478,7 +475,7 @@ class BaseModelMeta(type):
 
 
 class BaseModelReflectMeta(BaseModelMeta):
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: Any) -> Any:
         new_model = super().__new__(cls, name, bases, attrs)
 
         registry = new_model.meta.registry

@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from logging.config import fileConfig
-from typing import Any, Union
+from typing import Any
 
 from alembic import context
 from databasez import DatabaseURL
@@ -51,7 +51,7 @@ def get_app() -> Any:
     return app_env.app
 
 
-def get_engine_url() -> Union[str, None]:
+def get_engine_url() -> str | None:
     return os.environ.get("SAFFIER_DATABASE_URL")
 
 

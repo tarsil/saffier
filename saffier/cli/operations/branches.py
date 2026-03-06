@@ -2,20 +2,14 @@
 Client to interact with Saffier models and migrations.
 """
 
-import click
+from sayer import command
 
 from saffier.cli.base import branches as _branches
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, VerboseOption
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
-@click.command()
-def branches(env: MigrationEnv, directory: str, verbose: bool) -> None:
+@command
+def branches(verbose: VerboseOption, directory: DirectoryOption) -> None:
     """Show current branch points"""
-    _branches(env.app, directory, verbose)
+    _branches(get_migration_app(), directory, verbose)

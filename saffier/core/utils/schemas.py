@@ -1,4 +1,5 @@
-from typing import Any, Dict, Mapping, Type
+from collections.abc import Mapping
+from typing import Any
 
 from saffier.core.db.fields._internal import SaffierField
 from saffier.core.utils.base import Message
@@ -8,7 +9,7 @@ Undefined = object()
 
 
 class Schema(SaffierField):
-    error_messages: Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "type": "Must be an object.",
         "null": "May not be null.",
         "invalid_key": "All object keys must be strings.",
@@ -16,7 +17,7 @@ class Schema(SaffierField):
     }
 
     def __init__(
-        self, default: Any = Undefined, *, fields: Dict[str, Type[SaffierField]], **kwargs: Any
+        self, default: Any = Undefined, *, fields: dict[str, type[SaffierField]], **kwargs: Any
     ) -> None:
         super().__init__(default=default, **kwargs)
         self.fields = fields

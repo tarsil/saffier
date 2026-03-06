@@ -1,4 +1,3 @@
-from typing import Optional
 
 import pytest
 from pydantic import __version__
@@ -55,8 +54,8 @@ class AppModule(EdgyTenantBaseModel):
 
 
 class Permission(EdgyTenantBaseModel):
-    module: Optional[AppModule] = saffier.ForeignKey(AppModule)
-    designation: Optional[Designation] = saffier.ForeignKey("Designation")
+    module: AppModule | None = saffier.ForeignKey(AppModule)
+    designation: Designation | None = saffier.ForeignKey("Designation")
     can_read: bool = saffier.BooleanField(default=False)
     can_write: bool = saffier.BooleanField(default=False)
     can_update: bool = saffier.BooleanField(default=False)

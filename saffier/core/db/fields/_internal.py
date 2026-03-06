@@ -27,7 +27,7 @@ class SaffierField(ArbitraryHashableBaseModel):
     The base of all fields used by Saffier
     """
 
-    error_messages: typing.Dict[str, str] = {}
+    error_messages: dict[str, str] = {}
 
     def __init__(
         self,
@@ -67,7 +67,7 @@ class SaffierField(ArbitraryHashableBaseModel):
         return hasattr(self, "default")
 
     def validation_error(
-        self, code: str, value: typing.Optional[typing.Any] = None
+        self, code: str, value: typing.Any | None = None
     ) -> ValidationError:
         text = self.get_error_message(code)
         return ValidationError(text=text, code=code)
@@ -87,7 +87,7 @@ class String(SaffierField):
     SaffierField representation of a String.
     """
 
-    error_messages: typing.Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "type": "Must be a string.",
         "null": "May not be null.",
         "blank": "Must not be blank.",
@@ -101,10 +101,10 @@ class String(SaffierField):
         *,
         blank: bool = False,
         trim_whitespace: bool = False,
-        max_length: typing.Optional[int] = None,
-        min_length: typing.Optional[int] = None,
-        pattern: typing.Optional[typing.Union[str, typing.Pattern]] = None,
-        format: typing.Optional[str] = None,
+        max_length: int | None = None,
+        min_length: int | None = None,
+        pattern: str | typing.Pattern | None = None,
+        format: str | None = None,
         coerse_types: bool = True,
         **kwargs: typing.Any,
     ):
@@ -175,7 +175,7 @@ class String(SaffierField):
 
 class Number(SaffierField):
     field_type: typing.Any = None
-    error_messages: typing.Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "type": "Must be a number.",
         "null": "May not be null.",
         "integer": "Must be an integer.",
@@ -190,12 +190,12 @@ class Number(SaffierField):
     def __init__(
         self,
         *,
-        minimum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
-        maximum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
-        exclusive_minimum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
-        exclusive_maximum: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
-        precision: typing.Optional[str] = None,
-        multiple_of: typing.Optional[typing.Union[int, float, decimal.Decimal]] = None,
+        minimum: int | float | decimal.Decimal | None = None,
+        maximum: int | float | decimal.Decimal | None = None,
+        exclusive_minimum: int | float | decimal.Decimal | None = None,
+        exclusive_maximum: int | float | decimal.Decimal | None = None,
+        precision: str | None = None,
+        multiple_of: int | float | decimal.Decimal | None = None,
         coerce_types: bool = True,
         **kwargs: typing.Any,
     ) -> None:
@@ -219,9 +219,7 @@ class Number(SaffierField):
         self.coerce_types = coerce_types
 
     def check(self, value: typing.Any) -> typing.Any:
-        if value is None and self.null:
-            return None
-        elif value == "" and self.null and self.coerce_types:
+        if value is None and self.null or value == "" and self.null and self.coerce_types:
             return None
         elif value is None:
             raise self.validation_error("null")
@@ -285,11 +283,11 @@ class Decimal(Number):
 
 
 class Boolean(SaffierField):
-    error_messages: typing.Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "type": "Must be a boolean.",
         "null": "May not be null.",
     }
-    coerse_values: typing.Mapping[typing.Union[str, int], bool] = {
+    coerse_values: typing.Mapping[str | int, bool] = {
         "true": True,
         "false": False,
         "on": True,
@@ -300,7 +298,7 @@ class Boolean(SaffierField):
         1: True,
         0: False,
     }
-    coerce_null_values: typing.Set[str] = {"", "null", "none"}
+    coerce_null_values: set[str] = {"", "null", "none"}
 
     def __init__(self, *, coerce_types: bool = True, **kwargs: typing.Any) -> None:
         super().__init__(**kwargs)
@@ -327,7 +325,7 @@ class Boolean(SaffierField):
 
 
 class Choice(SaffierField):
-    error_messages: typing.Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "null": "May not be null.",
         "required": "This field is required.",
         "choice": "Not a valid choice.",
@@ -336,9 +334,7 @@ class Choice(SaffierField):
     def __init__(
         self,
         *,
-        choices: typing.Optional[
-            typing.Sequence[typing.Union[str, typing.Tuple[str, str]]]
-        ] = None,
+        choices: typing.Sequence[str | tuple[str, str]] | None = None,
         coerce_types: bool = True,
         **kwargs: typing.Any,
     ) -> None:
@@ -385,12 +381,12 @@ class DateTime(String):
 
 
 class Union(SaffierField):
-    error_messages: typing.Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "null": "May not be null.",
         "union": "Did not match any valid type.",
     }
 
-    def __init__(self, any_of: typing.List[SaffierField], **kwargs: typing.Any):
+    def __init__(self, any_of: list[SaffierField], **kwargs: typing.Any):
         super().__init__(**kwargs)
 
         self.any_of = any_of
@@ -432,7 +428,7 @@ class Const(SaffierField):
     Only ever matches the given given value.
     """
 
-    error_messages: typing.Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "only_null": "Must be null.",
         "const": "Must be the value '{const}'.",
     }

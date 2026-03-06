@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import ClassVar, List, Optional, Sequence
+from typing import ClassVar
 
 
 @dataclass
@@ -10,8 +11,8 @@ class Index:
 
     suffix: str = "idx"
     __max_name_length__: ClassVar[int] = 63
-    name: Optional[str] = None
-    fields: Optional[Sequence[str]] = None
+    name: str | None = None
+    fields: Sequence[str] | None = None
 
     def __post_init__(self) -> None:
         if self.name is not None and len(self.name) > self.__max_name_length__:
@@ -35,8 +36,8 @@ class UniqueConstraint:
     Class responsible for handling and declaring the database unique_together.
     """
 
-    fields: List[str]
-    name: Optional[str] = None
+    fields: list[str]
+    name: str | None = None
     __max_name_length__: ClassVar[int] = 63
 
     def __post_init__(self) -> None:

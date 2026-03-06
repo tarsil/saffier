@@ -38,7 +38,7 @@ IPV6_REGEX = re.compile(r"(?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4}")
 
 
 class BaseFormat:
-    error_messages: typing.Dict[str, str] = {}
+    error_messages: dict[str, str] = {}
 
     def validation_error(self, code: str) -> ValidationError:
         text = self.error_messages[code].format(**self.__dict__)
@@ -47,7 +47,7 @@ class BaseFormat:
     def is_native_type(self, value: typing.Any) -> bool:
         raise NotImplementedError()  # pragma: no cover
 
-    def check(self, value: typing.Any) -> typing.Union[typing.Any, ValidationError]:
+    def check(self, value: typing.Any) -> typing.Any | ValidationError:
         raise NotImplementedError()  # pragma: no cover
 
 
@@ -174,7 +174,7 @@ class IPAddressFormat(BaseFormat):
 
     def check(
         self, value: typing.Any
-    ) -> typing.Union[ipaddress.IPv4Address, ipaddress.IPv6Address]:
+    ) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
         match_ipv4 = IPV4_REGEX.match(value)
         match_ipv6 = IPV6_REGEX.match(value)
         if not match_ipv4 and not match_ipv6:

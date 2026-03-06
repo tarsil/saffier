@@ -1,5 +1,5 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Type, Union
+from typing import TYPE_CHECKING, Any
 
 from saffier.exceptions import RelationshipIncompatible, RelationshipNotFound
 from saffier.protocols.many_relationship import ManyRelationProtocol
@@ -16,10 +16,10 @@ class Relation(ManyRelationProtocol):
 
     def __init__(
         self,
-        instance: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        through: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        to: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        instance: type["Model"] | type["ReflectModel"] | None = None,
+        through: type["Model"] | type["ReflectModel"] | None = None,
+        to: type["Model"] | type["ReflectModel"] | None = None,
+        owner: type["Model"] | type["ReflectModel"] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -63,7 +63,7 @@ class Relation(ManyRelationProtocol):
 
         return wrapped
 
-    async def add(self, child: Type["Model"]) -> None:
+    async def add(self, child: type["Model"]) -> None:
         """
         Adds a child to the model as a list
 
@@ -80,7 +80,7 @@ class Relation(ManyRelationProtocol):
         if not exists:
             await self.through.query.create(**self._relation_params)  # type: ignore
 
-    async def remove(self, child: Type["Model"]) -> None:
+    async def remove(self, child: type["Model"]) -> None:
         """Removes a child from the list of many to many.
 
         . Validates if there is a relationship between the entities.

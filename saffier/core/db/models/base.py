@@ -1,6 +1,7 @@
 import copy
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Set, Type, Union, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -9,7 +10,7 @@ from typing_extensions import Self
 import saffier
 from saffier.conf import settings
 from saffier.core.db.datastructures import Index, UniqueConstraint
-from saffier.core.db.models.managers import Manager
+from saffier.core.db.models.managers import Manager, RedirectManager
 from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from saffier.core.db.models.model_proxy import ProxyModel
 from saffier.core.utils.models import DateParser, generify_model_fields
@@ -30,10 +31,11 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     is_proxy_model: ClassVar[bool] = False
     query: ClassVar[Manager] = Manager()
+    query_related: ClassVar[Manager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     __db_model__: ClassVar[bool] = False
-    __raw_query__: ClassVar[Optional[str]] = None
-    __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
+    __raw_query__: ClassVar[str | None] = None
+    __proxy_model__: ClassVar[type["Model"] | None] = None
 
     def __init__(self, **kwargs: Any) -> None:
         self.setup_model_fields_from_kwargs(kwargs)
@@ -105,7 +107,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return self.__class__.__name__.lower()
 
     @classmethod
-    def generate_proxy_model(cls) -> Type["Model"]:
+    def generate_proxy_model(cls) -> type["Model"]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -126,7 +128,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return proxy_model.model
 
     @classmethod
-    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
+    def build(cls, schema: str | None = None) -> sqlalchemy.Table:
         """
         Performs the operation of building the core SQLAlchemy Table object.
         Builds the constrainst, indexes, columns and metadata based on the
@@ -160,7 +162,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         )
 
     @classmethod
-    def _get_unique_constraints(cls, columns: Sequence) -> Optional[sqlalchemy.UniqueConstraint]:
+    def _get_unique_constraints(cls, columns: Sequence) -> sqlalchemy.UniqueConstraint | None:
         """
         Returns the unique constraints for the model.
 
@@ -173,19 +175,19 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return sqlalchemy.UniqueConstraint(*columns)
 
     @classmethod
-    def _get_indexes(cls, index: Index) -> Optional[sqlalchemy.Index]:
+    def _get_indexes(cls, index: Index) -> sqlalchemy.Index | None:
         """
         Creates the index based on the Index fields
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    def update_from_dict(self, dict_values: Dict[str, Any]) -> Self:
+    def update_from_dict(self, dict_values: dict[str, Any]) -> Self:
         """Updates the current model object with the new fields"""
         for key, value in dict_values.items():
             setattr(self, key, value)
         return self
 
-    def extract_db_fields(self) -> Dict[str, Any]:
+    def extract_db_fields(self) -> dict[str, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
@@ -205,7 +207,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                 value = self.fields[key].expand_relationship(value)
         super().__setattr__(key, value)
 
-    def __get_instance_values(self, instance: Any) -> Set[Any]:
+    def __get_instance_values(self, instance: Any) -> set[Any]:
         return {
             v
             for k, v in instance.__dict__.items()
@@ -242,7 +244,7 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
         setattr(self, self.pkname, value)
 
     @classmethod
-    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
+    def build(cls, schema: str | None = None) -> sqlalchemy.Table:
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """

@@ -17,7 +17,7 @@ class SaffierLazySettings(LazyObject):
     Saffier uses the settings module pointed to by LILYA_SETTINGS_MODULE.
     """
 
-    def _setup(self, name: Optional[str] = None) -> None:
+    def _setup(self, name: str | None = None) -> None:
         """
         Load the settings module pointed to by the environment variable. This
         is used the first time settings are needed, if the user hasn't
@@ -27,7 +27,7 @@ class SaffierLazySettings(LazyObject):
             ENVIRONMENT_VARIABLE, "saffier.conf.global_settings.SaffierSettings"
         )
 
-        settings: Type["SaffierSettings"] = import_string(settings_module)
+        settings: type[SaffierSettings] = import_string(settings_module)
 
         for setting, _ in settings().dict().items():
             assert setting.islower(), "%s should be in lowercase." % setting
@@ -38,9 +38,7 @@ class SaffierLazySettings(LazyObject):
         # Hardcode the class name as otherwise it yields 'SaffierSettings'.
         if self._wrapped is empty:
             return "<SaffierLazySettings [Unevaluated]>"
-        return '<SaffierLazySettings "{settings_module}">'.format(
-            settings_module=self._wrapped.__class__.__name__
-        )
+        return f'<SaffierLazySettings "{self._wrapped.__class__.__name__}">'
 
     @property
     def configured(self) -> Any:
@@ -48,4 +46,4 @@ class SaffierLazySettings(LazyObject):
         return self._wrapped is not empty
 
 
-settings: Type["SaffierSettings"] = SaffierLazySettings()  # type: ignore
+settings: type["SaffierSettings"] = SaffierLazySettings()  # type: ignore

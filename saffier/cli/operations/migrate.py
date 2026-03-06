@@ -1,33 +1,26 @@
-from typing import Any
-
-import click
+from sayer import command
 
 from saffier.cli.base import upgrade as _upgrade
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import (
+    DirectoryOption,
+    ExtraArgOption,
+    RevisionHeadArgument,
+    SQLOption,
+    TagOption,
+)
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option(
-    "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
-)
-@click.option(
-    "--tag", default=None, help=('Arbitrary "tag" name - can be used by custom env.py ' "scripts")
-)
-@click.option(
-    "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
-)
-@click.command()
-@click.argument("revision", default="head")
+@command(context_settings={"ignore_unknown_options": True})
 def migrate(
-    env: MigrationEnv, directory: str, sql: bool, tag: str, arg: Any, revision: str
+    sql: SQLOption,
+    tag: TagOption,
+    arg: ExtraArgOption,
+    revision: RevisionHeadArgument,
+    directory: DirectoryOption,
 ) -> None:
     """
     Upgrades to the latest version or to a specific version
     provided by the --tag.
     """
-    _upgrade(env.app, directory, revision, sql, tag, arg)
+    _upgrade(get_migration_app(), directory, revision, sql, tag, arg)

@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Awaitable
 from concurrent import futures
 from concurrent.futures import Future
-from typing import Any, Awaitable
+from typing import Any
 
 import nest_asyncio
 

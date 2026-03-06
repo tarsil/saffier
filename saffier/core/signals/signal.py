@@ -1,5 +1,6 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple, Type, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from saffier.exceptions import SignalError
 from saffier.utils.inspect import func_accepts_kwargs
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
     from saffier import Model
 
 
-def make_id(target: Any) -> Union[int, Tuple[int, int]]:
+def make_id(target: Any) -> int | tuple[int, int]:
     """
     Creates an id for a function.
     """
@@ -26,7 +27,7 @@ class Signal:
         """
         Creates a new signal.
         """
-        self.receivers: Dict[Union[int, Tuple[int, int]], Callable] = {}
+        self.receivers: dict[int | tuple[int, int], Callable] = {}
 
     def connect(self, receiver: Callable) -> None:
         """
@@ -47,10 +48,10 @@ class Signal:
         Removes the receiver from the signal.
         """
         key = make_id(receiver)
-        func: Union[Callable, None] = self.receivers.pop(key, None)
+        func: Callable | None = self.receivers.pop(key, None)
         return True if func is not None else False
 
-    async def send(self, sender: Type["Model"], **kwargs: Any) -> None:
+    async def send(self, sender: type["Model"], **kwargs: Any) -> None:
         """
         Sends the notification to all the receivers.
         """

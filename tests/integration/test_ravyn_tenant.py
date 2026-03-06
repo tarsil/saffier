@@ -1,12 +1,13 @@
-from typing import Any, AsyncGenerator, Coroutine
+from collections.abc import AsyncGenerator, Coroutine
+from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from ravyn import Ravyn, Gateway, JSONResponse, Request, get
-from ravyn.core.protocols.middleware import MiddlewareProtocol
 from httpx import AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
+from ravyn import Gateway, JSONResponse, Ravyn, Request, get
+from ravyn.core.protocols.middleware import MiddlewareProtocol
 
 from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
 from saffier.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin

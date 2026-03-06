@@ -1,36 +1,42 @@
 import select
 import sys
-from typing import Any, Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
+from typing import Annotated, Any
 
 import click
 import nest_asyncio
+from sayer import Option, command
 
 from saffier import Registry
-from saffier.cli.env import MigrationEnv
 from saffier.cli.operations.shell.enums import ShellOption
+from saffier.cli.state import get_migration_app
 from saffier.core.events import AyncLifespanContextManager
 from saffier.core.sync import execsync
 
 
-@click.option(
-    "--kernel",
-    default="ipython",
-    type=click.Choice(["ipython", "ptpython"]),
-    help="Which shell should start.",
-    show_default=True,
-)
-@click.command()
-def shell(env: MigrationEnv, kernel: bool) -> None:
+@command
+def shell(
+    kernel: Annotated[
+        str,
+        Option(
+            "ipython",
+            type=click.Choice(["ipython", "ptpython"]),
+            help="Which shell should start.",
+            show_default=True,
+        ),
+    ],
+) -> None:
     """
     Starts an interactive ipython shell with all the models
     and important python libraries.
 
     This can be used with a Migration class or with SaffierExtra object lookup.
     """
+    app = get_migration_app()
     try:
-        registry = env.app._saffier_db["migrate"].registry  # type: ignore
+        registry = app._saffier_db["migrate"].registry
     except AttributeError:
-        registry = env.app._saffier_extra["extra"].registry  # type: ignore
+        registry = app._saffier_extra["extra"].registry
 
     if (
         sys.platform != "win32"
@@ -40,13 +46,13 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
         exec(sys.stdin.read(), globals())
         return
 
-    on_startup = getattr(env.app, "on_startup", [])
-    on_shutdown = getattr(env.app, "on_shutdown", [])
-    lifespan = getattr(env.app, "lifespan", None)
+    on_startup = getattr(app, "on_startup", [])
+    on_shutdown = getattr(app, "on_shutdown", [])
+    lifespan = getattr(app, "lifespan", None)
     lifespan = handle_lifespan_events(
         on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
     )
-    execsync(run_shell)(env.app, lifespan, registry, kernel)
+    execsync(run_shell)(app, lifespan, registry, kernel)
     return None
 
 
@@ -69,9 +75,9 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
 
 
 def handle_lifespan_events(
-    on_startup: Optional[Sequence[Callable]] = None,
-    on_shutdown: Optional[Sequence[Callable]] = None,
-    lifespan: Optional[Any] = None,
+    on_startup: Sequence[Callable] | None = None,
+    on_shutdown: Sequence[Callable] | None = None,
+    lifespan: Any | None = None,
 ) -> Any:
     """Handles with the lifespan events in the new Starlette format of lifespan.
     This adds a mask that keeps the old `on_startup` and `on_shutdown` events variable

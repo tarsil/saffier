@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Type, cast
+from typing import TYPE_CHECKING, cast
 
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -17,7 +17,7 @@ class Schema:
     All the operations regarding a schema are placed in one object
     """
 
-    def __init__(self, registry: Type["Registry"]) -> None:
+    def __init__(self, registry: type["Registry"]) -> None:
         self.registry = registry
 
     def get_default_schema(self) -> str:

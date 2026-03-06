@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from functools import cached_property
-from typing import Any, Dict, Mapping, Type
+from typing import Any
 
 import sqlalchemy
 from sqlalchemy import Engine
@@ -18,10 +19,10 @@ class Registry:
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
         self.database: Database = database
-        self.models: Dict[str, Any] = {}
-        self.reflected: Dict[str, Any] = {}
-        self.db_schema = kwargs.get("schema", None)
-        self.extra: Mapping[str, Type["Database"]] = kwargs.pop("extra", {})
+        self.models: dict[str, Any] = {}
+        self.reflected: dict[str, Any] = {}
+        self.db_schema = kwargs.get("schema")
+        self.extra: Mapping[str, type[Database]] = kwargs.pop("extra", {})
 
         self.schema = Schema(registry=self)
 

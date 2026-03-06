@@ -3,8 +3,9 @@ import inspect
 import os
 import typing
 import warnings
+from collections.abc import Callable
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -63,7 +64,7 @@ class Migrate(BaseExtra):
         self,
         app: typing.Any,
         registry: "Registry",
-        model_apps: Union[Dict[str, str], Tuple[str], List[str], None] = None,
+        model_apps: dict[str, str] | tuple[str] | list[str] | None = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
@@ -71,7 +72,7 @@ class Migrate(BaseExtra):
         super().__init__(**kwargs)
 
         self.app = app
-        self.configure_callbacks: typing.List[Callable] = []
+        self.configure_callbacks: list[Callable] = []
         self.registry = registry
         self.model_apps = model_apps or {}
 
@@ -80,7 +81,7 @@ class Migrate(BaseExtra):
         ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
 
         if isinstance(self.model_apps, dict):
-            self.model_apps = cast(Dict[str, str], self.model_apps.values())
+            self.model_apps = cast(dict[str, str], self.model_apps.values())
 
         models = self.check_db_models(self.model_apps)
 
@@ -104,15 +105,15 @@ class Migrate(BaseExtra):
         self.set_saffier_extension(app)
 
     def check_db_models(
-        self, model_apps: Union[Dict[str, str], Tuple[str], List[str]]
-    ) -> Dict[str, Any]:
+        self, model_apps: dict[str, str] | tuple[str] | list[str]
+    ) -> dict[str, Any]:
         """
         Goes through all the model applications declared in the migrate and
         adds them into the registry.
         """
         from saffier.core.db.models import Model, ReflectModel
 
-        models: Dict[str, Any] = {}
+        models: dict[str, Any] = {}
 
         for location in model_apps:
             module = import_module(location)
@@ -145,9 +146,9 @@ class Migrate(BaseExtra):
 
     def get_config(
         self,
-        directory: Optional[str] = None,
-        arg: Optional[typing.Any] = None,
-        options: Optional[typing.Any] = None,
+        directory: str | None = None,
+        arg: typing.Any | None = None,
+        options: typing.Any | None = None,
     ) -> Any:
         if directory is None:
             directory = self.directory
@@ -164,7 +165,7 @@ class Migrate(BaseExtra):
         if not hasattr(config.cmd_opts, "x"):
             if arg is not None:
                 config.cmd_opts.x = []
-                if isinstance(arg, list) or isinstance(arg, tuple):
+                if isinstance(arg, list | tuple):
                     for x in arg:
                         config.cmd_opts.x.append(x)
                 else:
@@ -188,9 +189,9 @@ def list_templates() -> None:
 
 @catch_errors
 def init(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
-    template: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
+    template: str | None = None,
     package: bool = False,
 ) -> None:
     """Creates a new migration folder"""
@@ -214,16 +215,16 @@ def init(
 
 @catch_errors
 def revision(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
-    message: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
+    message: str | None = None,
     autogenerate: bool = False,
     sql: bool = False,
     head: str = "head",
     splice: bool = False,
-    branch_label: Optional[str] = None,
-    version_path: Optional[str] = None,
-    revision_id: Optional[typing.Any] = None,
+    branch_label: str | None = None,
+    version_path: str | None = None,
+    revision_id: typing.Any | None = None,
 ) -> None:
     """
     Creates a new revision file
@@ -246,16 +247,16 @@ def revision(
 
 @catch_errors
 def migrate(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
-    message: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
+    message: str | None = None,
     sql: bool = False,
     head: str = "head",
     splice: bool = False,
-    branch_label: Optional[str] = None,
-    version_path: Optional[str] = None,
-    revision_id: Optional[typing.Any] = None,
-    arg: Optional[typing.Any] = None,
+    branch_label: str | None = None,
+    version_path: str | None = None,
+    revision_id: typing.Any | None = None,
+    arg: typing.Any | None = None,
 ) -> None:
     """Alias for 'revision --autogenerate'"""
     config = app._saffier_db["migrate"].migrate.get_config(  # type: ignore
@@ -277,7 +278,7 @@ def migrate(
 
 @catch_errors
 def edit(
-    app: Optional[typing.Any], directory: Optional[str] = None, revision: str = "current"
+    app: typing.Any | None, directory: str | None = None, revision: str = "current"
 ) -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
@@ -289,12 +290,12 @@ def edit(
 
 @catch_errors
 def merge(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
-    revisions: str = "",
-    message: Optional[str] = None,
-    branch_label: Optional[str] = None,
-    revision_id: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
+    revisions: str | list[str] | tuple[str, ...] = "",
+    message: str | None = None,
+    branch_label: str | None = None,
+    revision_id: str | None = None,
 ) -> None:
     """Merge two revisions together.  Creates a new migration file"""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
@@ -305,12 +306,12 @@ def merge(
 
 @catch_errors
 def upgrade(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
     revision: str = "head",
     sql: bool = False,
-    tag: Optional[str] = None,
-    arg: Optional[typing.Any] = None,
+    tag: str | None = None,
+    arg: typing.Any | None = None,
 ) -> None:
     """Upgrade to a later version"""
     config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
@@ -319,12 +320,12 @@ def upgrade(
 
 @catch_errors
 def downgrade(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
     revision: str = "-1",
     sql: bool = False,
-    tag: Optional[str] = None,
-    arg: Optional[typing.Any] = None,
+    tag: str | None = None,
+    arg: typing.Any | None = None,
 ) -> None:
     """Revert to a previous version"""
     config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
@@ -335,8 +336,8 @@ def downgrade(
 
 @catch_errors
 def show(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
     revision: str = "head",
 ) -> None:
     """Show the revision denoted by the given symbol."""
@@ -346,9 +347,9 @@ def show(
 
 @catch_errors
 def history(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
-    rev_range: Optional[typing.Any] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
+    rev_range: typing.Any | None = None,
     verbose: bool = False,
     indicate_current: bool = False,
 ) -> None:
@@ -359,8 +360,8 @@ def history(
 
 @catch_errors
 def heads(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
     verbose: bool = False,
     resolve_dependencies: bool = False,
 ) -> None:
@@ -371,7 +372,7 @@ def heads(
 
 @catch_errors
 def branches(
-    app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
+    app: typing.Any | None, directory: str | None = None, verbose: bool = False
 ) -> None:
     """Show current branch points"""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
@@ -380,7 +381,7 @@ def branches(
 
 @catch_errors
 def current(
-    app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
+    app: typing.Any | None, directory: str | None = None, verbose: bool = False
 ) -> None:
     """Display the current revision for each database."""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
@@ -389,11 +390,11 @@ def current(
 
 @catch_errors
 def stamp(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
     revision: str = "head",
     sql: bool = False,
-    tag: Optional[typing.Any] = None,
+    tag: typing.Any | None = None,
 ) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
@@ -403,8 +404,8 @@ def stamp(
 
 @catch_errors
 def check(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
+    app: typing.Any | None,
+    directory: str | None = None,
 ) -> None:
     """Check if there are any new operations to migrate"""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore

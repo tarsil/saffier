@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Type
+from typing import TYPE_CHECKING
 
 import sqlalchemy
 from loguru import logger
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
 
 
-def table_schema(model_class: Type["TenantModel"], schema: str) -> sqlalchemy.Table:
+def table_schema(model_class: type["TenantModel"], schema: str) -> sqlalchemy.Table:
     """
     Making sure the tables on inheritance state, creates the new
     one properly.
@@ -23,7 +23,7 @@ def table_schema(model_class: Type["TenantModel"], schema: str) -> sqlalchemy.Ta
 
 
 async def create_tables(
-    registry: "TenantRegistry", tenant_models: Dict[str, Type["TenantModel"]], schema: str
+    registry: "TenantRegistry", tenant_models: dict[str, type["TenantModel"]], schema: str
 ) -> None:
     """
     Creates the table models for a specific schema just generated.

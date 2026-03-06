@@ -1,5 +1,6 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from sqlalchemy.engine.result import Row
 
@@ -15,14 +16,14 @@ class ModelRow(SaffierBaseModel):
     def from_query_result(
         cls,
         row: Row,
-        select_related: Optional[Sequence[Any]] = None,
-        prefetch_related: Optional[Sequence["Prefetch"]] = None,
+        select_related: Sequence[Any] | None = None,
+        prefetch_related: Sequence["Prefetch"] | None = None,
         is_only_fields: bool = False,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
-        using_schema: Union[str, None] = None,
-    ) -> Optional[Type["Model"]]:
+        using_schema: str | None = None,
+    ) -> type["Model"] | None:
         """
         Class method to convert a SQLAlchemy Row result into a SaffierModel row type.
 
@@ -37,7 +38,7 @@ class ModelRow(SaffierBaseModel):
 
         :return: Model class.
         """
-        item: Dict[str, Any] = {}
+        item: dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
 
@@ -116,7 +117,7 @@ class ModelRow(SaffierBaseModel):
 
             # We need to generify the model fields to make sure we can populate the
             # model without mandatory fields
-            model = cast("Type[Model]", cls.proxy_model(**item))
+            model = cast("type[Model]", cls.proxy_model(**item))
 
             # Apply the schema to the model
             model = cls.__apply_schema(model, using_schema)
@@ -140,9 +141,9 @@ class ModelRow(SaffierBaseModel):
                         item[column.key] = row._mapping[column.key]
 
         model = (
-            cast("Type[Model]", cls(**item))
+            cast("type[Model]", cls(**item))
             if not exclude_secrets
-            else cast("Type[Model]", cls.proxy_model(**item))
+            else cast("type[Model]", cls.proxy_model(**item))
         )
 
         # Apply the schema to the model
@@ -158,7 +159,7 @@ class ModelRow(SaffierBaseModel):
         return model
 
     @classmethod
-    def __apply_schema(cls, model: Type["Model"], schema: Optional[str] = None) -> Type["Model"]:
+    def __apply_schema(cls, model: type["Model"], schema: str | None = None) -> type["Model"]:
         # Apply the schema to the model
         if schema is not None:
             model.table = model.build(schema)  # type: ignore
@@ -181,12 +182,12 @@ class ModelRow(SaffierBaseModel):
     def __handle_prefetch_related(
         cls,
         row: Row,
-        model: Type["Model"],
+        model: type["Model"],
         prefetch_related: Sequence["Prefetch"],
-        parent_cls: Optional[Type["Model"]] = None,
+        parent_cls: type["Model"] | None = None,
         original_prefetch: Optional["Prefetch"] = None,
         is_nested: bool = False,
-    ) -> Type["Model"]:
+    ) -> type["Model"]:
         """
         Handles any prefetch related scenario from the model.
         Loads in advance all the models needed for a specific record
@@ -260,10 +261,10 @@ class ModelRow(SaffierBaseModel):
         cls,
         row: Row,
         prefetch_related: "Prefetch",
-        parent_cls: Type["Model"],
+        parent_cls: type["Model"],
         original_prefetch: "Prefetch",
         queryset: "QuerySet",
-    ) -> List[Type["Model"]]:
+    ) -> list[type["Model"]]:
         """
         Processes the nested prefetch related names.
         """
@@ -296,10 +297,10 @@ class ModelRow(SaffierBaseModel):
     @classmethod
     async def __run_query(
         cls,
-        model: Optional[Type["Model"]] = None,
-        extra: Optional[Dict[str, Any]] = None,
+        model: type["Model"] | None = None,
+        extra: dict[str, Any] | None = None,
         queryset: Optional["QuerySet"] = None,
-    ) -> Union[List[Type["Model"]], Any]:
+    ) -> list[type["Model"]] | Any:
         """
         Runs a specific query against a given model with filters.
         """

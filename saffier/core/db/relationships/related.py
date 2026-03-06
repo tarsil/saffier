@@ -1,5 +1,5 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from saffier.core.db import fields
 
@@ -16,9 +16,9 @@ class RelatedField:
     def __init__(
         self,
         related_name: str,
-        related_to: Union[Type["Model"], Type["ReflectModel"]],
-        related_from: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        instance: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        related_to: type["Model"] | type["ReflectModel"],
+        related_from: type["Model"] | type["ReflectModel"] | None = None,
+        instance: type["Model"] | type["ReflectModel"] | None = None,
     ) -> None:
         self.related_name = related_name
         self.related_to = related_to
@@ -77,14 +77,11 @@ class RelatedField:
         If there is no field with the related_name declared, find the first field
         with the FK to the related_to.
         """
-        field_name: Optional[str] = None
+        field_name: str | None = None
 
         for field, value in self.related_from.fields.items():  # type: ignore
             if isinstance(value, (fields.ForeignKey, fields.OneToOneField)):
-                if value.related_name == self.related_name:
-                    field_name = field
-                    break
-                elif not value.related_name or value.related_name is None:
+                if value.related_name == self.related_name or not value.related_name or value.related_name is None:
                     field_name = field
                     break
         return cast("str", field_name)

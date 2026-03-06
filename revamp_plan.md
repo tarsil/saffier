@@ -63,6 +63,13 @@ Acceptance criteria:
 - CI matrix updated and green for baseline checks.
 - Zensical docs tooling scaffold added.
 
+Status update (2026-03-06):
+
+- Completed: Sayer CLI migration in `saffier/cli/cli.py` and `saffier/cli/operations/*`.
+- Completed: Ravyn test migration at `ravyn==0.3.9` and test integration modules renamed to Ravyn naming.
+- Completed: Added CLI runtime context helpers in `saffier/cli/state.py` and shared Sayer params in `saffier/cli/common_params.py`.
+- In progress: Full suite stabilization blocked by local PostgreSQL auth config in this environment.
+
 ## Phase 1 - No-Pydantic foundation (internal primitives first)
 
 Goal:

@@ -34,7 +34,7 @@ from .core.db.fields import (
     UUIDField,
 )
 from .core.db.models import Model, ReflectModel
-from .core.db.models.managers import Manager
+from .core.db.models.managers import BaseManager, Manager, RedirectManager
 from .core.db.querysets import QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
@@ -65,7 +65,9 @@ __all__ = [
     "JSONField",
     "ManyToMany",
     "ManyToManyField",
+    "BaseManager",
     "Manager",
+    "RedirectManager",
     "Migrate",
     "Model",
     "MultipleObjectsReturned",
