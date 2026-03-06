@@ -76,9 +76,9 @@ class Migrate(BaseExtra):
         self.registry = registry
         self.model_apps = model_apps or {}
 
-        assert isinstance(
-            self.model_apps, (dict, tuple, list)
-        ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+        assert isinstance(self.model_apps, (dict, tuple, list)), (
+            "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+        )
 
         if isinstance(self.model_apps, dict):
             self.model_apps = cast(dict[str, str], self.model_apps.values())
@@ -119,9 +119,11 @@ class Migrate(BaseExtra):
             module = import_module(location)
             members = inspect.getmembers(
                 module,
-                lambda attr: is_class_and_subclass(attr, Model)
-                and not attr.meta.abstract
-                and not is_class_and_subclass(attr, ReflectModel),
+                lambda attr: (
+                    is_class_and_subclass(attr, Model)
+                    and not attr.meta.abstract
+                    and not is_class_and_subclass(attr, ReflectModel)
+                ),
             )
             for name, model in members:
                 models[name] = model
@@ -277,9 +279,7 @@ def migrate(
 
 
 @catch_errors
-def edit(
-    app: typing.Any | None, directory: str | None = None, revision: str = "current"
-) -> None:
+def edit(app: typing.Any | None, directory: str | None = None, revision: str = "current") -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
         config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
@@ -371,18 +371,14 @@ def heads(
 
 
 @catch_errors
-def branches(
-    app: typing.Any | None, directory: str | None = None, verbose: bool = False
-) -> None:
+def branches(app: typing.Any | None, directory: str | None = None, verbose: bool = False) -> None:
     """Show current branch points"""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.branches(config, verbose=verbose)
 
 
 @catch_errors
-def current(
-    app: typing.Any | None, directory: str | None = None, verbose: bool = False
-) -> None:
+def current(app: typing.Any | None, directory: str | None = None, verbose: bool = False) -> None:
     """Display the current revision for each database."""
     config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.current(config, verbose=verbose)

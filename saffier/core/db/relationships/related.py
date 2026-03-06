@@ -80,10 +80,13 @@ class RelatedField:
         field_name: str | None = None
 
         for field, value in self.related_from.fields.items():  # type: ignore
-            if isinstance(value, (fields.ForeignKey, fields.OneToOneField)):
-                if value.related_name == self.related_name or not value.related_name or value.related_name is None:
-                    field_name = field
-                    break
+            if isinstance(value, (fields.ForeignKey, fields.OneToOneField)) and (
+                value.related_name == self.related_name
+                or not value.related_name
+                or value.related_name is None
+            ):
+                field_name = field
+                break
         return cast("str", field_name)
 
     def wrap_args(self, func: Any) -> Any:

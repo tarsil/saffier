@@ -35,7 +35,6 @@ theme:
     - content.code.select
     - navigation.indexes
     - navigation.path
-    - navigation.tabs
 
 repo_name: tarsil/saffier
 repo_url: https://github.com/tarsil/saffier
@@ -73,7 +72,6 @@ plugins:
 
 nav:
   - Home: "index.md"
-  - Saffier: "saffier.md"
   - Core:
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"

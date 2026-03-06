@@ -64,7 +64,9 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: "scripts/install"
       - name: "Run lint checks"
-        run: "scripts/check"
+        run: "hatch run python -m ruff check saffier tests docs_src --line-length 99"
+      - name: "Run type checks (Ty)"
+        run: "hatch run test:check_types"
       - name: "Run tests"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/saffier"

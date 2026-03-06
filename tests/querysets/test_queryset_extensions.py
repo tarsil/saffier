@@ -1,4 +1,5 @@
 import pytest
+import sqlalchemy
 
 import saffier
 from saffier.exceptions import QuerySetError
@@ -31,6 +32,34 @@ def test_reverse_flips_existing_ordering():
     queryset = User.query.order_by("name", "-id").reverse()
 
     assert queryset._order_by == ("-name", "id")
+
+
+def test_batch_size_sets_chunk_size():
+    queryset = User.query.batch_size(25)
+
+    assert queryset._batch_size == 25
+
+
+def test_local_or_adds_or_clause():
+    queryset = User.query.filter(name="Alice").local_or(name="Bob")
+
+    assert len(queryset.filter_clauses) == 1
+    assert len(queryset.or_clauses) == 1
+
+
+def test_extra_select_appends_expression():
+    queryset = User.query.extra_select(sqlalchemy.literal(1).label("marker"))
+    expression = queryset._build_select()
+
+    assert "marker" in str(expression)
+
+
+def test_reference_select_tracks_named_expression():
+    queryset = User.query.reference_select({"marker": sqlalchemy.literal(1)})
+    expression = queryset._build_select()
+
+    assert "marker" in queryset._reference_select
+    assert "marker" in str(expression)
 
 
 def test_select_for_update_builds_locking_clause():

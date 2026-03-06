@@ -1,5 +1,4 @@
 import pytest
-from pydantic import __version__
 
 import saffier
 from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
@@ -12,7 +11,6 @@ models = TenantRegistry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class Tenant(TenantMixin):

@@ -127,14 +127,12 @@ def is_async_connection(url: DatabaseURL) -> bool:
     if not url.driver:
         return False
 
-    if (
+    return (
         (url.driver in settings.postgres_drivers)
         or (url.driver in settings.mysql_drivers)
         or (url.driver in settings.sqlite_drivers)
         or url.driver in settings.mssql_drivers  # type: ignore
-    ):
-        return True
-    return False
+    )
 
 
 async def run_migrations_online() -> Any:

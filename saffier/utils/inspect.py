@@ -1,10 +1,10 @@
 import inspect
+import logging
 import sys
 from collections.abc import Callable
 from typing import Any, NoReturn
 
 import sqlalchemy
-from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql import schema, sqltypes
 
@@ -14,6 +14,7 @@ from saffier.core.sync import execsync
 from saffier.core.terminal import Print
 
 printer = Print()
+logger = logging.getLogger(__name__)
 
 SQL_GENERIC_TYPES = {
     sqltypes.BigInteger: saffier.BigIntegerField,
@@ -165,9 +166,12 @@ class InspectDB:
         if field_type == "CharField":
             field_params["max_length"] = real_field.length
 
-        if field_type in {"CharField", "TextField"} and hasattr(real_field, "collation"):
-            if real_field.collation is not None:
-                field_params["collation"] = real_field.collation
+        if (
+            field_type in {"CharField", "TextField"}
+            and hasattr(real_field, "collation")
+            and real_field.collation is not None
+        ):
+            field_params["collation"] = real_field.collation
 
         if field_type == "DecimalField":
             field_params["max_digits"] = real_field.precision
@@ -211,17 +215,17 @@ class InspectDB:
         meta += [
             "    class Meta:\n",
             "        registry = registry\n",
-            "        tablename = '%s'\n" % table["tablename"],
+            f"        tablename = '{table['tablename']}'\n",
         ]
 
         if unique_together:
             meta.append(
-                "        unique_together = %s\n" % unique_together,
+                f"        unique_together = {unique_together}\n",
             )
 
         if unique_indexes:
             meta.append(
-                "        indexes = %s\n" % unique_indexes,
+                f"        indexes = {unique_indexes}\n",
             )
         return meta
 
@@ -252,21 +256,15 @@ class InspectDB:
         yield (
             "# Feel free to rename the models, but don't rename tablename values or field names.\n"
         )
-        yield (
-            "# The generated models do not manage migrations. Those are handled by `%s.Model`.\n"
-            % DB_MODULE
-        )
-        yield (
-            "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n"
-            % DB_MODULE
-        )
-        yield "import %s \n" % DB_MODULE
-        yield "from %s import UniqueConstraint, Index \n" % DB_MODULE
+        yield f"# The generated models do not manage migrations. Those are handled by `{DB_MODULE}.Model`.\n"
+        yield f"# The automatic generated models will be subclassed as `{DB_MODULE}.ReflectModel`.\n\n\n"
+        yield f"import {DB_MODULE} \n"
+        yield f"from {DB_MODULE} import UniqueConstraint, Index \n"
 
         yield "\n"
         yield "\n"
         yield f"database = {DB_MODULE}.Database('{connection_string}')\n"
-        yield "registry = %s.Registry(database=database)\n" % DB_MODULE
+        yield f"registry = {DB_MODULE}.Registry(database=database)\n"
 
         # Start writing the classes
         for table in tables:
@@ -286,7 +284,7 @@ class InspectDB:
             for column in columns:
                 # ForeignKey related
                 foreign_keys = self.get_foreign_keys(column)
-                is_fk: bool = False if not foreign_keys else True
+                is_fk = bool(foreign_keys)
                 attr_name = column.name
 
                 field_type, field_params = self.get_field_type(column, is_fk)
@@ -329,7 +327,7 @@ class InspectDB:
                         field_description += ", "
                     field_description += ", ".join(f"{k}={v!r}" for k, v in field_params.items())
                 field_description += ")\n"
-                yield "    %s" % field_description
+                yield f"    {field_description}"
 
             yield "\n"
             yield from self.get_meta(table, unique_constraints, indexes)

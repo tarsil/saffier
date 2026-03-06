@@ -1,7 +1,5 @@
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic import ConfigDict
-
 if TYPE_CHECKING:
     from saffier import Model
     from saffier.core.db.models.metaclasses import MetaInfo
@@ -22,9 +20,9 @@ class ProxyModel:
         definitions: dict[Any, Any] | None = None,
         metadata: type["MetaInfo"] | None = None,
         qualname: str | None = None,
-        config: ConfigDict | None = None,
+        config: dict[str, Any] | None = None,
         proxy: bool = True,
-        pydantic_extra: Any | None = None,
+        model_extra: Any | None = None,
     ) -> None:
         self.__name__: str = name
         self.__module__: str = module
@@ -32,9 +30,9 @@ class ProxyModel:
         self.__definitions__: dict[Any, Any] | None = definitions
         self.__metadata__: type[MetaInfo] | None = metadata
         self.__qualname__: str | None = qualname
-        self.__config__: ConfigDict | None = config
+        self.__config__: dict[str, Any] | None = config
         self.__proxy__: bool = proxy
-        self.__pydantic_extra__ = pydantic_extra
+        self.__model_extra__ = model_extra
         self.__model__ = None
 
     def build(self) -> "ProxyModel":

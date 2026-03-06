@@ -78,7 +78,9 @@ class Manager(BaseManager):
         tenant = get_tenant()
         if tenant:
             set_tenant(None)
-            return self.queryset_class(self.model_class, table=self.model_class.table_schema(tenant))  # type: ignore[arg-type]
+            return self.queryset_class(
+                self.model_class, table=self.model_class.table_schema(tenant)
+            )  # type: ignore[arg-type]
         return self.queryset_class(self.model_class)
 
     def __getattr__(self, item: Any) -> Any:

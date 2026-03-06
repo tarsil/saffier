@@ -57,7 +57,7 @@ class MigrationEnv:
         except ImportError:
             ...
 
-        _path = os.getenv(SAFFIER_DISCOVER_APP) if not path else path
+        _path = path if path else os.getenv(SAFFIER_DISCOVER_APP)
         _app = self.find_app(path=_path, cwd=cwd)
 
         return MigrationEnv(path=_app.path, app=_app.app)

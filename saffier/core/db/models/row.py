@@ -87,11 +87,10 @@ class ModelRow(SaffierBaseModel):
             for column in model_related.table.columns:
                 if column.name in secret_fields or related in secret_fields:
                     continue
-                if column.name not in cls.fields.keys():
+                if column.name not in cls.fields:
                     continue
-                elif related not in child_item:
-                    if getattr(row, related) is not None:
-                        child_item[column.name] = getattr(row, related)
+                elif related not in child_item and getattr(row, related) is not None:
+                    child_item[column.name] = getattr(row, related)
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -102,7 +101,9 @@ class ModelRow(SaffierBaseModel):
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
             mapping_fields = (
-                [str(field) for field in only_fields] if is_only_fields else list(row._mapping.keys())  # type: ignore
+                [str(field) for field in only_fields]
+                if is_only_fields
+                else list(row._mapping.keys())  # type: ignore
             )
 
             for column, value in row._mapping.items():

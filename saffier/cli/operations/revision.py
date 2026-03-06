@@ -24,7 +24,10 @@ def revision(
     sql: SQLOption,
     head: Annotated[
         str,
-        Option(default="head", help="Specify head revision or <branchname>@head to base new revision on"),
+        Option(
+            default="head",
+            help="Specify head revision or <branchname>@head to base new revision on",
+        ),
     ],
     splice: Annotated[
         bool,

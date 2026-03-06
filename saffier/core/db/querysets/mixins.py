@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import sqlalchemy
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 _SaffierModel = TypeVar("_SaffierModel", bound="Model")
 ReflectSaffierModel = TypeVar("ReflectSaffierModel", bound="ReflectModel")
 
-SaffierModel = Union[_SaffierModel, ReflectSaffierModel]
+SaffierModel = _SaffierModel | ReflectSaffierModel
 
 
 class QuerySetPropsMixin:
@@ -79,9 +79,9 @@ class TenancyMixin:
         Generates the new queryset using the selected connection provided in the extra of the model
         registry.
         """
-        assert (
-            connection_name in self.model_class.meta.registry.extra
-        ), f"`{connection_name}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+        assert connection_name in self.model_class.meta.registry.extra, (
+            f"`{connection_name}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+        )
 
         connection: type[Registry] = self.model_class.meta.registry.extra[connection_name]
         if schema:

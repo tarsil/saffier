@@ -1,5 +1,6 @@
+import logging
+
 import pytest
-from loguru import logger
 
 import saffier
 from saffier.core.signals import (
@@ -17,6 +18,7 @@ from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = saffier.Registry(database=database)
+logger = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.anyio
 

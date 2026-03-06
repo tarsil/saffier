@@ -3,9 +3,8 @@ import sys
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any
 
-import click
 import nest_asyncio
-from sayer import Option, command
+from sayer import Option, command, error
 
 from saffier import Registry
 from saffier.cli.operations.shell.enums import ShellOption
@@ -20,7 +19,6 @@ def shell(
         str,
         Option(
             "ipython",
-            type=click.Choice(["ipython", "ptpython"]),
             help="Which shell should start.",
             show_default=True,
         ),
@@ -32,6 +30,11 @@ def shell(
 
     This can be used with a Migration class or with SaffierExtra object lookup.
     """
+    if kernel not in {ShellOption.IPYTHON, ShellOption.PTPYTHON}:
+        allowed = ", ".join([ShellOption.IPYTHON, ShellOption.PTPYTHON])
+        error(f"Invalid shell '{kernel}'. Allowed values: {allowed}.")
+        sys.exit(1)
+
     app = get_migration_app()
     try:
         registry = app._saffier_db["migrate"].registry

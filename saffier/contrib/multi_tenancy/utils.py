@@ -1,11 +1,12 @@
+import logging
 from typing import TYPE_CHECKING
 
 import sqlalchemy
-from loguru import logger
 
 from saffier.core.terminal import Terminal
 
 terminal = Terminal()
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry

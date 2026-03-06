@@ -1,7 +1,6 @@
+import logging
 import uuid
 from typing import Any, cast
-
-from loguru import logger
 
 import saffier
 from saffier import settings
@@ -10,6 +9,8 @@ from saffier.contrib.multi_tenancy.utils import create_tables
 from saffier.core.db.models import Model
 from saffier.core.db.models.utils import get_model
 from saffier.exceptions import ObjectNotFound
+
+logger = logging.getLogger(__name__)
 
 
 class TenantMixin(saffier.Model):
@@ -67,8 +68,8 @@ class TenantMixin(saffier.Model):
                 else self.meta.registry.db_schema
             )
             raise ModelSchemaError(
-                "Can't update tenant outside it's own schema or the public schema. Current schema is '%s'"
-                % current_schema
+                "Can't update tenant outside it's own schema or the public schema. "
+                f"Current schema is '{current_schema}'"
             )
 
         tenant: type[Model] = await super().save(force_save, values, **kwargs)
@@ -92,7 +93,9 @@ class TenantMixin(saffier.Model):
         if self.schema_name == settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
 
-        await self.meta.registry.schema.drop_schema(schema=self.schema_name, cascade=True, if_exists=True)  # type: ignore
+        await self.meta.registry.schema.drop_schema(
+            schema=self.schema_name, cascade=True, if_exists=True
+        )  # type: ignore
         await super().delete()
 
 
@@ -183,9 +186,12 @@ class TenantUserMixin(saffier.Model):
     async def save(self, *args: Any, **kwargs: Any) -> type["TenantUserMixin"]:
         await super().save(*args, **kwargs)
         if self.is_active:
-            await get_model(  # type: ignore
-                registry=self.meta.registry, model_name=self.__class__.__name__
-            ).query.filter(is_active=True, user=self.user).exclude(pk=self.pk).update(
-                is_active=False
+            await (
+                get_model(  # type: ignore
+                    registry=self.meta.registry, model_name=self.__class__.__name__
+                )
+                .query.filter(is_active=True, user=self.user)
+                .exclude(pk=self.pk)
+                .update(is_active=False)
             )
         return cast("type[TenantUserMixin]", self)

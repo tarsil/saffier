@@ -37,9 +37,9 @@ construct representing the DDL DEFAULT value for the column.
 
 ## Available fields
 
-Saffier is built on the top of **pydantic** and inspired by `typesystem`. This means, for example,
-that migrating from the Encode ORM is almost direct as it was made sure the same patterns, names,
-and internal validation remained the same, intentionally.
+Saffier follows a Python-native field and validation layer inspired by `typesystem`. This means,
+for example, that migrating from Encode ORM is almost direct because core patterns, names,
+and validation semantics remain intentionally familiar.
 
 To make the interface even more familiar, the field names end with a `Field` at the end.
 

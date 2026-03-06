@@ -1,6 +1,7 @@
 import typing
-from typing import Any
+from typing import Any, cast
 
+import sqlalchemy
 from sqlalchemy.engine.result import Row
 
 from saffier.core.db.models.base import SaffierBaseReflectModel
@@ -76,15 +77,21 @@ class Model(ModelRow, DeclarativeMixin):
 
         return self
 
-    async def delete(self) -> None:
+    async def delete(self) -> int:
         """Delete operation from the database"""
         await self.signals.pre_delete.send(sender=self.__class__, instance=self)
 
         pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.delete().where(pk_column == self.pk)
+        count_expression = sqlalchemy.func.count().select().select_from(self.table)
+        count_expression = count_expression.where(pk_column == self.pk)
+        row_count = cast("int", await self.database.fetch_val(count_expression) or 0)
 
+        expression = self.table.delete().where(pk_column == self.pk)
         await self.database.execute(expression)
-        await self.signals.post_delete.send(sender=self.__class__, instance=self)
+        await self.signals.post_delete.send(
+            sender=self.__class__, instance=self, row_count=row_count
+        )
+        return row_count
 
     async def load(self) -> None:
         # Build the select expression.

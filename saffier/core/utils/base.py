@@ -81,9 +81,9 @@ class Message(SaffierBaseModel):
             position_str = f", position={self.start_position!r}"
         else:
             position_str = (
-                f", start_position={self.start_position!r}," f" end_position={self.end_position!r}"
+                f", start_position={self.start_position!r}, end_position={self.end_position!r}"
             )
-        return f"{class_name}(text={self.text!r}," f" code={self.code!r}{index_str}{position_str})"
+        return f"{class_name}(text={self.text!r}, code={self.code!r}{index_str}{position_str})"
 
 
 class BaseError(Mapping, Exception):

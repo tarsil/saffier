@@ -172,9 +172,7 @@ class IPAddressFormat(BaseFormat):
     def is_native_type(self, value: typing.Any) -> bool:
         return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
-    def check(
-        self, value: typing.Any
-    ) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+    def check(self, value: typing.Any) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
         match_ipv4 = IPV4_REGEX.match(value)
         match_ipv6 = IPV6_REGEX.match(value)
         if not match_ipv4 and not match_ipv6:

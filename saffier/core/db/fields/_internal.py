@@ -66,9 +66,7 @@ class SaffierField(ArbitraryHashableBaseModel):
     def has_default(self) -> bool:
         return hasattr(self, "default")
 
-    def validation_error(
-        self, code: str, value: typing.Any | None = None
-    ) -> ValidationError:
+    def validation_error(self, code: str, value: typing.Any | None = None) -> ValidationError:
         text = self.get_error_message(code)
         return ValidationError(text=text, code=code)
 
@@ -155,17 +153,14 @@ class String(SaffierField):
                 return None
             raise self.check("blank")
 
-        if self.min_length is not None:
-            if len(value) < self.min_length:
-                raise self.validation_error("min_length", self.min_length)
+        if self.min_length is not None and len(value) < self.min_length:
+            raise self.validation_error("min_length", self.min_length)
 
-        if self.max_length is not None:
-            if len(value) > self.max_length:
-                raise self.validation_error("max_length", self.max_length)
+        if self.max_length is not None and len(value) > self.max_length:
+            raise self.validation_error("max_length", self.max_length)
 
-        if self.pattern_regex is not None:
-            if not self.pattern_regex.search(value):
-                raise self.validation_error("pattern", self.pattern)
+        if self.pattern_regex is not None and not self.pattern_regex.search(value):
+            raise self.validation_error("pattern", self.pattern)
 
         if self.format in FORMATS:
             return FORMATS[self.format].check(value)

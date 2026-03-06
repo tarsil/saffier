@@ -30,9 +30,9 @@ class Schema:
         self, database: Database, schema: str, is_shared: bool = True
     ) -> None:
         path = (
-            "SET search_path TO %s, shared;" % schema
+            f"SET search_path TO {schema}, shared;"
             if is_shared
-            else "SET search_path TO %s;" % schema
+            else f"SET search_path TO {schema};"
         )
         expression = sqlalchemy.text(path)
         await database.execute(expression)
@@ -50,7 +50,7 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with Database(self.registry.database, force_rollback=False) as database:
+        async with Database(self.registry.database, force_rollback=False) as database:  # noqa: SIM117
             async with database.transaction():
                 await database.run_sync(execute_create)
 
@@ -69,6 +69,6 @@ class Schema:
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with Database(self.registry.database, force_rollback=False) as database:
+        async with Database(self.registry.database, force_rollback=False) as database:  # noqa: SIM117
             async with database.transaction():
                 await database.run_sync(execute_drop)

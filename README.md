@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/tarsil/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
-    <img src="https://github.com/tarsil/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
-</a>
+<a href="https://github.com/tarsil/saffier/actions/workflows/test-suite.yml/badge.svg?event=push&branch=main" target="_blank">
+    <img src="https://github.com/tarsil/saffier/actions/workflows/test-suite.yml/badge.svg?event=push&branch=main" alt="Test Suite">
+  </a>
 
 <a href="https://pypi.org/project/saffier" target="_blank">
     <img src="https://img.shields.io/pypi/v/saffier?color=%2334D058&label=pypi%20package" alt="Package version">

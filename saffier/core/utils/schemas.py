@@ -22,7 +22,9 @@ class Schema(SaffierField):
         super().__init__(default=default, **kwargs)
         self.fields = fields
         self.required = [
-            key for key, field in fields.items() if not (field.read_only or field.has_default())  # type: ignore
+            key
+            for key, field in fields.items()
+            if not (field.read_only or field.has_default())  # type: ignore
         ]
 
     def check(self, value: Any) -> Any:
@@ -39,7 +41,7 @@ class Schema(SaffierField):
         validated = {}
         error_messages = []
 
-        for key in value.keys():
+        for key in value:
             if not isinstance(key, str):
                 text = self.get_error_message("invalid_key")
                 message = Message(text=text, code="required", index=[key])

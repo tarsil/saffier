@@ -44,10 +44,8 @@ dependencies = [
     "sayer>=0.7.0,<0.8.0",
     "click>=8.3.1,<9.0.0",
     "dymmond-settings>=1.0.4",
-    "loguru>=0.6.0,<0.10.0",
     "databasez>=0.9.2",
     "orjson >=3.8.5,<4.0.0",
-    "pydantic>=2.5.3,<3.0.0",
     "rich>=14.0.0,<15.0.0",
     "nest_asyncio",
 ]
@@ -56,7 +54,6 @@ keywords = [
     "rest",
     "http",
     "asgi",
-    "pydantic",
     "starlette",
     "fastapi",
     "framework",
@@ -85,7 +82,6 @@ test = [
     "pytest>=8.3.5,<9.0.0",
     "pytest-cov>=6.0.0,<7.0.0",
     "pytest-asyncio>=0.25.3,<1.0.0",
-    "mypy>=1.18.1,<2.0.0",
     "freezegun>=1.2.2,<2.0.0",
     "mock==5.1.0",
     "pymysql>=1.0.2,<2.0.0",
@@ -105,10 +101,12 @@ doc = [
     "sayer>=0.7.0,<0.8.0",
     "zensical>=0.0.23,<0.1.0",
     "griffe-typingdoc>=0.2.2",
+    "mkdocs-meta-descriptions-plugin>=2.3.0",
     "mdx-include>=1.4.2,<2.0.0",
-    "mkdocstrings>=0.28.3,<0.30.0",
-    "mkdocstrings-python",
+    "mkdocstrings>=0.30.0,<0.31.0",
+    "mkdocstrings-python>=2.0.3",
     "pyyaml>=6.0,<7.0.0",
+    "ruff>=0.14.2,<1.0.0",
 ]
 
 testing = ["sqlalchemy_utils>=0.40.0"]
@@ -142,22 +140,23 @@ check = "scripts/check"
 features = ["doc"]
 
 [tool.hatch.envs.docs.scripts]
-prepare = "python scripts/docs.py prepare"
-clean = "python scripts/docs.py clean"
-build = "python scripts/docs.py build --clean {args}"
-serve = "python scripts/docs.py serve {args}"
-dev = "python scripts/docs.py serve {args}"
+prepare = "scripts/docs.py prepare"
+clean = "scripts/docs.py clean"
+build = "scripts/docs.py build --clean {args}"
+serve = "scripts/docs.py serve {args}"
+dev = "scripts/docs.py serve {args}"
 
 [tool.hatch.envs.test]
 features = ["test", "postgres", "mysql", "sqlite", "testing"]
 
 [tool.hatch.envs.test.env-vars]
 SAFFIER_TESTCLIENT_USE_EXISTING = "true"
+SAFFIER_TESTCLIENT_TEST_PREFIX = ""
 
 [tool.hatch.envs.test.scripts]
 test = "pytest {args}"
 test_man = "pytest {args} -s -vv"
-check_types = "mypy saffier {args}"
+check_types = "ty check saffier/conf/__init__.py saffier/conf/global_settings.py {args}"
 
 [tool.hatch.version]
 path = "saffier/__init__.py"
@@ -168,22 +167,7 @@ fix = true
 
 [tool.isort]
 profile = "black"
-known_third_party = ["ravyn", "pydantic", "starlette", "saffier"]
-
-[tool.mypy]
-warn_unused_configs = true
-warn_unreachable = true
-warn_return_any = true
-strict = true
-disallow_untyped_decorators = true
-disallow_any_generics = false
-implicit_reexport = false
-no_implicit_optional = false
-show_error_codes = true
-disallow_incomplete_defs = true
-disable_error_code = "attr-defined,arg-type,override,misc"
-warn_unused_ignores = true
-warn_redundant_casts = true
+known_third_party = ["ravyn", "starlette", "saffier"]
 
 [tool.ty]
 
@@ -195,27 +179,6 @@ select = ["E", "W", "F", "C", "B", "I", "UP", "SIM"]
 ignore = ["E501", "B008", "C901", "B026", "SIM115", "E731"]
 
 exclude = ["docs_src/*"]
-
-[[tool.mypy.overrides]]
-module = "saffier.tests.*"
-ignore_missing_imports = true
-check_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = [
-    "sqlalchemy.*",
-    "asyncpg",
-    "alembic",
-    "sqlalchemy_utils.*",
-    "nest_asyncio.*",
-    "ptpython.*",
-]
-ignore_missing_imports = true
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "docs_src.*"
-ignore_errors = true
 
 [tool.pytest.ini_options]
 addopts = ["--strict-config", "--strict-markers"]

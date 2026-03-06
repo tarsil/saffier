@@ -52,6 +52,9 @@ class BaseQuerySet(
         table: Any = None,
         exclude_secrets: Any = False,
         for_update: Any = None,
+        batch_size: int | None = None,
+        extra_select: Any = None,
+        reference_select: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("type[Model]", model_class)
@@ -73,6 +76,9 @@ class BaseQuerySet(
         self._exclude_secrets = exclude_secrets or False
         self.extra: dict[str, Any] = {}
         self._for_update = for_update
+        self._batch_size = batch_size
+        self._extra_select = [] if extra_select is None else extra_select
+        self._reference_select = {} if reference_select is None else reference_select
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
@@ -105,10 +111,7 @@ class BaseQuerySet(
 
     def _build_or_clauses_expression(self, or_clauses: Any, expression: Any) -> Any:
         """Builds the filter clauses expression"""
-        if len(or_clauses) == 1:
-            clause = or_clauses[0]
-        else:
-            clause = sqlalchemy.sql.or_(*or_clauses)
+        clause = or_clauses[0] if len(or_clauses) == 1 else sqlalchemy.sql.or_(*or_clauses)
         expression = expression.where(clause)
         return expression
 
@@ -163,8 +166,17 @@ class BaseQuerySet(
         tables = [queryset.table]
         select_from = queryset.table
 
+        select_related = list(dict.fromkeys(queryset._select_related))
+        # When a deeper path exists (e.g. `members__users`), joining its prefix
+        # (`members`) separately duplicates table aliases and breaks SQL generation.
+        select_related = [
+            path
+            for path in select_related
+            if not any(other != path and other.startswith(f"{path}__") for other in select_related)
+        ]
+
         # Select related
-        for item in queryset._select_related:
+        for item in select_related:
             # For m2m relationships
             model_class = queryset.model_class
             has_many_fk_same_table = False
@@ -184,7 +196,7 @@ class BaseQuerySet(
 
                 # If there is multiple FKs to the same table
                 if not has_many_fk_same_table:
-                    select_from = sqlalchemy.sql.join(select_from, table)  # type: ignore
+                    select_from = sqlalchemy.sql.join(select_from, table)
                 else:
                     lookup_field = None
 
@@ -196,11 +208,27 @@ class BaseQuerySet(
                             lookup_field = field
                             break
 
-                    select_from = sqlalchemy.sql.join(  # type: ignore
-                        select_from,
-                        table,
-                        select_from.c.id == getattr(table.c, lookup_field),
-                    )
+                    if lookup_field is None:
+                        select_from = sqlalchemy.sql.join(select_from, table)
+                    else:
+                        left_column = getattr(select_from.c, queryset.pkname, None)
+                        if left_column is None:
+                            primary_keys = list(select_from.primary_key)
+                            left_column = primary_keys[0] if primary_keys else None
+
+                        if left_column is None:
+                            raise QuerySetError(
+                                detail=(
+                                    "Unable to resolve join key for select_related "
+                                    f"path '{item}' and related part '{part}'."
+                                )
+                            )
+
+                        select_from = sqlalchemy.sql.join(
+                            select_from,
+                            table,
+                            left_column == getattr(table.c, lookup_field),
+                        )
 
                 tables.append(table)
         return tables, select_from
@@ -241,7 +269,14 @@ class BaseQuerySet(
 
         queryset._validate_only_and_defer()
         tables, select_from = queryset._build_tables_select_from_relationship()
-        expression = sqlalchemy.sql.select(*tables)
+        reference_select = []
+        for key, value in queryset._reference_select.items():
+            if hasattr(value, "label"):
+                reference_select.append(value.label(key))
+            else:
+                reference_select.append(value)
+
+        expression = sqlalchemy.sql.select(*tables, *queryset._extra_select, *reference_select)
         expression = expression.select_from(select_from)
 
         if queryset._only:
@@ -417,6 +452,9 @@ class BaseQuerySet(
                 table=self.table,
                 using_schema=self.using_schema,
                 for_update=self._for_update,
+                batch_size=self._batch_size,
+                extra_select=self._extra_select,
+                reference_select=self._reference_select,
             ),
         )
 
@@ -480,6 +518,9 @@ class BaseQuerySet(
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
         queryset._for_update = copy.copy(self._for_update)
+        queryset._batch_size = self._batch_size
+        queryset._extra_select = copy.copy(self._extra_select)
+        queryset._reference_select = copy.copy(self._reference_select)
 
         return queryset
 
@@ -501,7 +542,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self._expression = value
 
     async def __aiter__(self) -> AsyncIterator[SaffierModel]:
-        for value in await self:
+        async for value in self._execute_iterate():
             yield value
 
     def _set_query_expression(self, expression: Any) -> None:
@@ -547,6 +588,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     ) -> "QuerySet":
         """
         Filters the QuerySet by the OR operand.
+        """
+        queryset: QuerySet = self._clone()
+        queryset = self.filter(clause=clause, or_=True, **kwargs)
+        return queryset
+
+    def local_or(
+        self,
+        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Local OR alias matching the Saffier queryset style.
         """
         queryset: QuerySet = self._clone()
         queryset = self.filter(clause=clause, or_=True, **kwargs)
@@ -645,6 +698,30 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._order_by = tuple(
             value[1:] if value.startswith("-") else f"-{value}" for value in queryset._order_by
         )
+        return queryset
+
+    def batch_size(self, batch_size: int | None = None) -> "QuerySet":
+        """
+        Sets the chunk size for async queryset iteration.
+        """
+        queryset: QuerySet = self._clone()
+        queryset._batch_size = batch_size
+        return queryset
+
+    def extra_select(self, *extra: Any) -> "QuerySet":
+        """
+        Adds extra SQLAlchemy expressions to the SELECT list.
+        """
+        queryset: QuerySet = self._clone()
+        queryset._extra_select.extend(extra)
+        return queryset
+
+    def reference_select(self, references: dict[str, Any]) -> "QuerySet":
+        """
+        Adds named reference selections to the SELECT list.
+        """
+        queryset: QuerySet = self._clone()
+        queryset._reference_select.update(references)
         return queryset
 
     def limit(self, limit_count: int) -> "QuerySet":
@@ -847,8 +924,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         rows = await queryset.database.fetch_all(expression)
 
-        is_only_fields = True if queryset._only else False
-        is_defer_fields = True if queryset._defer else False
+        is_only_fields = bool(queryset._only)
+        is_defer_fields = bool(queryset._defer)
 
         # Attach the raw query to the object
         queryset.model_class.raw_query = queryset.sql
@@ -893,8 +970,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await queryset.database.fetch_all(expression)
         queryset._set_query_expression(expression)
 
-        is_only_fields = True if queryset._only else False
-        is_defer_fields = True if queryset._defer else False
+        is_only_fields = bool(queryset._only)
+        is_defer_fields = bool(queryset._defer)
 
         if not rows:
             raise ObjectNotFound()
@@ -1010,18 +1087,51 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._set_query_expression(expression)
         await queryset.database.execute_many(expression, query_list)
 
-    async def delete(self) -> None:
+    async def raw_delete(self, use_models: bool = False) -> int:
         queryset: QuerySet = self._clone()
-        await self.model_class.signals.pre_delete.send(sender=self.__class__, instance=self)
 
+        if use_models:
+            row_count = 0
+            for model in await queryset.all():
+                row_count += await model.delete()
+            return row_count
+
+        count_expression = sqlalchemy.func.count().select().select_from(queryset.table)
+        if queryset.filter_clauses:
+            count_expression = queryset._build_filter_clauses_expression(
+                queryset.filter_clauses, expression=count_expression
+            )
+
+        if queryset.or_clauses:
+            count_expression = queryset._build_or_clauses_expression(
+                queryset.or_clauses, expression=count_expression
+            )
+
+        row_count = cast("int", await queryset.database.fetch_val(count_expression) or 0)
         expression = queryset.table.delete()
-        for filter_clause in queryset.filter_clauses:
-            expression = expression.where(filter_clause)
+
+        if queryset.filter_clauses:
+            expression = queryset._build_filter_clauses_expression(
+                queryset.filter_clauses, expression=expression
+            )
+
+        if queryset.or_clauses:
+            expression = queryset._build_or_clauses_expression(queryset.or_clauses, expression)
 
         queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
+        return row_count
 
-        await self.model_class.signals.post_delete.send(sender=self.__class__, instance=self)
+    async def delete(self, use_models: bool = False) -> int:
+        queryset: QuerySet = self._clone()
+        await self.model_class.signals.pre_delete.send(sender=self.__class__, instance=self)
+
+        row_count = await queryset.raw_delete(use_models=use_models)
+
+        await self.model_class.signals.post_delete.send(
+            sender=self.__class__, instance=self, row_count=row_count
+        )
+        return row_count
 
     async def update(self, **kwargs: Any) -> None:
         """
@@ -1067,6 +1177,50 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             kwargs.update(defaults)
             instance = await queryset.create(**kwargs)
             return instance, True
+
+    async def bulk_get_or_create(
+        self,
+        objs: list[dict[str, Any] | SaffierModel],
+        unique_fields: list[str] | None = None,
+    ) -> list[SaffierModel]:
+        """
+        Bulk gets or creates records.
+
+        When `unique_fields` is provided, existing records are fetched by those fields.
+        Missing records are created. Duplicate lookup payloads inside `objs` are collapsed.
+        """
+        queryset: QuerySet = self._clone()
+        instances: list[SaffierModel] = []
+        seen_lookups: set[tuple[tuple[str, Any], ...]] = set()
+
+        for obj in objs:
+            values = obj if isinstance(obj, dict) else obj.extract_db_fields()
+
+            if unique_fields:
+                lookup = {}
+                for field in unique_fields:
+                    if field not in values:
+                        raise QuerySetError(
+                            detail=f"Field '{field}' is required in unique_fields lookups."
+                        )
+                    lookup[field] = values[field]
+
+                lookup_key = tuple(sorted(lookup.items()))
+                if lookup_key in seen_lookups:
+                    continue
+                seen_lookups.add(lookup_key)
+
+                instance = await queryset.get_or_none(**lookup)
+                if instance is not None:
+                    instances.append(instance)
+                    continue
+
+            instance = await queryset.create(**values)
+            instances.append(instance)
+
+        return instances
+
+    bulk_select_or_insert = bulk_get_or_create
 
     async def update_or_create(
         self, defaults: dict[str, Any], **kwargs: Any
@@ -1184,6 +1338,39 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset: QuerySet = self._clone()
         records = await queryset._all(**queryset.extra)
         return records
+
+    async def _execute_iterate(self) -> AsyncIterator[SaffierModel]:
+        queryset: QuerySet = self._clone()
+
+        if queryset.is_m2m:
+            queryset.distinct_on = [queryset.m2m_related]
+
+        if queryset.extra:
+            queryset = queryset.filter(**queryset.extra)
+
+        expression = queryset._build_select()
+        queryset._set_query_expression(expression)
+
+        is_only_fields = bool(queryset._only)
+        is_defer_fields = bool(queryset._defer)
+        queryset.model_class.raw_query = queryset.sql
+
+        async for row in queryset.database.iterate(expression, chunk_size=queryset._batch_size):
+            result = queryset.model_class.from_query_result(
+                row,
+                select_related=queryset._select_related,
+                prefetch_related=queryset._prefetch_related,
+                is_only_fields=is_only_fields,
+                only_fields=queryset._only,
+                is_defer_fields=is_defer_fields,
+                using_schema=queryset.using_schema,
+                exclude_secrets=queryset._exclude_secrets,
+            )
+
+            if not queryset.is_m2m:
+                yield result
+            else:
+                yield getattr(result, queryset.m2m_related)
 
     def __await__(
         self,

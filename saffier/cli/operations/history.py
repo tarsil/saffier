@@ -11,7 +11,9 @@ from saffier.cli.state import get_migration_app
 def history(
     rev_range: Annotated[
         str | None,
-        Option(None, "-r", "--rev-range", help="Specify a revision range; format is [start]:[end]"),
+        Option(
+            None, "-r", "--rev-range", help="Specify a revision range; format is [start]:[end]"
+        ),
     ],
     verbose: VerboseOption,
     indicate_current: Annotated[

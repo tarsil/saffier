@@ -130,6 +130,14 @@ users = await User.query.filter(User.columns.email.contains("foo"))
 users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
 ```
 
+### Local OR
+
+Use `local_or()` to combine OR clauses with existing queryset filters:
+
+```python
+users = await User.query.filter(is_active=True).local_or(email__icontains="example.com")
+```
+
 !!! Warning
     The `columns` refers to the columns of the underlying SQLAlchemy table.
 
@@ -158,6 +166,26 @@ go as well.
 
 ```python
 await User.query.filter(email__icontains="foo").limit(5).order_by("id")
+```
+
+### Batch size
+
+When iterating asynchronously, you can set a chunk size for database reads:
+
+```python
+async for user in User.query.order_by("id").batch_size(100):
+    ...
+```
+
+### Extra and reference selects
+
+You can extend the selected columns with SQLAlchemy expressions:
+
+```python
+import sqlalchemy
+
+queryset = User.query.extra_select(sqlalchemy.literal(1).label("marker"))
+queryset = queryset.reference_select({"score": sqlalchemy.literal(100)})
 ```
 
 ### Order by
@@ -310,12 +338,34 @@ await User.query.create(is_active=False, email="bar@foo.com")
 await User.query.create(is_active=True, email="foo@bar.com", first_name="Foo", last_name="Bar")
 ```
 
-### Delete
+### Bulk get or create
 
-Used to delete an instance.
+Creates missing rows and reuses existing rows when matching `unique_fields`.
 
 ```python
-await User.query.filter(email="foo@bar.com").delete()
+users = await User.query.bulk_get_or_create(
+    [
+        {"name": "Alice", "language": "English"},
+        {"name": "Bob", "language": "Portuguese"},
+    ],
+    unique_fields=["name", "language"],
+)
+```
+
+Alias available: `bulk_select_or_insert`.
+
+### Delete
+
+Used to delete rows and return the number of deleted records.
+
+```python
+deleted = await User.query.filter(email="foo@bar.com").delete()
+```
+
+To execute per-instance delete hooks/signals during queryset deletion, use:
+
+```python
+deleted = await User.query.filter(is_active=False).delete(use_models=True)
 ```
 
 Or directly in the instance.
@@ -323,7 +373,13 @@ Or directly in the instance.
 ```python
 user = await User.query.get(email="foo@bar.com")
 
-await user.delete()
+deleted = await user.delete()
+```
+
+Use `raw_delete()` when you want database-level deletion without model-level delete hooks:
+
+```python
+deleted = await User.query.filter(is_active=False).raw_delete()
 ```
 
 ### Update

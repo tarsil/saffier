@@ -1,4 +1,3 @@
-
 from typing import Annotated
 
 from sayer import Option, command

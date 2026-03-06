@@ -56,9 +56,7 @@ class Field:
         self.primary_key = primary_key
         self.index = index
         self.unique = unique
-        self.validator: SaffierField | type[SaffierField] = self.get_validator(
-            **kwargs
-        )
+        self.validator: SaffierField | type[SaffierField] = self.get_validator(**kwargs)
         self.comment = kwargs.get("comment")
         self.owner = kwargs.pop("owner", None)
         self.server_onupdate = kwargs.pop("server_onupdate", None)

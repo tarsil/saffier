@@ -1,6 +1,6 @@
-__version__ = "1.4.2"
+__version__ = "1.5.0"
 
-from saffier.conf import settings
+from saffier.conf import configure_settings, override_settings, reload_settings, settings
 from saffier.conf.global_settings import SaffierSettings
 
 from .cli import Migrate
@@ -88,7 +88,10 @@ __all__ = [
     "UniqueConstraint",
     "URLField",
     "UUIDField",
+    "configure_settings",
     "settings",
+    "override_settings",
+    "reload_settings",
     "fields",
     "run_sync",
 ]

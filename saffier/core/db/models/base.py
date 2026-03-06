@@ -48,9 +48,8 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             kwargs[self.pkname] = kwargs.pop("pk")
 
         for key, value in kwargs.items():
-            if key not in self.fields:
-                if not hasattr(self, key):
-                    raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
+            if key not in self.fields and not hasattr(self, key):
+                raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
             # Set model field and add to the kwargs dict
             setattr(self, key, value)
@@ -237,20 +236,14 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         super().__setattr__(key, value)
 
     def __get_instance_values(self, instance: Any) -> set[Any]:
-        return {
-            v
-            for k, v in instance.__dict__.items()
-            if k in instance.fields.keys() and v is not None
-        }
+        return {v for k, v in instance.__dict__.items() if k in instance.fields and v is not None}
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
             return False
         original = self.__get_instance_values(instance=self)
         other_values = self.__get_instance_values(instance=other)
-        if original != other_values:
-            return False
-        return True
+        return original == other_values
 
 
 class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):

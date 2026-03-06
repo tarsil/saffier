@@ -53,8 +53,7 @@ def create_saffier_model(
     __proxy__: bool = False,
 ) -> type["Model"]:
     """
-    Generates an `saffier.Model` with all the required definitions to generate the pydantic
-    like model.
+    Generates a dynamic `saffier.Model` using the provided metadata and definitions.
     """
 
     if not __bases__:

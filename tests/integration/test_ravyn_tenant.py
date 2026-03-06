@@ -1,11 +1,11 @@
 from collections.abc import AsyncGenerator, Coroutine
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from anyio import from_thread, sleep, to_thread
 from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
-from pydantic import __version__
 from ravyn import Gateway, JSONResponse, Ravyn, Request, get
 from ravyn.core.protocols.middleware import MiddlewareProtocol
 
@@ -21,7 +21,6 @@ models = TenantRegistry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class Tenant(TenantMixin):
@@ -133,13 +132,13 @@ async def async_client(app) -> AsyncGenerator:
         yield ac
 
 
-async def create_data():
+async def create_data() -> str:
     """
     Creates mock data
     """
     saffier = await User.query.create(name="saffier")
 
-    tenant_schema = "saffier_alt_tenant"
+    tenant_schema = f"saffier_alt_tenant_{uuid4().hex[:8]}"
     alt_tenant = await Tenant.query.create(schema_name=tenant_schema, tenant_name="saffier-alt")
     tenant_user = await User.query.using(alt_tenant.schema_name).create(name="tenant-user")
 
@@ -155,12 +154,14 @@ async def create_data():
     for i in range(25):
         await Product.query.create(name=f"Product-{i}", user=saffier)
 
+    return tenant_schema
+
 
 async def test_user_query_tenant_data(async_client, async_cli):
-    await create_data()
+    tenant_schema = await create_data()
 
     # Test tenant response intercepted in the middleware
-    response_tenant = await async_client.get("/products", headers={"tenant": "saffier_alt_tenant"})
+    response_tenant = await async_client.get("/products", headers={"tenant": tenant_schema})
     assert response_tenant.status_code == 200
 
     assert len(response_tenant.json()) == 10
@@ -172,7 +173,7 @@ async def test_user_query_tenant_data(async_client, async_cli):
     assert len(response_saffier.json()) == 25
 
     # Check tenant schema again
-    response_tenant = await async_client.get("/products", headers={"tenant": "saffier_alt_tenant"})
+    response_tenant = await async_client.get("/products", headers={"tenant": tenant_schema})
     assert response_tenant.status_code == 200
 
     assert len(response_tenant.json()) == 10

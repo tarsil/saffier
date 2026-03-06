@@ -5,7 +5,6 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
-from pydantic import __version__
 from ravyn import Gateway, JSONResponse, Ravyn, Request, get
 from ravyn.core.protocols.middleware import MiddlewareProtocol
 
@@ -21,7 +20,6 @@ models = TenantRegistry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class Tenant(TenantMixin):

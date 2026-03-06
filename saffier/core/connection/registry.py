@@ -62,13 +62,13 @@ class Registry:
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
-        async with Database(self.database, force_rollback=False) as database:
+        async with Database(self.database, force_rollback=False) as database:  # noqa: SIM117
             async with database.transaction():
                 await database.create_all(self.metadata)
 
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
-        async with Database(self.database, force_rollback=False) as database:
+        async with Database(self.database, force_rollback=False) as database:  # noqa: SIM117
             async with database.transaction():
                 await database.drop_all(self.metadata)

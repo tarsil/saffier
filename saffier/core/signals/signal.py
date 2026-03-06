@@ -49,7 +49,7 @@ class Signal:
         """
         key = make_id(receiver)
         func: Callable | None = self.receivers.pop(key, None)
-        return True if func is not None else False
+        return func is not None
 
     async def send(self, sender: type["Model"], **kwargs: Any) -> None:
         """
