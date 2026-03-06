@@ -41,6 +41,22 @@ class QuerySetProtocol(Protocol):
 
     def reference_select(self, references: dict[str, Any]) -> "QuerySet": ...
 
+    def paginator(
+        self,
+        page_size: int,
+        *,
+        next_item_attr: str = ...,
+        previous_item_attr: str = ...,
+    ) -> Any: ...
+
+    def cursor_paginator(
+        self,
+        page_size: int,
+        *,
+        next_item_attr: str = ...,
+        previous_item_attr: str = ...,
+    ) -> Any: ...
+
     def limit(self, limit_count: int) -> "QuerySet": ...
 
     def offset(self, offset: int) -> "QuerySet": ...

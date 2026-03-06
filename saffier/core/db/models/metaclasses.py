@@ -32,8 +32,10 @@ class MetaInfo:
         "fields_mapping",
         "registry",
         "tablename",
+        "table_prefix",
         "unique_together",
         "indexes",
+        "constraints",
         "foreign_key_fields",
         "parents",
         "pk",
@@ -57,10 +59,14 @@ class MetaInfo:
         self.pk: Field | None = getattr(meta, "pk", None)
         self.pk_attribute: Field | str = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
-        self.fields: set[Any] = getattr(meta, "fields", set())
-        self.fields_mapping: dict[str, Field] = getattr(meta, "fields_mapping", {})
-        self.registry: type[Registry] | None = getattr(meta, "registry", None)
+        fields = getattr(meta, "fields", None)
+        if fields is None:
+            fields = getattr(meta, "fields_mapping", {})
+        self.fields: dict[str, Field] = dict(fields or {})
+        self.fields_mapping: dict[str, Field] = self.fields
+        self.registry: Registry | None = getattr(meta, "registry", None)
         self.tablename: str | None = getattr(meta, "tablename", None)
+        self.table_prefix: str | None = getattr(meta, "table_prefix", None)
         self.parents: Any = getattr(meta, "parents", [])
         self.many_to_many_fields: set[str] = set()
         self.foreign_key_fields: dict[str, Any] = {}
@@ -68,8 +74,9 @@ class MetaInfo:
         self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
+        self.constraints: Any = getattr(meta, "constraints", None)
         self.reflect: bool = getattr(meta, "reflect", False)
-        self.managers: list[Manager] = getattr(meta, "managers", [])
+        self.managers: list[str] = list(getattr(meta, "managers", []) or [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: set[str] = getattr(meta, "related_names", set())
@@ -78,14 +85,14 @@ class MetaInfo:
         self.signals: Broadcaster | None = getattr(meta, "signals", {})  # type: ignore
 
 
-def _check_model_inherited_registry(bases: tuple[type, ...]) -> type[Registry]:
+def _check_model_inherited_registry(bases: tuple[type, ...]) -> Registry:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
 
     If not found, then a ImproperlyConfigured exception is raised.
     """
-    found_registry: type[Registry] | None = None
+    found_registry: Registry | None = None
 
     for base in bases:
         meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
@@ -98,39 +105,65 @@ def _check_model_inherited_registry(bases: tuple[type, ...]) -> type[Registry]:
 
     if not found_registry:
         raise ImproperlyConfigured(
-            "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
+            "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
         )
     return found_registry
 
 
+def get_model_meta_attr(
+    attr: str,
+    bases: tuple[type, ...],
+    meta_class: object | MetaInfo | None = None,
+) -> Any | None:
+    """
+    Returns a meta attribute either from the direct Meta class or from parent model metas.
+    """
+    if meta_class is not None:
+        direct_attr = getattr(meta_class, attr, None)
+        if direct_attr is not None:
+            return direct_attr
+
+    for base in bases:
+        base_meta: MetaInfo | None = getattr(base, "meta", None)
+        if base_meta is None:
+            continue
+        value = getattr(base_meta, attr, None)
+        if value is not None:
+            return value
+    return None
+
+
 def _check_manager_for_bases(
-    base: tuple[type, ...],
+    base: type,
     attrs: Any,
     meta: MetaInfo | None = None,
 ) -> None:
     """
     When an abstract class is declared, we must treat the manager's value coming from the top.
     """
-    if not meta:
-        for key, value in inspect.getmembers(base):
-            if isinstance(value, Manager) and key not in attrs:
-                attrs[key] = copy.copy(value)
-    else:
-        if not meta.abstract:
-            for key, value in inspect.getmembers(base):
-                if isinstance(value, Manager) and key not in attrs:
-                    attrs[key] = copy.copy(value)
+    for key, value in inspect.getmembers(base):
+        if not isinstance(value, Manager):
+            continue
+
+        is_inheritable = bool(getattr(value, "inherit", True))
+        if meta and not meta.abstract and not is_inheritable:
+            attrs[key] = None
+            continue
+
+        if key not in attrs:
+            attrs[key] = copy.copy(value)
 
 
 def _set_related_name_for_foreign_keys(
-    foreign_keys: set[saffier_fields.OneToOneField | saffier_fields.ForeignKey],
+    foreign_keys: dict[str, saffier_fields.OneToOneField | saffier_fields.ForeignKey],
     model_class: Union["Model", "ReflectModel"],
-) -> str:
+) -> set[str]:
     """
     Sets the related name for the foreign keys.
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
+    related_names: set[str] = set()
     for name, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
@@ -156,8 +189,9 @@ def _set_related_name_for_foreign_keys(
 
         # Set the fields mapping where a related name maps a specific foreign key
         model_class.meta.related_names_mapping[default_related_name] = name
+        related_names.add(default_related_name)
 
-    return cast("str", default_related_name)
+    return related_names
 
 
 def _set_many_to_many_relation(
@@ -184,20 +218,35 @@ def _register_model_signals(model_class: type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
+def _copy_field(field: Field) -> Field:
+    if getattr(field, "no_copy", False):
+        return field
+    return copy.copy(field)
+
+
 class BaseModelMeta(type):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: tuple[type, ...], attrs: Any) -> Any:
+    def __new__(
+        cls,
+        name: str,
+        bases: tuple[type, ...],
+        attrs: Any,
+        meta_info_class: type[MetaInfo] = MetaInfo,
+        register_content_type: bool = True,
+    ) -> Any:
         fields: dict[str, Field] = {}
-        one_to_one_fields: Any = set()
-        foreign_key_fields: Any = {}
-        many_to_many_fields: Any = set()
+        one_to_one_fields: set[saffier_fields.OneToOneField] = set()
+        foreign_key_fields: dict[
+            str, saffier_fields.OneToOneField | saffier_fields.ForeignKey
+        ] = {}
+        many_to_many_fields: set[saffier_fields.ManyToManyField] = set()
         meta_class: Model.Meta = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
-        registry: Any = None
+        registry: Registry | None = None
 
         # Searching for fields "Field" in the class hierarchy.
-        def __search_for_fields(base: type, attrs: Any) -> None:
+        def __search_for_fields(base: type, inherited_attrs: dict[str, Any]) -> None:
             """
             Search for class attributes of the type fields.Field in the given class.
 
@@ -208,26 +257,30 @@ class BaseModelMeta(type):
             """
 
             for parent in base.__mro__[1:]:
-                __search_for_fields(parent, attrs)
+                __search_for_fields(parent, inherited_attrs)
 
             meta: MetaInfo | None = getattr(base, "meta", None)
             if not meta:
                 # Mixins and other classes
                 for key, value in inspect.getmembers(base):
-                    if isinstance(value, Field) and key not in attrs:
-                        attrs[key] = value
+                    if isinstance(value, Field) and key not in inherited_attrs:
+                        inherited_attrs[key] = value
 
-                _check_manager_for_bases(base, attrs)  # type: ignore
+                _check_manager_for_bases(base, inherited_attrs)  # type: ignore[arg-type]
             else:
-                # abstract classes
-                for key, value in meta.fields_mapping.items():
-                    attrs[key] = value
+                # Abstract classes inherit all fields.
+                # Concrete classes only propagate fields explicitly marked as inheritable.
+                for key, value in meta.fields.items():
+                    if meta.abstract or getattr(value, "inherit", True):
+                        inherited_attrs[key] = value
+                    else:
+                        inherited_attrs.pop(key, None)
 
                 # For managers coming from the top that are not abstract classes
-                _check_manager_for_bases(base, attrs, meta)  # type: ignore
+                _check_manager_for_bases(base, inherited_attrs, meta)  # type: ignore[arg-type]
 
         # Search in the base classes
-        inherited_fields: Any = {}
+        inherited_fields: dict[str, Any] = {}
         for base in bases:
             __search_for_fields(base, inherited_fields)
 
@@ -247,7 +300,11 @@ class BaseModelMeta(type):
                     is_pk_present = True
                     pk_attribute = key
 
-            if not is_pk_present and not getattr(meta_class, "abstract", None):
+            if (
+                not is_pk_present
+                and not getattr(meta_class, "abstract", None)
+                and not getattr(meta_class, "reflect", None)
+            ):
                 if "id" not in attrs:
                     attrs = {"id": BigIntegerField(primary_key=True, autoincrement=True), **attrs}
 
@@ -258,8 +315,8 @@ class BaseModelMeta(type):
 
         for key, value in attrs.items():
             if isinstance(value, Field):
-                if getattr(meta_class, "abstract", None):
-                    value = copy.copy(value)
+                value = _copy_field(value)
+                value.name = key
 
                 fields[key] = value
 
@@ -278,8 +335,9 @@ class BaseModelMeta(type):
 
         for slot in fields:
             attrs.pop(slot, None)
-        attrs["meta"] = meta = MetaInfo(meta_class)
+        attrs["meta"] = meta = meta_info_class(meta_class)
 
+        meta.fields = fields
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.one_to_one_fields = one_to_one_fields
@@ -299,6 +357,38 @@ class BaseModelMeta(type):
 
         meta.parents = parents
         new_class = cast("type[Model]", model_class(cls, name, bases, attrs))
+        new_class._db_schemas = {}
+
+        # Validate meta collection types before inheriting from bases.
+        for attr_name in ("unique_together", "indexes", "constraints"):
+            attr_value = getattr(meta, attr_name, None)
+            if attr_value is not None and not isinstance(attr_value, (list, tuple)):
+                value_type = type(attr_value).__name__
+                raise ImproperlyConfigured(
+                    f"{attr_name} must be a tuple or list. Got {value_type} instead."
+                )
+
+        meta.unique_together = list(meta.unique_together or [])
+        meta.indexes = list(meta.indexes or [])
+        meta.constraints = list(meta.constraints or [])
+
+        # Inherit parent meta options where the child didn't explicitly define them.
+        for base in new_class.__bases__:
+            if not hasattr(base, "meta"):
+                continue
+
+            base_meta = cast("MetaInfo", base.meta)
+            if base_meta.unique_together:
+                meta.unique_together = [*base_meta.unique_together, *meta.unique_together]
+            if base_meta.indexes:
+                meta.indexes = [*base_meta.indexes, *meta.indexes]
+            if base_meta.constraints:
+                meta.constraints = [*base_meta.constraints, *meta.constraints]
+
+        meta.table_prefix = cast(
+            "str | None",
+            get_model_meta_attr("table_prefix", bases, meta_class),
+        )
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if meta.abstract:
@@ -312,11 +402,13 @@ class BaseModelMeta(type):
                     "Multiple managers are not allowed in abstract classes."
                 )
 
-            if getattr(meta, "unique_together", None) is not None:
+            if meta.unique_together:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
 
-            if getattr(meta, "indexes", None) is not None:
+            if meta.indexes:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
+            if meta.constraints:
+                raise ImproperlyConfigured("constraints cannot be in abstract classes.")
         else:
             meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
@@ -330,50 +422,46 @@ class BaseModelMeta(type):
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
             tablename = f"{name.lower()}s"
+            if meta.table_prefix:
+                tablename = f"{meta.table_prefix}_{tablename}"
             meta.tablename = tablename
 
         # Handle unique together
-        if getattr(meta, "unique_together", None) is not None:
-            unique_together = meta.unique_together
-            if not isinstance(unique_together, (list, tuple)):
-                value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(
-                    f"unique_together must be a tuple or list. Got {value_type} instead."
-                )
-            else:
-                for value in unique_together:
-                    if not isinstance(value, (str, tuple, UniqueConstraint)):
-                        raise ValueError(
-                            "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
-                        )
+        if meta.unique_together:
+            for value in meta.unique_together:
+                if not isinstance(value, (str, tuple, UniqueConstraint)):
+                    raise ValueError(
+                        "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
+                    )
 
         # Handle indexes
-        if getattr(meta, "indexes", None) is not None:
-            indexes = meta.indexes
-            if not isinstance(indexes, (list, tuple)):
-                value_type = type(indexes).__name__
-                raise ImproperlyConfigured(
-                    f"indexes must be a tuple or list. Got {value_type} instead."
-                )
-            else:
-                for value in indexes:
-                    if not isinstance(value, Index):
-                        raise ValueError("Meta.indexes must be a list of Index types.")
+        if meta.indexes:
+            for value in meta.indexes:
+                if not isinstance(value, Index):
+                    raise ValueError("Meta.indexes must be a list of Index types.")
+
+        # Handle constraints
+        if meta.constraints:
+            for value in meta.constraints:
+                if not isinstance(value, sqlalchemy.Constraint):
+                    raise ValueError(
+                        "Meta.constraints must be a list of sqlalchemy.Constraint types."
+                    )
 
         registry = meta.registry
-        new_class.database = registry.database
+        new_class.database = registry.database  # type: ignore[union-attr]
 
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:
-            registry.models[name] = new_class
+            registry.models[name] = new_class  # type: ignore[union-attr]
 
-        for name, field in meta.fields_mapping.items():
+        for field_name, field in meta.fields.items():
             field.registry = registry
             if field.primary_key:
-                new_class.pkname = name
+                new_class.pkname = field_name
 
         new_class.__db_model__ = True
-        new_class.fields = meta.fields_mapping
+        new_class.fields = meta.fields
         meta.model = new_class
         meta.manager.model_class = new_class
 
@@ -383,16 +471,17 @@ class BaseModelMeta(type):
 
         # Sets the foreign key fields
         if meta.foreign_key_fields and not new_class.is_proxy_model:
-            related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
-            meta.related_names.add(related_name)
+            related_names = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            meta.related_names.update(related_names)
 
         for field, value in new_class.fields.items():  # type: ignore
             if isinstance(value, saffier_fields.ManyToManyField):
                 _set_many_to_many_relation(value, new_class, field)
 
         # Set the manager
-        for _, value in attrs.items():
+        for manager_name, value in attrs.items():
             if isinstance(value, Manager):
+                value.name = manager_name
                 value.model_class = new_class
 
         # Register the signals
@@ -409,15 +498,31 @@ class BaseModelMeta(type):
             new_class.__proxy_model__.parent = new_class
             meta.registry.models[new_class.__name__] = new_class  # type: ignore
 
+        if (
+            register_content_type
+            and registry is not None
+            and not new_class.meta.abstract
+            and not new_class.is_proxy_model
+            and hasattr(registry, "_handle_model_registration")
+        ):
+            registry._handle_model_registration(new_class)
+
         return new_class
+
+    def get_db_schema(cls) -> str | None:
+        """
+        Returns a db_schema from the model registry, if available.
+        """
+        meta = getattr(cls, "meta", None)
+        if meta is None or getattr(meta, "registry", None) is None:
+            return None
+        return cast("str | None", meta.registry.db_schema)
 
     def get_db_shema(cls) -> str | None:
         """
         Returns a db_schema from registry if any is passed.
         """
-        if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
-            return cast("str", cls.meta.registry.db_schema)
-        return None
+        return cls.get_db_schema()
 
     @property
     def table(cls) -> Any:
@@ -432,7 +537,15 @@ class BaseModelMeta(type):
         2. If a db_schema in the `registry` is passed, then it will use that as a default.
         3. If none is passed, defaults to the shared schema of the database connected.
         """
-        db_schema = cls.get_db_shema()
+        if getattr(cls, "is_proxy_model", False):
+            parent = getattr(cls, "parent", None)
+            if parent is None:
+                raise AttributeError("No parent model found for proxy model.")
+            return parent.table
+        if getattr(cls.meta, "registry", None) is None:
+            raise AttributeError("No registry.")
+
+        db_schema = cls.get_db_schema()
 
         if not hasattr(cls, "_table"):
             cls._table = cls.build(db_schema)
@@ -446,7 +559,13 @@ class BaseModelMeta(type):
     def table(self, value: sqlalchemy.Table) -> None:
         self._table = value
 
-    def table_schema(cls, schema: str) -> Any:
+    def table_schema(
+        cls,
+        schema: str | None = None,
+        *,
+        metadata: sqlalchemy.MetaData | None = None,
+        update_cache: bool = False,
+    ) -> Any:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
@@ -454,7 +573,54 @@ class BaseModelMeta(type):
         The use of context vars instead of using the lru_cache comes from
         a warning from `ruff` where lru can lead to memory leaks.
         """
-        return cls.build(schema=schema)
+        del metadata  # metadata is accepted for API parity with Edgy.
+        if getattr(cls, "is_proxy_model", False):
+            parent = getattr(cls, "parent", None)
+            if parent is None:
+                raise AttributeError("No parent model found for proxy model.")
+            return parent.table_schema(schema=schema, update_cache=update_cache)
+
+        if schema is None or (cls.get_db_schema() or "") == schema:
+            table = getattr(cls, "_table", None)
+            if update_cache or table is None or table.name.lower() != cls.meta.tablename:
+                cls._table = cls.build(schema=schema)
+            return cls.table
+
+        schema_obj = cls._db_schemas.pop(schema, None)
+        if schema_obj is None or update_cache:
+            schema_obj = cls.build(schema=schema)
+        cls._db_schemas[schema] = schema_obj
+        while len(cls._db_schemas) > 100:
+            cls._db_schemas.pop(next(iter(cls._db_schemas)), None)
+
+        return schema_obj
+
+    @property
+    def pknames(cls) -> Sequence[str]:
+        cached = cls.__dict__.get("_pknames")
+        if cached is None:
+            names = tuple(
+                field_name
+                for field_name, field in cls.fields.items()
+                if getattr(field, "primary_key", False)
+            )
+            if not names:
+                names = (getattr(cls, "pkname", "id"),)
+            cls._pknames = names
+        return cast("Sequence[str]", cls._pknames)
+
+    @property
+    def pkcolumns(cls) -> Sequence[str]:
+        cached = cls.__dict__.get("_pkcolumns")
+        if cached is None:
+            try:
+                names = tuple(column.key for column in cls.table.primary_key.columns)
+            except Exception:
+                names = ()
+            if not names:
+                names = tuple(cls.pknames)
+            cls._pkcolumns = names
+        return cast("Sequence[str]", cls._pkcolumns)
 
     @property
     def signals(cls) -> "Broadcaster":
@@ -463,21 +629,43 @@ class BaseModelMeta(type):
         """
         return cast("Broadcaster", cls.meta.signals)
 
+    def transaction(cls, *, force_rollback: bool = False, **kwargs: Any) -> Any:
+        return cls.database.transaction(force_rollback=force_rollback, **kwargs)
+
     @property
     def proxy_model(cls) -> Any:
         """
         Returns the proxy_model from the Model when called using the cache.
         """
+        if getattr(cls, "is_proxy_model", False):
+            return cls
+        if getattr(cls, "__proxy_model__", None) is None:
+            proxy_model = cls.generate_proxy_model()
+            proxy_model.parent = cls
+            cls.__proxy_model__ = proxy_model
         return cls.__proxy_model__
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
-        return cast("sqlalchemy.sql.ColumnCollection", cls._table.columns)
+        return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
 
 
 class BaseModelReflectMeta(BaseModelMeta):
-    def __new__(cls, name: str, bases: tuple[type, ...], attrs: Any) -> Any:
-        new_model = super().__new__(cls, name, bases, attrs)
+    def __new__(
+        cls,
+        name: str,
+        bases: tuple[type, ...],
+        attrs: Any,
+        **kwargs: Any,
+    ) -> Any:
+        new_model = super().__new__(
+            cls,
+            name,
+            bases,
+            attrs,
+            register_content_type=False,
+            **kwargs,
+        )
 
         registry = new_model.meta.registry
 

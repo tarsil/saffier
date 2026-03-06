@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <style>
+      :root {
+        --sidebar: {{ sidebar_bg_colour }};
+        --bg: #f5f7fb;
+        --text: #0f172a;
+        --muted: #475569;
+        --card: #ffffff;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; color: var(--text); background: var(--bg); }
+      .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+      .sidebar { background: var(--sidebar); color: #fff; padding: 24px 16px; }
+      .sidebar h1 { font-size: 20px; margin: 0 0 20px 0; }
+      .sidebar a { color: #fff; text-decoration: none; display: block; padding: 8px 0; opacity: 0.9; }
+      .content { padding: 24px; }
+      .card { background: var(--card); border-radius: 12px; padding: 18px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05); }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border-bottom: 1px solid #e2e8f0; text-align: left; padding: 10px 8px; vertical-align: top; }
+      th { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+      input, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; }
+      button, .btn { background: #0f172a; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; text-decoration: none; display: inline-block; }
+      .muted { color: var(--muted); font-size: 13px; }
+      .errors { color: #991b1b; font-size: 13px; margin-top: 8px; }
+      @media (max-width: 900px) {
+        .layout { grid-template-columns: 1fr; }
+        .sidebar { position: sticky; top: 0; z-index: 2; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <h1>{{ menu_title }}</h1>
+        <a href="{{ request.url_for('admin_dashboard') }}">Dashboard</a>
+        <a href="{{ request.url_for('admin_models') }}">Models</a>
+      </aside>
+      <main class="content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

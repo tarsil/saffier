@@ -4,6 +4,8 @@ from typing import Any, cast
 import sqlalchemy
 from sqlalchemy.engine.result import Row
 
+import saffier
+from saffier.conf import settings
 from saffier.core.db.models.base import SaffierBaseReflectModel
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
@@ -63,12 +65,19 @@ class Model(ModelRow, DeclarativeMixin):
         """
         await self.signals.pre_update.send(sender=self.__class__, instance=self)
 
-        fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
+        db_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key in self.fields and self.fields[key].has_column()
+        }
+        fields = {key: field.validator for key, field in self.fields.items() if key in db_kwargs}
         validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-        await self.database.execute(expression)
+        db_kwargs = self._update_auto_now_fields(validator.check(db_kwargs), self.fields)
+
+        if db_kwargs:
+            pk_column = getattr(self.table.c, self.pkname)
+            expression = self.table.update().values(**db_kwargs).where(pk_column == self.pk)
+            await self.database.execute(expression)
         await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Update the model instance.
@@ -145,7 +154,12 @@ class Model(ModelRow, DeclarativeMixin):
             key: field.validator for key, field in self.fields.items() if key in extracted_fields
         }
         if values:
-            kwargs = self._update_auto_now_fields(values, self.fields)
+            db_values = {
+                key: value
+                for key, value in values.items()
+                if key in self.fields and self.fields[key].has_column()
+            }
+            kwargs = self._update_auto_now_fields(db_values, self.fields)
         else:
             validator = Schema(fields=fields)
             kwargs = self._update_auto_now_fields(validator.check(extracted_fields), self.fields)
@@ -175,6 +189,13 @@ class Model(ModelRow, DeclarativeMixin):
         it runs only once per foreign key avoiding multiple database calls.
         """
         if name not in self.__dict__ and name in self.fields and name != self.pkname:
+            field = self.fields[name]
+            if getattr(field, "is_computed", False):
+                return field.get_value(self, name)
+            if field.is_virtual:
+                if isinstance(field, saffier.ManyToManyField):
+                    return getattr(self, settings.many_to_many_relation.format(key=name))
+                raise AttributeError(name)
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)

@@ -12,7 +12,4 @@ def get_model(registry: Registry, model_name: str) -> type["Model"]:
 
     Raise lookup error if no model is found.
     """
-    try:
-        return cast("type[Model]", registry.models[model_name])
-    except KeyError:
-        raise LookupError(f"Registry doesn't have a {model_name} model.") from None
+    return cast("type[Model]", registry.get_model(model_name))

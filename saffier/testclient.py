@@ -46,7 +46,6 @@ class DatabaseTestClient(_DatabaseTestClient):
     testclient_lazy_setup: bool = testclient_default_lazy_setup
     testclient_force_rollback: bool = testclient_default_force_rollback
 
-    # TODO: replace by testclient default overwrites
     def __init__(
         self,
         url: typing.Union[str, "DatabaseURL", "sqlalchemy.URL", "Database"],

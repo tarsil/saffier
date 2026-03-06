@@ -101,9 +101,15 @@ in the same fashion.
 * **Managers** - Versatility at its core, you can have separate managers for your models to optimise
 specific queries and querysets at ease.
 * **Filters** - Filter by any field you want and need.
+* **Q expressions** - Complex boolean query composition with `Q` objects.
 * **Model operators** - Classic operations such as `update`, `get`, `get_or_none`, `bulk_create`,
 `bulk_update` and a lot more.
+* **Pagination** - Numbered and cursor pagination in `saffier.contrib.pagination`.
 * **Relationships made it easy** - Support for `OneToOne` and `ForeignKey` in the same Django style.
+* **Auto reflection patterns** - Pattern-driven reflected models via `AutoReflectModel`.
+* **Content types** - Generic content type support via `Registry(..., with_content_type=True)`.
+* **Permissions contrib** - Reusable permission model and permission manager helpers.
+* **Admin subsystem** - Python-native admin site and optional ASGI admin app.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you
 need so we give you already one.

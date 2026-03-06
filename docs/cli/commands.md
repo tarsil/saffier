@@ -23,7 +23,7 @@ See [Discovery](../migrations/discovery.md) for details.
 | Generate revision files | `revision`, `makemigrations`, `merge`, `edit` |
 | Apply or revert revisions | `migrate`, `downgrade`, `stamp` |
 | Inspect migration state | `current`, `heads`, `branches`, `history`, `show`, `check` |
-| Runtime utilities | `shell`, `inspectdb` |
+| Runtime utilities | `shell`, `inspectdb`, `admin_serve` |
 
 ## Migration Bootstrap
 
@@ -145,6 +145,21 @@ Reflect an existing database into models.
 
 ```shell
 $ saffier inspectdb --database "postgres+asyncpg://user:pass@localhost:5432/my_db"
+```
+
+### `saffier admin_serve`
+
+Run the Saffier admin ASGI app.
+
+```shell
+$ saffier admin_serve --admin-path /admin
+$ saffier admin_serve --host 0.0.0.0 --port 9000 --create-all
+```
+
+To enable the optional admin dependencies:
+
+```shell
+$ pip install "saffier[admin]"
 ```
 
 ## Recommended Flow

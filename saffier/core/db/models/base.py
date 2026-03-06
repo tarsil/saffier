@@ -163,10 +163,12 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
+        table_constraints = cls.meta.constraints
 
         columns = []
         for name, field in cls.fields.items():
-            columns.append(field.get_column(name))
+            if field.has_column():
+                columns.append(field.get_column(name))
 
         # Handle the uniqueness together
         uniques = []
@@ -180,12 +182,17 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             index = cls._get_indexes(field)
             indexes.append(index)
 
+        constraints = []
+        for constraint in table_constraints or []:
+            constraints.append(constraint)
+
         return sqlalchemy.Table(
             tablename,
             metadata,
             *columns,
             *uniques,
             *indexes,
+            *constraints,
             extend_existing=True,  # type: ignore
         )
 
@@ -221,13 +228,23 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         are simply relations.
         """
         related_names = self.meta.related_names
-        return {k: v for k, v in self.__dict__.items() if k not in related_names}
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in related_names and k in self.fields and self.fields[k].has_column()
+        }
 
     def __setattr__(self, key: Any, value: Any) -> Any:
         if key in self.fields:
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.
             field = self.fields[key]
+            if getattr(field, "is_computed", False):
+                field.set_value(self, key, value)
+                return
+            if field.is_virtual:
+                super().__setattr__(key, value)
+                return
 
             if isinstance(field, saffier.ManyToManyField):
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
@@ -297,10 +314,16 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
     @classmethod
     def reflect(cls, tablename: str, metadata: sqlalchemy.MetaData) -> sqlalchemy.Table:
         try:
+            database = getattr(cls, "database", None)
+            autoload_with = (
+                database.sync_engine
+                if database is not None and getattr(database, "sync_engine", None) is not None
+                else cls.meta.registry.sync_engine  # type: ignore[union-attr]
+            )
             return sqlalchemy.Table(
                 tablename,
                 metadata,
-                autoload_with=cls.meta.registry.sync_engine,  # type: ignore
+                autoload_with=autoload_with,
             )
         except Exception as e:
             raise ImproperlyConfigured(

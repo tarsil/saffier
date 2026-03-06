@@ -165,6 +165,25 @@ class MyModel(saffier.Model):
 
 * **choices** - An enum containing the choices for the field.
 
+#### CharChoiceField
+
+A character-backed choice field. Useful when you want enum-like semantics but explicit string
+storage.
+
+```python
+from enum import Enum
+import saffier
+
+
+class Status(Enum):
+    PENDING = "pending"
+    DONE = "done"
+
+
+class Job(saffier.Model):
+    status = saffier.CharChoiceField(choices=Status, max_length=20)
+```
+
 #### DateField
 
 ```python
@@ -248,6 +267,125 @@ class MyModel(saffier.Model):
 
 Derives from the same as [IntergerField](#integerfield) and validates the decimal float.
 
+#### SmallIntegerField
+
+```python
+import saffier
+
+
+class Counter(saffier.Model):
+    tiny_value = saffier.SmallIntegerField(default=0)
+```
+
+#### DurationField
+
+Stores `datetime.timedelta` using SQL `INTERVAL`.
+
+```python
+import datetime
+import saffier
+
+
+class Timer(saffier.Model):
+    elapsed = saffier.DurationField(default=datetime.timedelta)
+```
+
+#### BinaryField
+
+Stores bytes payloads using SQL `LargeBinary`.
+
+```python
+import saffier
+
+
+class Attachment(saffier.Model):
+    blob = saffier.BinaryField(max_length=4096, null=True)
+```
+
+#### ExcludeField
+
+Virtual field used to reserve an attribute name without creating a database column.
+
+```python
+import saffier
+
+
+class MyModel(saffier.Model):
+    transient = saffier.ExcludeField()
+```
+
+#### PlaceholderField
+
+Alias of `ExcludeField` used for placeholder semantics.
+
+```python
+import saffier
+
+
+class MyModel(saffier.Model):
+    placeholder = saffier.PlaceholderField()
+```
+
+#### ComputedField
+
+Virtual field whose value is resolved by getter/setter callbacks.
+
+```python
+import saffier
+
+
+class Permission(saffier.Model):
+    name = saffier.CharField(max_length=100)
+    description = saffier.ComputedField(
+        getter="get_description",
+        setter="set_description",
+    )
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def get_description(cls, field, instance, owner=None):
+        return instance.name.upper()
+```
+
+#### FileField
+
+String-backed field for file references/paths.
+
+```python
+import saffier
+
+
+class Asset(saffier.Model):
+    file_ref = saffier.FileField(null=True)
+```
+
+#### ImageField
+
+String-backed field for image references/paths.
+
+```python
+import saffier
+
+
+class Asset(saffier.Model):
+    image_ref = saffier.ImageField(null=True)
+```
+
+#### PGArrayField
+
+PostgreSQL `ARRAY` field with mutable list tracking.
+
+```python
+import sqlalchemy
+import saffier
+
+
+class User(saffier.Model):
+    tags = saffier.PGArrayField(sqlalchemy.String(), null=True)
+```
+
 #### ForeignKey
 
 ```python
@@ -313,6 +451,11 @@ class MyModel(saffier.Model):
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Saffier generates the model by default
 if none is provided.
+
+!!! Note
+    Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.
+    Auto-generated through models always include it, and custom through models must also expose
+    `id` as the primary key.
 
 #### IPAddressField
 

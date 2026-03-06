@@ -397,9 +397,20 @@ class BaseQuerySet(
 
     def _validate_kwargs(self, **kwargs: Any) -> Any:
         fields = self.model_class.fields
-        validator = Schema(fields={key: value.validator for key, value in fields.items()})
+        schema_fields = {}
+        for key, value in fields.items():
+            if not value.has_column():
+                continue
+            field_validator = value.validator
+            if value.primary_key and key in kwargs and field_validator.read_only:
+                field_validator = copy.copy(field_validator)
+                field_validator.read_only = False
+            schema_fields[key] = field_validator
+        validator = Schema(fields=schema_fields)
         kwargs = validator.check(kwargs)
         for key, value in fields.items():
+            if not value.has_column():
+                continue
             if value.validator.read_only and value.validator.has_default():
                 kwargs[key] = value.validator.get_default_value()
         return kwargs
@@ -433,7 +444,8 @@ class BaseQuerySet(
             schema = get_schema()
             if self.using_schema is None and schema is not None:
                 self.using_schema = schema
-            queryset.model_class.table = self.model_class.build(self.using_schema)
+            if self.using_schema is not None or getattr(self.model_class, "_table", None) is None:
+                queryset.model_class.table = self.model_class.build(self.using_schema)
 
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
@@ -677,6 +689,44 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset: QuerySet = self._clone()
         queryset._reference_select.update(references)
         return queryset
+
+    def paginator(
+        self,
+        page_size: int,
+        *,
+        next_item_attr: str = "",
+        previous_item_attr: str = "",
+    ) -> Any:
+        """
+        Returns a numbered paginator bound to the queryset.
+        """
+        from saffier.contrib.pagination import NumberedPaginator
+
+        return NumberedPaginator(
+            queryset=self._clone(),
+            page_size=page_size,
+            next_item_attr=next_item_attr,
+            previous_item_attr=previous_item_attr,
+        )
+
+    def cursor_paginator(
+        self,
+        page_size: int,
+        *,
+        next_item_attr: str = "",
+        previous_item_attr: str = "",
+    ) -> Any:
+        """
+        Returns a cursor paginator bound to the queryset.
+        """
+        from saffier.contrib.pagination import CursorPaginator
+
+        return CursorPaginator(
+            queryset=self._clone(),
+            page_size=page_size,
+            next_item_attr=next_item_attr,
+            previous_item_attr=previous_item_attr,
+        )
 
     def limit(self, limit_count: int) -> "QuerySet":
         """
@@ -976,7 +1026,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         kwargs = queryset._validate_kwargs(**kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
-        instance = await instance.save(force_save=True, values=kwargs)
+        instance = await instance.save(force_save=True)
         return instance
 
     async def bulk_create(self, objs: list[dict]) -> None:
@@ -984,11 +1034,22 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Bulk creates records in a table
         """
         queryset: QuerySet = self._clone()
-        new_objs = [queryset._validate_kwargs(**obj) for obj in objs]
+        new_objs = []
+        for obj in objs:
+            validated_obj = queryset._validate_kwargs(**obj)
+            db_values = {
+                key: value
+                for key, value in validated_obj.items()
+                if key in queryset.model_class.fields
+                and queryset.model_class.fields[key].has_column()
+            }
+            new_objs.append(db_values)
 
-        expression = queryset.table.insert().values(new_objs)
+        if not new_objs:
+            return
+        expression = queryset.table.insert()
         queryset._set_query_expression(expression)
-        await queryset.database.execute_many(expression)
+        await queryset.database.execute_many(expression, new_objs)
 
     async def bulk_update(self, objs: list[SaffierModel], fields: list[str]) -> None:
         """
@@ -1003,7 +1064,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         new_fields = {}
         for key, field in queryset.model_class.fields.items():
-            if key in fields:
+            if key in fields and field.has_column():
                 new_fields[key] = field.validator
 
         validator = Schema(fields=new_fields)
@@ -1012,7 +1073,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         for obj in objs:
             new_obj = {}
             for key, value in obj.__dict__.items():
-                if key in fields:
+                if key in fields and key in queryset.model_class.fields:
+                    if not queryset.model_class.fields[key].has_column():
+                        continue
                     new_obj[key] = value
             new_objs.append(new_obj)
 
@@ -1092,22 +1155,31 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Updates a record in a specific table with the given kwargs.
         """
         queryset: QuerySet = self._clone()
+        db_kwargs = {
+            key: value
+            for key, value in kwargs.items()
+            if key in queryset.model_class.fields and queryset.model_class.fields[key].has_column()
+        }
         fields = {
             key: field.validator
             for key, field in queryset.model_class.fields.items()
-            if key in kwargs
+            if key in db_kwargs
         }
 
         validator = Schema(fields=fields)
-        kwargs = queryset._update_auto_now_fields(
-            validator.check(kwargs), queryset.model_class.fields
+        db_kwargs = queryset._update_auto_now_fields(
+            validator.check(db_kwargs), queryset.model_class.fields
         )
 
         await self.model_class.signals.pre_update.send(
-            sender=self.__class__, instance=self, kwargs=kwargs
+            sender=self.__class__, instance=self, kwargs=db_kwargs
         )
 
-        expression = queryset.table.update().values(**kwargs)
+        if not db_kwargs:
+            await self.model_class.signals.post_update.send(sender=self.__class__, instance=self)
+            return
+
+        expression = queryset.table.update().values(**db_kwargs)
 
         for filter_clause in queryset.filter_clauses:
             expression = expression.where(filter_clause)

@@ -1,7 +1,10 @@
+import enum
 import typing
 from datetime import date, datetime
 
 import sqlalchemy
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.ext.mutable import MutableList
 
 import saffier
 from saffier.contrib.sqlalchemy.fields import IPAddress
@@ -10,10 +13,12 @@ from saffier.core.db.fields._internal import (
     URL,
     UUID,
     Any,
+    Binary,
     Boolean,
     Date,
     DateTime,
     Decimal,
+    Duration,
     Email,
     Float,
     Integer,
@@ -24,6 +29,7 @@ from saffier.core.db.fields._internal import (
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
 from saffier.core.terminal import Print
+from saffier.exceptions import ImproperlyConfigured
 
 if typing.TYPE_CHECKING:
     from saffier import Model
@@ -36,6 +42,8 @@ class Field:
     """
     Base field for the model declaration fields.
     """
+
+    is_virtual: bool = False
 
     def __init__(
         self,
@@ -59,6 +67,10 @@ class Field:
         self.validator: SaffierField | type[SaffierField] = self.get_validator(**kwargs)
         self.comment = kwargs.get("comment")
         self.owner = kwargs.pop("owner", None)
+        self.registry = kwargs.pop("registry", None)
+        self.name = kwargs.pop("name", "")
+        self.inherit = kwargs.pop("inherit", True)
+        self.no_copy = kwargs.pop("no_copy", False)
         self.server_onupdate = kwargs.pop("server_onupdate", None)
         self.autoincrement = kwargs.pop("autoincrement", False)
         self.secret = kwargs.pop("secret", False)
@@ -92,6 +104,9 @@ class Field:
     def get_constraints(self) -> typing.Any:
         return []
 
+    def has_column(self) -> bool:
+        return not self.is_virtual
+
     def expand_relationship(self, value: typing.Any) -> typing.Any:
         return value
 
@@ -105,12 +120,12 @@ class Field:
             has_server_default = False
 
         if (
-            not isinstance(self, (IntegerField, BigIntegerField))
+            not isinstance(self, (IntegerField, BigIntegerField, SmallIntegerField))
             and not has_default
             and not has_server_default
         ):
             raise ValueError(
-                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
+                "Primary keys other than IntegerField, SmallIntegerField and BigIntegerField must provide a default or a server_default."
             )
 
 
@@ -152,6 +167,15 @@ class IntegerField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Integer()
+
+
+class SmallIntegerField(IntegerField):
+    """
+    Representation of a SmallIntegerField.
+    """
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        return sqlalchemy.SmallInteger()
 
 
 class FloatField(Field):
@@ -247,6 +271,18 @@ class TimeField(Field):
         return sqlalchemy.Time()
 
 
+class DurationField(Field):
+    """
+    Representation of a duration/timedelta.
+    """
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Duration(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.Interval:
+        return sqlalchemy.Interval()
+
+
 class JSONField(Field):
     """
     JSON Representation of an object field
@@ -266,11 +302,17 @@ class ForeignKey(Field):
 
     class ForeignKeyValidator(SaffierField):
         def check(self, value: typing.Any) -> typing.Any:
-            return value.pk
+            if value is None and self.null:
+                return None
+            if value is None:
+                raise self.validation_error("null")
+            if hasattr(value, "pk"):
+                return value.pk
+            return value
 
     def __init__(
         self,
-        to: type["Model"],
+        to: type["Model"] | str,
         null: bool = False,
         on_delete: str = RESTRICT,
         on_update: str = CASCADE,
@@ -285,7 +327,16 @@ class ForeignKey(Field):
         if on_update and (on_update == SET_NULL and not null):
             raise AssertionError("When SET_NULL is enabled, null must be True.")
 
-        super().__init__(null=null)
+        primary_key = bool(kwargs.pop("primary_key", False))
+        index = bool(kwargs.pop("index", False))
+        unique = bool(kwargs.pop("unique", False))
+        super().__init__(
+            null=null,
+            primary_key=primary_key,
+            index=index,
+            unique=unique,
+            **kwargs,
+        )
         self.to = to
         self.on_delete = on_delete
         self.on_update = on_update or CASCADE
@@ -295,10 +346,10 @@ class ForeignKey(Field):
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
+                self._target = self.registry.models[self.to]
             else:
-                self._target = self.to  # type: ignore
-        return self._target  # type: ignore
+                self._target = self.to
+        return self._target
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return self.ForeignKeyValidator(**kwargs)
@@ -331,6 +382,8 @@ class ManyToManyField(Field):
     Representation of a ManyToManyField based on a foreignkey.
     """
 
+    is_virtual: bool = True
+
     def __init__(
         self,
         to: type["Model"] | str,
@@ -340,10 +393,11 @@ class ManyToManyField(Field):
         if "null" in kwargs:
             terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
-        super().__init__(null=True)
+        related_name = kwargs.pop("related_name", None)
+        super().__init__(null=True, **kwargs)
         self.to = to
         self.through = through
-        self.related_name = kwargs.pop("related_name", None)
+        self.related_name = related_name
 
         if self.related_name:
             assert isinstance(self.related_name, str), "related_name must be a string."
@@ -354,7 +408,7 @@ class ManyToManyField(Field):
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
+                self._target = self.registry.models[self.to]
             else:
                 self._target = self.to
         return self._target
@@ -403,7 +457,43 @@ class ManyToManyField(Field):
 
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.owner.meta.registry.models[self.through]  # type: ignore
+                self.through = self.owner.meta.registry.models[self.through]
+
+            # M2M through models in Saffier are always required to expose an
+            # auto-incrementing integer "id" primary key.
+            id_field = self.through.fields.get("id")
+            if id_field is None:
+                has_non_id_pk = any(
+                    field.primary_key
+                    for field_name, field in self.through.fields.items()
+                    if field_name != "id"
+                )
+                if has_non_id_pk:
+                    raise ImproperlyConfigured(
+                        "ManyToMany through models must use an auto-incrementing 'id' primary key."
+                    )
+                id_field = saffier.IntegerField(primary_key=True, autoincrement=True)
+                id_field.owner = self.through
+                id_field.registry = self.through.meta.registry
+                id_field.name = "id"
+                self.through.fields["id"] = id_field
+                self.through.meta.fields["id"] = id_field
+                self.through.meta.fields_mapping["id"] = id_field
+                self.through.meta.pk = id_field
+                self.through.meta.pk_attribute = "id"
+                self.through.pkname = "id"
+                self.through._table = None
+                self.through.__proxy_model__ = None
+            elif not id_field.primary_key:
+                raise ImproperlyConfigured(
+                    "ManyToMany through models must define 'id' as the primary key."
+                )
+            elif not isinstance(id_field, (IntegerField, SmallIntegerField, BigIntegerField)):
+                raise ImproperlyConfigured(
+                    "ManyToMany through model 'id' primary key must be an integer type."
+                )
+            else:
+                id_field.autoincrement = True
 
             self.through.meta.is_multi = True
             self.through.meta.multi_related = [self.to.__name__.lower()]
@@ -441,7 +531,7 @@ class ManyToManyField(Field):
             (saffier.Model,),
             {
                 "Meta": new_meta,
-                "id": saffier.IntegerField(primary_key=True),
+                "id": saffier.IntegerField(primary_key=True, autoincrement=True),
                 f"{owner_name.lower()}": ForeignKey(
                     self.owner,
                     on_delete=saffier.CASCADE,
@@ -505,7 +595,34 @@ class ChoiceField(Field):
         return Any(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
-        return sqlalchemy.Enum(self.choices)
+        enum_values = [
+            choice[0] if isinstance(choice, (tuple, list)) else choice for choice in self.choices
+        ]
+        return sqlalchemy.Enum(*[str(value) for value in enum_values])
+
+
+class CharChoiceField(Field):
+    """
+    Choice field stored as character values.
+    """
+
+    def __init__(
+        self,
+        choices: type[enum.Enum] | typing.Sequence[typing.Any],
+        max_length: int | None = 30,
+        **kwargs: typing.Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.choices = choices
+        self.max_length = max_length
+
+    def get_validator(self, **kwargs: typing.Any) -> Any:
+        return Any(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        if self.max_length is None:
+            return sqlalchemy.Text()
+        return sqlalchemy.String(length=self.max_length)
 
 
 class DecimalField(Field):
@@ -577,3 +694,197 @@ class URLField(CharField):
 
     def get_column_type(self) -> sqlalchemy.String:
         return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
+
+
+class BinaryField(Field):
+    """
+    Representation of bytes/binary data.
+    """
+
+    def __init__(self, max_length: int | None = None, **kwargs: typing.Any):
+        self.max_length = max_length
+        super().__init__(**kwargs)
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        kwargs["max_length"] = self.max_length
+        return Binary(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.LargeBinary:
+        return sqlalchemy.LargeBinary(length=self.max_length)
+
+
+class ExcludeField(Field):
+    """
+    Virtual field used to reserve an attribute name without creating a DB column.
+    """
+
+    is_virtual = True
+
+    def __init__(self, **kwargs: typing.Any) -> None:
+        kwargs.setdefault("null", True)
+        kwargs.setdefault("read_only", True)
+        super().__init__(**kwargs)
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        raise RuntimeError(f"Virtual field '{name}' does not map to a database column.")
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        raise RuntimeError("ExcludeField does not expose a column type.")
+
+
+class PlaceholderField(ExcludeField):
+    """
+    Explicit alias for placeholders used by relation internals.
+    """
+
+
+class ComputedField(Field):
+    """
+    Virtual field whose value is resolved by getter/setter callbacks.
+    """
+
+    is_virtual = True
+    is_computed = True
+
+    def __init__(
+        self,
+        *,
+        getter: str | typing.Callable[..., typing.Any] | None = None,
+        setter: str | typing.Callable[..., typing.Any] | None = None,
+        fallback_getter: typing.Callable[..., typing.Any] | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        kwargs.setdefault("null", True)
+        kwargs.setdefault("read_only", setter is None)
+        super().__init__(**kwargs)
+        self.getter = getter
+        self.setter = setter
+        self.fallback_getter = fallback_getter
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        raise RuntimeError(f"Computed field '{name}' does not map to a database column.")
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        raise RuntimeError("ComputedField does not expose a column type.")
+
+    def _resolve_callable(
+        self,
+        instance: typing.Any,
+        func: str | typing.Callable[..., typing.Any] | None,
+    ) -> typing.Callable[..., typing.Any] | None:
+        if func is None:
+            return None
+        if isinstance(func, str):
+            return getattr(instance, func)
+        return func
+
+    @staticmethod
+    def _call_with_supported_signatures(
+        callback: typing.Callable[..., typing.Any],
+        field: "ComputedField",
+        instance: typing.Any,
+        owner: type["Model"],
+        value: typing.Any = None,
+        *,
+        include_value: bool = False,
+    ) -> typing.Any:
+        call_signatures = [
+            (field, instance, owner),
+            (field, instance),
+            (instance,),
+            (),
+        ]
+        if include_value:
+            call_signatures = [
+                (field, instance, value, owner),
+                (field, instance, value),
+                (instance, value),
+                (value,),
+            ]
+
+        for args in call_signatures:
+            try:
+                return callback(*args)
+            except TypeError:
+                continue
+        if include_value:
+            return callback(field, instance, value, owner)
+        return callback(field, instance, owner)
+
+    def get_value(self, instance: typing.Any, name: str) -> typing.Any:
+        if name in instance.__dict__:
+            return instance.__dict__[name]
+
+        owner = instance.__class__
+        getter = self._resolve_callable(instance, self.getter)
+        if getter is not None:
+            value = self._call_with_supported_signatures(getter, self, instance, owner)
+            if value is not None:
+                return value
+
+        fallback = self._resolve_callable(instance, self.fallback_getter)
+        if fallback is not None:
+            return self._call_with_supported_signatures(fallback, self, instance, owner)
+
+        raise AttributeError(name)
+
+    def set_value(self, instance: typing.Any, name: str, value: typing.Any) -> None:
+        owner = instance.__class__
+        setter = self._resolve_callable(instance, self.setter)
+        if setter is None:
+            instance.__dict__[name] = value
+            return
+
+        result = self._call_with_supported_signatures(
+            setter,
+            self,
+            instance,
+            owner,
+            value,
+            include_value=True,
+        )
+        if result is not None:
+            instance.__dict__[name] = result
+
+
+class FileField(CharField):
+    """
+    Lightweight file path/reference field stored as text.
+    """
+
+    def __init__(self, max_length: int = 255, **kwargs: typing.Any) -> None:
+        kwargs.setdefault("max_length", max_length)
+        super().__init__(**kwargs)
+
+
+class ImageField(FileField):
+    """
+    Lightweight image path/reference field stored as text.
+    """
+
+
+class PGArrayField(Field):
+    """
+    PostgreSQL ARRAY field with mutable list tracking.
+    """
+
+    def __init__(self, item_type: sqlalchemy.types.TypeEngine, **kwargs: typing.Any) -> None:
+        if not isinstance(item_type, sqlalchemy.types.TypeEngine):
+            raise AssertionError("item_type must be a SQLAlchemy TypeEngine instance.")
+        self.item_type = item_type
+        super().__init__(**kwargs)
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        return typing.cast(
+            sqlalchemy.types.TypeEngine,
+            MutableList.as_mutable(postgresql.ARRAY(self.item_type)),
+        )

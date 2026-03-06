@@ -20,6 +20,7 @@ from saffier.cli.constants import (
 )
 from saffier.cli.env import MigrationEnv
 from saffier.cli.operations import (
+    admin_serve,
     check,
     current,
     downgrade,
@@ -110,3 +111,4 @@ _add_command(stamp, name="stamp")
 _add_command(check, name="check")
 _add_command(shell, name="shell")
 _add_command(inspect_db, name="inspectdb")
+_add_command(admin_serve, name="admin_serve")

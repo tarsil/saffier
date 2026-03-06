@@ -1,0 +1,38 @@
+{% extends "admin/base.html.jinja" %}
+{% block content %}
+  <div class="card">
+    <h2>{{ model.__name__ }}</h2>
+    <p class="muted">Page {{ page.current_page }}{% if page.next_page %} / next {{ page.next_page }}{% endif %}</p>
+    <form method="get">
+      <input type="text" name="q" value="{{ query }}" placeholder="Search..." />
+      <input type="hidden" name="per_page" value="{{ per_page }}" />
+    </form>
+    <p>
+      <a class="btn" href="{{ request.url_for('admin_model_create', name=model_name) }}">Create</a>
+      <a class="btn" href="{{ request.url_for('admin_model_schema', name=model_name) }}">JSON Schema</a>
+    </p>
+    <table>
+      <thead>
+        <tr>
+          {% for field in model_fields %}
+            <th>{{ field.name }}</th>
+          {% endfor %}
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in objects %}
+        <tr>
+          {% for field in model_fields %}
+            <td>{{ getattr(row.instance, field.name, "") }}</td>
+          {% endfor %}
+          <td>
+            <a class="btn" href="{{ request.url_for('admin_model_object', name=model_name, pk=row.pk) }}">View</a>
+            <a class="btn" href="{{ request.url_for('admin_model_edit', name=model_name, pk=row.pk) }}">Edit</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

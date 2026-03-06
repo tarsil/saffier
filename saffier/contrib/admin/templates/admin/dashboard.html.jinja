@@ -1,0 +1,21 @@
+{% extends "admin/base.html.jinja" %}
+{% block content %}
+  <div class="card">
+    <h2>{{ dashboard_title }}</h2>
+    <p class="muted">Total records: {{ total_records }}. Top model: {{ top_model.name }} ({{ top_model.count }}).</p>
+    <table>
+      <thead>
+        <tr><th>Model</th><th>Records</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for item in model_stats %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.count }}</td>
+          <td><a class="btn" href="{{ request.url_for('admin_model_detail', name=item.name) }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

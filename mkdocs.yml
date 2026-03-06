@@ -75,9 +75,12 @@ nav:
   - Core:
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"
-      - Reflection: "reflection.md"
+      - Reflection:
+          - Reflection: "reflection.md"
+          - Auto Reflection: "reflection/autoreflection.md"
       - Managers: "managers.md"
       - Fields: "fields.md"
+      - Pagination: "pagination.md"
       - Queries:
           - Queries: "queries/queries.md"
           - Q Expressions: "queries/q.md"
@@ -89,12 +92,15 @@ nav:
   - Features:
       - Signals: "signals.md"
       - Relationships: "relationships.md"
+      - Content Types: "contenttypes/intro.md"
+      - Permissions: "permissions/intro.md"
       - Connection: "connection.md"
       - Tenancy:
           - Saffier: "tenancy/saffier.md"
           - Contrib: "tenancy/contrib.md"
       - Registry: "registry.md"
       - CLI Commands: "cli/commands.md"
+      - Admin: "admin/admin.md"
       - Shell Support: "shell.md"
       - Inspect DB: "inspectdb.md"
       - Migrations:

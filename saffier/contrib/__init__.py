@@ -1,0 +1,3 @@
+"""
+Saffier contrib namespace package.
+"""

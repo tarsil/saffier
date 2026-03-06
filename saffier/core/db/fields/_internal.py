@@ -1,6 +1,7 @@
 import decimal
 import re
 import typing
+from datetime import timedelta
 from math import isfinite
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel
@@ -316,6 +317,72 @@ class Boolean(SaffierField):
                 value = self.coerse_values[value]
             except (KeyError, TypeError):
                 raise self.validation_error("type")  # noqa
+        return value
+
+
+class Duration(SaffierField):
+    error_messages: dict[str, str] = {
+        "type": "Must be a timedelta or seconds.",
+        "null": "May not be null.",
+    }
+
+    def __init__(self, *, coerce_types: bool = True, **kwargs: typing.Any) -> None:
+        super().__init__(**kwargs)
+        self.coerce_types = coerce_types
+
+    def check(self, value: typing.Any) -> typing.Any:
+        if value is None and self.null:
+            return None
+        elif value is None:
+            raise self.validation_error("null")
+        elif isinstance(value, timedelta):
+            return value
+
+        if self.coerce_types:
+            if isinstance(value, (int, float)):
+                return timedelta(seconds=float(value))
+            if isinstance(value, str):
+                stripped = value.strip()
+                try:
+                    return timedelta(seconds=float(stripped))
+                except ValueError:
+                    ...
+        raise self.validation_error("type")
+
+
+class Binary(SaffierField):
+    error_messages: dict[str, str] = {
+        "type": "Must be bytes.",
+        "null": "May not be null.",
+        "max_length": "Must have no more than {max_length} bytes.",
+    }
+
+    def __init__(
+        self,
+        *,
+        coerce_types: bool = True,
+        max_length: int | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.coerce_types = coerce_types
+        self.max_length = max_length
+
+    def check(self, value: typing.Any) -> typing.Any:
+        if value is None and self.null:
+            return None
+        elif value is None:
+            raise self.validation_error("null")
+
+        if isinstance(value, (bytearray, memoryview)):
+            value = bytes(value)
+        elif isinstance(value, str) and self.coerce_types:
+            value = value.encode()
+        elif not isinstance(value, bytes):
+            raise self.validation_error("type")
+
+        if self.max_length is not None and len(value) > self.max_length:
+            raise self.validation_error("max_length")
         return value
 
 

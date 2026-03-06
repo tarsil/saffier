@@ -122,6 +122,10 @@ field is **mandatory** and it will raise an `ImproperlyConfigured` error if no r
 
     <sup>Default: `name of class pluralised`<sup>
 
+* **table_prefix** - Prefix automatically prepended to generated table names.
+
+    <sup>Default: `None`<sup>
+
 * **abstract** - If the model is abstract or not. If is abstract, then it won't generate the
 database table.
 
@@ -132,6 +136,8 @@ database table.
     <sup>Default: `None`<sup>
 
 * **indexes** - The extra custom indexes you want to add to the model
+
+* **constraints** - Extra SQLAlchemy table constraints to attach to the generated table.
 
 ### Registry
 
@@ -211,6 +217,27 @@ In this example, the `User` class will be represented by a `db_users` mapping in
     in your codebase. The tablename is used **solely for SQL internal purposes**. You will
     still access the given table in your codebase via main class.
 
+### Table prefix
+
+When `Meta.table_prefix` is defined, Saffier prefixes the generated table name automatically.
+
+```python
+import saffier
+
+database = saffier.Database("<your-url>")
+models = saffier.Registry(database=database)
+
+
+class Product(saffier.Model):
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+        table_prefix = "catalog"
+```
+
+This model maps to `catalog_products`. Prefixes are inherited from parent models unless overridden.
+
 
 ### Abstract
 
@@ -261,9 +288,34 @@ Abstract models do not allow you to:
 
 * **Declare** [managers](./managers.md).
 * **Declare** [unique together](#unique-together)
+* **Declare** [indexes](#indexes)
+* **Declare** `constraints`
 
 This limitations are intentional as these operations should be done for [models](#declaring-models)
 and not abstact models.
+
+### Metaclass helpers
+
+Saffier models expose a few metaclass-level helpers that are useful for tooling and advanced
+runtime workflows:
+
+* `Model.pknames` - Tuple of primary-key field names.
+* `Model.pkcolumns` - Tuple of primary-key column names.
+* `Model.table_schema(schema, update_cache=False)` - Returns the SQLAlchemy table for a given
+schema, with per-model schema cache support.
+* `Model.transaction(...)` - Opens a transaction using the model database connection.
+
+### Inheritance controls
+
+You can opt fields out of concrete-model inheritance with `inherit=False`:
+
+```python
+class Base(saffier.Model):
+    internal_code = saffier.CharField(max_length=50, inherit=False)
+```
+
+When a concrete child model inherits from `Base`, `internal_code` is not propagated to the child
+model schema.
 
 ### Unique together
 
@@ -428,3 +480,24 @@ the model field.
 ```python hl_lines="16-19"
 {!> ../docs_src/models/indexes/complex_together.py !}
 ```
+
+### Constraints
+
+Use `Meta.constraints` for table-level SQLAlchemy constraints:
+
+```python
+import sqlalchemy
+import saffier
+
+
+class Invoice(saffier.Model):
+    total = saffier.IntegerField()
+
+    class Meta:
+        registry = models
+        constraints = [
+            sqlalchemy.CheckConstraint("total >= 0", name="invoice_total_non_negative")
+        ]
+```
+
+`Meta.constraints` accepts a list/tuple of `sqlalchemy.Constraint` instances.
