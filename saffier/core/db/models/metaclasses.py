@@ -270,7 +270,8 @@ class BaseModelMeta(type):
                     many_to_many_fields.add(value)
                     continue
                 elif isinstance(value, saffier_fields.ForeignKey) and not isinstance(
-                    value, saffier_fields.ManyToManyField  # type: ignore
+                    value,
+                    saffier_fields.ManyToManyField,  # type: ignore
                 ):
                     foreign_key_fields[key] = value
                     continue
@@ -398,7 +399,7 @@ class BaseModelMeta(type):
         _register_model_signals(new_class)
 
         # Update the model references with the validations of the model
-        # Being done by the Edgy fields instead.
+        # Being handled by the Saffier fields instead.
         # Generates a proxy model for each model created
         # Making sure the core model where the fields are inherited
         # And mapped contains the main proxy_model

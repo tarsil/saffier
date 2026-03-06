@@ -72,8 +72,8 @@ async def rollback_connections():
 
 
 async def test_activate_using_takes_precedence():
-    tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
-    saffier = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
+    tenant = await Tenant.query.create(schema_name="tenant_alpha", tenant_name="tenant_alpha")
+    tenant_beta = await Tenant.query.create(schema_name="tenant_beta", tenant_name="tenant_beta")
 
     # Activate the schema and query always the tenant set
     activate_schema(tenant.schema_name)
@@ -99,7 +99,7 @@ async def test_activate_using_takes_precedence():
     assert len(query) == 1
     assert query[0].pk == permission.pk
 
-    activate_schema(saffier.tenant_name)
+    activate_schema(tenant_beta.tenant_name)
 
     # Even if the activate_schema pointing to a different schema is enabled
     # The use of `using` takes precedence all the time

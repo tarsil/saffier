@@ -4,7 +4,6 @@ from typing import (
     Any,
     Protocol,
     TypeVar,
-    Union,
     runtime_checkable,
 )
 
@@ -15,7 +14,7 @@ if TYPE_CHECKING:  # pragma: nocover
 _SaffierModel = TypeVar("_SaffierModel", bound="Model")
 ReflectSaffierModel = TypeVar("ReflectSaffierModel", bound="ReflectModel")
 
-SaffierModel = Union[_SaffierModel, ReflectSaffierModel]
+SaffierModel = _SaffierModel | ReflectSaffierModel
 
 
 @runtime_checkable
@@ -94,6 +93,18 @@ class QuerySetProtocol(Protocol):
     ) -> tuple[SaffierModel, bool]: ...
 
     async def contains(self, instance: SaffierModel) -> bool: ...
+
+    def union(self, other: "QuerySet", *, all: bool = ...) -> "QuerySet": ...
+
+    def union_all(self, other: "QuerySet") -> "QuerySet": ...
+
+    def intersect(self, other: "QuerySet", *, all: bool = ...) -> "QuerySet": ...
+
+    def intersect_all(self, other: "QuerySet") -> "QuerySet": ...
+
+    def except_(self, other: "QuerySet", *, all: bool = ...) -> "QuerySet": ...
+
+    def except_all(self, other: "QuerySet") -> "QuerySet": ...
 
     def select_for_update(
         self,

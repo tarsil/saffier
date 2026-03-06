@@ -265,7 +265,7 @@ The settings can be stored in a location like `myapp/configs/saffier/settings.py
 **Make the settings globally available to Saffier**.
 
 ```shell
-$ export SAFFIER_SETTINGS_MODULE=myapp.configs.saffier.settings.EdgySettings
+$ export SAFFIER_SETTINGS_MODULE=myapp.configs.saffier.settings.SaffierSettings
 ```
 
 Exporting as an environment variable will make sure Saffier will use your settings instead of the

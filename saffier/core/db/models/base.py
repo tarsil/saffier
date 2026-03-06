@@ -135,8 +135,32 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         provided Meta class object.
         """
         tablename = cls.meta.tablename
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
-        metadata.schema = schema
+        registry_metadata: sqlalchemy.MetaData = cast(
+            "sqlalchemy.MetaData", cls.meta.registry._metadata
+        )  # type: ignore
+        schema_metadata_cache: dict[str | None, sqlalchemy.MetaData] = getattr(
+            cls.meta.registry,
+            "_schema_metadata_cache",
+            {},
+        )
+        if not hasattr(cls.meta.registry, "_schema_metadata_cache"):
+            cls.meta.registry._schema_metadata_cache = schema_metadata_cache
+        registry_schema = cls.meta.registry.db_schema
+
+        # Keep tenant/using table generation isolated from the shared registry
+        # metadata. This prevents cross-schema table/index leakage in metadata.
+        if schema == registry_schema:
+            metadata = registry_metadata
+            metadata.schema = schema
+        else:
+            if schema not in schema_metadata_cache:
+                schema_metadata_cache[schema] = sqlalchemy.MetaData(schema=schema)
+            metadata = schema_metadata_cache[schema]
+
+        table_key = tablename if schema is None else f"{schema}.{tablename}"
+        existing_table = metadata.tables.get(table_key)
+        if existing_table is not None:
+            return existing_table
 
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
@@ -158,7 +182,12 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             indexes.append(index)
 
         return sqlalchemy.Table(
-            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True  # type: ignore
+            tablename,
+            metadata,
+            *columns,
+            *uniques,
+            *indexes,
+            extend_existing=True,  # type: ignore
         )
 
     @classmethod
@@ -248,16 +277,37 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
-        metadata.schema = schema
+        registry_metadata = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        schema_metadata_cache: dict[str | None, sqlalchemy.MetaData] = getattr(
+            cls.meta.registry,
+            "_schema_metadata_cache",
+            {},
+        )
+        if not hasattr(cls.meta.registry, "_schema_metadata_cache"):
+            cls.meta.registry._schema_metadata_cache = schema_metadata_cache
+        registry_schema = cls.meta.registry.db_schema
+
+        if schema == registry_schema:
+            metadata = registry_metadata
+            metadata.schema = schema
+        else:
+            if schema not in schema_metadata_cache:
+                schema_metadata_cache[schema] = sqlalchemy.MetaData(schema=schema)
+            metadata = schema_metadata_cache[schema]
         tablename: str = cast("str", cls.meta.tablename)
+        table_key = tablename if schema is None else f"{schema}.{tablename}"
+        existing_table = metadata.tables.get(table_key)
+        if existing_table is not None:
+            return existing_table
         return cls.reflect(tablename, metadata)
 
     @classmethod
     def reflect(cls, tablename: str, metadata: sqlalchemy.MetaData) -> sqlalchemy.Table:
         try:
             return sqlalchemy.Table(
-                tablename, metadata, autoload_with=cls.meta.registry.sync_engine  # type: ignore
+                tablename,
+                metadata,
+                autoload_with=cls.meta.registry.sync_engine,  # type: ignore
             )
         except Exception as e:
             raise ImproperlyConfigured(

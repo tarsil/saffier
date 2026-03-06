@@ -199,6 +199,40 @@ users = await User.query.distinct("email")
     has that limitation whereas `postgres` does not.
     Be careful to know and understand where this should be applied.
 
+### Set operations
+
+Saffier supports SQL set operations between querysets of the same model:
+
+```python
+active_users = User.query.filter(is_active=True)
+staff_users = User.query.filter(is_staff=True)
+
+combined = active_users.union(staff_users)
+intersection = active_users.intersect(staff_users)
+difference = active_users.except_(staff_users)
+```
+
+If you need duplicate-preserving variants, use:
+
+```python
+User.query.union_all(other_queryset)
+User.query.intersect_all(other_queryset)
+User.query.except_all(other_queryset)
+```
+
+!!! Warning
+    Set operations require both querysets to select the same shape and model.
+    Apply `filter()`/`exclude()` before combining querysets.
+
+### Row locking
+
+Use `select_for_update()` to request row-level locking when running inside a transaction:
+
+```python
+async with database.transaction():
+    users = await User.query.select_for_update(nowait=True).all()
+```
+
 ### Select related
 
 Returns a QuerySet that will “follow” foreign-key relationships, selecting additional

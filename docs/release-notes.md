@@ -5,6 +5,20 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- QuerySet set operations: `union`, `union_all`, `intersect`, `intersect_all`, `except_`, and `except_all`.
+
+### Changed
+
+- Documentation updated with Saffier-first naming and query set-operation guidance.
+
+### Fixed
+
+- Tenant schema table metadata now keeps foreign-key relationships consistent across related models in non-default schemas.
+
 ## 1.4.2
 
 ### Changed
@@ -137,7 +151,7 @@ to the right tenant.
 
 ### Added
 
-- Support for `sync` queries. This will enable Edgy to run in blocking frameworks like
+- Support for `sync` queries. This will enable Saffier to run in blocking frameworks like
 Flask, bottle or any other by using the newly added [run_sync](./queries/queries.md#blocking-queries).
 
 ### Fixed
@@ -150,7 +164,7 @@ when querying the tenant.
 
 ### Added
 
-- Support for [`or_`, `and_` and `not_`](./queries/queries#saffier-style) for SQLAlchemy style queries and Edgy syntax sugar queries.
+- Support for [`or_`, `and_` and `not_`](./queries/queries#saffier-style) for SQLAlchemy style queries and Saffier syntax sugar queries.
 
 ### Changed
 
@@ -165,7 +179,7 @@ caused by the `urlsplit`.
 
 !!! Warning
 	This could impact your migrations, so the advise would be to generate a new migration
-	after upgrading to the new version of Edgy to make sure the database reflects the proper
+	after upgrading to the new version of Saffier to make sure the database reflects the proper
 	nullables/non-nullable fields.
 
 
@@ -177,7 +191,7 @@ caused by the `urlsplit`.
 
 ### Changed
 
-- Added `name` for `edgy.UniqueConstraint` allowing unique custom names for the `unique_together`.
+- Added `name` for `saffier.UniqueConstraint` allowing unique custom names for the `unique_together`.
 - `max_name_length` in the datastuctures changed to `__max_name_length__` and `ClassVar`.
 
 ## 1.0.1

@@ -30,3 +30,4 @@ venv
 coverage.*
 example.sqlite
 docs_internal/
+revamp_plan.md

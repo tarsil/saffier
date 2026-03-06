@@ -20,7 +20,7 @@ class Tenant(TenantMixin):
         registry = models
 
 
-class EdgyTenantBaseModel(TenantModel):
+class SaffierTenantBaseModel(TenantModel):
     id: int = saffier.IntegerField(primary_key=True)
 
     class Meta:
@@ -29,21 +29,21 @@ class EdgyTenantBaseModel(TenantModel):
         abstract = True
 
 
-class Designation(EdgyTenantBaseModel):
+class Designation(SaffierTenantBaseModel):
     name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_designation"
 
 
-class AppModule(EdgyTenantBaseModel):
+class AppModule(SaffierTenantBaseModel):
     name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_module"
 
 
-class Permission(EdgyTenantBaseModel):
+class Permission(SaffierTenantBaseModel):
     module = saffier.ForeignKey(AppModule)
     designation = saffier.ForeignKey("Designation")
     can_read = saffier.BooleanField(default=False)

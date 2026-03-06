@@ -29,12 +29,22 @@ class DatabaseTestClient(_DatabaseTestClient):
     Note: the default of lazy_setup is True here. This enables the simple Registry syntax.
     """
 
-    testclient_lazy_setup: bool = (
+    testclient_default_test_prefix: str = default_test_prefix
+    testclient_default_lazy_setup: bool = (
         os.environ.get("SAFFIER_TESTCLIENT_LAZY_SETUP", "true") or ""
     ).lower() == "true"
-    testclient_force_rollback: bool = (
+    testclient_default_force_rollback: bool = (
         os.environ.get("SAFFIER_TESTCLIENT_FORCE_ROLLBACK") or ""
     ).lower() == "true"
+    testclient_default_use_existing: bool = default_use_existing
+    testclient_default_drop_database: bool = default_drop_database
+    testclient_default_full_isolation: bool = (
+        os.environ.get("SAFFIER_TESTCLIENT_FULL_ISOLATION", "true") or ""
+    ).lower() == "true"
+
+    # Backwards-compatible aliases kept for external access.
+    testclient_lazy_setup: bool = testclient_default_lazy_setup
+    testclient_force_rollback: bool = testclient_default_force_rollback
 
     # TODO: replace by testclient default overwrites
     def __init__(

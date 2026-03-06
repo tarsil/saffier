@@ -37,14 +37,8 @@ hide:
 
 ## Announcement
 
-Saffier is and always will be free and belongs to the community but due to the advancement of the [Dymmond](https://github.com/dymmond)
-ecosystem, it was decided to persue the continuation of a more customisable, versatile, modular and faster tool
-to maintain and grow, [Edgy](https://edgy.dymmond.com). This does not mean Saffier will be forgotten, quite the opposite but the main
-efforts are focused on the open source of the ecosystem of Dymmond as there is a lot of work to carry on and the community is driven
-by that.
-
-**If you would like to continue with Saffier and also maintain it, I'm more than happy to pass it on to you as Saffier can grow in so many**
-other possible ways that we can't even quantify it here.
+Saffier is and always will be free and community-owned. The project is being actively modernized across
+ORM capabilities, testing, tooling, and documentation while preserving its Python-native ORM identity.
 
 ## Motivation
 
@@ -60,29 +54,9 @@ are done into a more common and familiar interface.
 
 ## Before continuing
 
-If you are looking for something more **Pyadntic** oriented where you can take literally advantage
-of everything that Pydantic can offer, then instead of continuing with Saffier, have a look at
-its ***data ORM brother***, [Edgy](https://edgy.tarsild.io).
-
-**Edgy** its extremely powerful as well with a key difference that its **100% Pydantic** which means
-you can leverage the technology if you already familiar with it.
-
-No worries, it is not completely different from Saffier, in fact, it was designed with the same principles and what it changes for you
-are essentially the ***imports***.
-
-### Thinking of moving to Edgy?
-
-If you are considering of moving to Edgy but you don't want to be bothered about learning a new
-tool and afraid of breaking changes, then fear not!
-
-Edgy was designed to also make your migration feel seemless, which means that essentially you would
-only need to install it and change the imports in your project from `saffier` to `edgy` and it should
-work automatically for you.
-
-Even the documentation structure its almost the same, intentionally, so what you already know with
-Saffier, you will know with **Edgy**.
-
-**This discards any custom code done by you, of course.**
+Saffier is a Python-native ORM focused on query ergonomics, model expressiveness, and predictable async behavior.
+If your project also needs dedicated data validation, you can integrate Saffier with the validation
+library of your choice.
 
 ## Why this ORM
 
@@ -97,7 +71,7 @@ There was one issue though, although ORM was doing a great familiar interface wi
 providing the async solution needed, it was, by the time of this writting,
 incomplete and they even stated that in the documentation and that is how Saffier was born.
 
-Saffier uses some of the same concepts of ORM from Encode but rewritten in Pydantic but not all.
+Saffier uses some of the same concepts of ORM from Encode but with its own Python-native model layer.
 
 ## Saffier
 
@@ -105,11 +79,10 @@ Saffier is some sort of a fork from [Encode ORM](https://www.encode.io/orm/) but
 core and with a complete set of tools with a familiar interface to work with.
 If you are familiar with Django, then you came for a treat 😄.
 
-Saffier leverages the power of **Pydantic** for its fields while offering a friendly, familiar and
-easy to use interface.
+Saffier provides a Python-native field system while offering a friendly, familiar, and easy-to-use interface.
 
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
-[Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
+[Ravyn](https://ravyn.dymmond.com), Starlette, FastAPI, Sanic, Quart... with simple pluggable
 design thanks to its origins.
 
 ### Special notes

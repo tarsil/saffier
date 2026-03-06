@@ -58,20 +58,20 @@ async def rollback_connections():
             yield
 
 
-@pytest.mark.parametrize("func", ["bad", 1, 3, [3], {"name": "test"}])
-def test_passing_not_callable(func):
+@pytest.mark.parametrize("value", ["bad", 1, 3, [3], {"name": "test"}])
+async def test_passing_not_callable(value):
     with pytest.raises(SignalError):
-        pre_save(User)(func)
+        pre_save(User)(value)
 
 
-def test_passing_no_kwargs():
+async def test_passing_no_kwargs():
     with pytest.raises(SignalError):
 
         @pre_save(User)
         def execute(sender, instance): ...
 
 
-def test_invalid_signal():
+async def test_invalid_signal():
     broadcaster = Broadcaster()
     with pytest.raises(SignalError):
         broadcaster.save = 1
@@ -109,7 +109,7 @@ async def test_signals():
         logger.info(f"post_delete signal broadcasted for {instance.get_instance_name()}")
 
     # Signals for the create
-    user = await User.query.create(name="Edgy")
+    user = await User.query.create(name="Saffier")
     logs = await Log.query.all()
 
     assert len(logs) == 2
@@ -169,7 +169,7 @@ async def test_staticmethod_signals():
             await Log.query.create(signal="pre_save_two", instance=instance.model_dump())
 
     # Signals for the create
-    user = await User.query.create(name="Edgy")
+    user = await User.query.create(name="Saffier")
     logs = await Log.query.all()
 
     assert len(logs) == 2
@@ -183,8 +183,8 @@ async def test_multiple_senders():
     async def pre_saving(sender, instance, **kwargs):
         await Log.query.create(signal="pre_save", instance=instance.model_dump())
 
-    user = await User.query.create(name="Edgy")
-    profile = await User.query.create(name="Profile Edgy")
+    user = await User.query.create(name="Saffier")
+    profile = await User.query.create(name="Profile Saffier")
 
     logs = await Log.query.all()
     assert len(logs) == 2
@@ -200,9 +200,9 @@ async def test_custom_signal():
 
     User.meta.signals.custom.connect(processing)
 
-    user = await User.query.create(name="Edgy")
+    user = await User.query.create(name="Saffier")
     await User.meta.signals.custom.send(sender=User, instance=user)
 
-    assert user.name == "Edgy ORM"
+    assert user.name == "Saffier ORM"
 
     User.meta.signals.custom.disconnect(processing)

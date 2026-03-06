@@ -74,25 +74,26 @@ class InspectDB:
         Starts the InspectDB and passes all the configurations.
         """
         registry = Registry(database=self.database)
-        execsync(registry.database.connect)()
-
-        # Get the engine to connect
-        engine: AsyncEngine = registry.engine
-
-        # Connect to a schema
-        metadata: sqlalchemy.MetaData = (
-            sqlalchemy.MetaData(schema=self.schema)
-            if self.schema is not None
-            else sqlalchemy.MetaData()
-        )
-        metadata = execsync(self.reflect)(engine=engine, metadata=metadata)
+        metadata = execsync(self._collect_metadata)(registry=registry)
 
         # Generate the tables
         tables, _ = self.generate_table_information(metadata)
 
         for line in self.write_output(tables, self.database.url._url):
             sys.stdout.writelines(line)  # type: ignore
-        execsync(registry.database.disconnect)()
+
+    async def _collect_metadata(self, registry: Registry) -> sqlalchemy.MetaData:
+        await registry.database.connect()
+        try:
+            engine: AsyncEngine = registry.engine
+            metadata: sqlalchemy.MetaData = (
+                sqlalchemy.MetaData(schema=self.schema)
+                if self.schema is not None
+                else sqlalchemy.MetaData()
+            )
+            return await self.reflect(engine=engine, metadata=metadata)
+        finally:
+            await registry.database.disconnect()
 
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData
@@ -249,14 +250,16 @@ class InspectDB:
             "to the desired behavior.\n"
         )
         yield (
-            "# Feel free to rename the models, but don't rename tablename values or "
-            "field names.\n"
+            "# Feel free to rename the models, but don't rename tablename values or field names.\n"
         )
         yield (
             "# The generated models do not manage migrations. Those are handled by `%s.Model`.\n"
             % DB_MODULE
         )
-        yield "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n" % DB_MODULE
+        yield (
+            "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n"
+            % DB_MODULE
+        )
         yield "import %s \n" % DB_MODULE
         yield "from %s import UniqueConstraint, Index \n" % DB_MODULE
 
@@ -324,9 +327,7 @@ class InspectDB:
                 if field_params:
                     if not field_description.endswith("("):
                         field_description += ", "
-                    field_description += ", ".join(
-                        f"{k}={v!r}" for k, v in field_params.items()
-                    )
+                    field_description += ", ".join(f"{k}={v!r}" for k, v in field_params.items())
                 field_description += ")\n"
                 yield "    %s" % field_description
 

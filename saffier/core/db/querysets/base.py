@@ -162,13 +162,12 @@ class BaseQuerySet(
 
         tables = [queryset.table]
         select_from = queryset.table
-        has_many_fk_same_table = False
 
         # Select related
         for item in queryset._select_related:
             # For m2m relationships
             model_class = queryset.model_class
-            select_from = queryset.table
+            has_many_fk_same_table = False
 
             for part in item.split("__"):
                 try:
@@ -178,7 +177,10 @@ class BaseQuerySet(
                     model_class = getattr(model_class, part).related_from
                     has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
 
-                table = model_class.table
+                if queryset.using_schema is not None:
+                    table = model_class.table_schema(queryset.using_schema)
+                else:
+                    table = model_class.table
 
                 # If there is multiple FKs to the same table
                 if not has_many_fk_same_table:
@@ -385,10 +387,11 @@ class BaseQuerySet(
             clauses.append(clause)
 
         if exclude:
-            if not or_:
-                filter_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
-            else:
-                or_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
+            if clauses:
+                if not or_:
+                    filter_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
+                else:
+                    or_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
         else:
             if not or_:
                 filter_clauses += clauses
@@ -1090,6 +1093,63 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise ValueError("'obj' must be a model or reflect model instance.")
         return await queryset.filter(pk=instance.pk).exists()
 
+    def _combine(
+        self,
+        other: "QuerySet",
+        op: str,
+        *,
+        all_: bool = False,
+    ) -> "CombinedQuerySet":
+        if not isinstance(other, QuerySet):
+            raise TypeError("other must be a QuerySet")
+
+        if self.model_class is not other.model_class:
+            raise QuerySetError(detail="Both querysets must have the same model_class to combine.")
+
+        if self.database is not other.database and str(self.database.url) != str(
+            other.database.url
+        ):
+            raise QuerySetError(detail="Both querysets must use the same database.")
+
+        op_name = f"{op}_all" if all_ else op
+        return CombinedQuerySet(left=self, right=other, op=op_name)
+
+    def union(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
+        """
+        Returns the SQL UNION of this queryset and another queryset.
+        """
+        return self._combine(other, "union", all_=all)
+
+    def union_all(self, other: "QuerySet") -> "CombinedQuerySet":
+        """
+        Shortcut for UNION ALL.
+        """
+        return self._combine(other, "union", all_=True)
+
+    def intersect(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
+        """
+        Returns the SQL INTERSECT of this queryset and another queryset.
+        """
+        return self._combine(other, "intersect", all_=all)
+
+    def intersect_all(self, other: "QuerySet") -> "CombinedQuerySet":
+        """
+        Shortcut for INTERSECT ALL.
+        """
+        return self._combine(other, "intersect", all_=True)
+
+    def except_(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
+        """
+        Returns the SQL EXCEPT of this queryset and another queryset.
+        """
+        return self._combine(other, "except", all_=all)
+
+    def except_all(self, other: "QuerySet") -> "CombinedQuerySet":
+        """
+        Shortcut for EXCEPT ALL.
+        """
+        return self._combine(other, "except", all_=True)
+
     def select_for_update(
         self,
         *,
@@ -1132,3 +1192,122 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls
+
+
+class CombinedQuerySet(QuerySet):
+    """
+    QuerySet representing a SQL set operation between two querysets.
+    """
+
+    def __init__(
+        self,
+        left: QuerySet,
+        right: QuerySet,
+        *,
+        op: str = "union",
+    ) -> None:
+        super().__init__(
+            model_class=left.model_class,
+            database=left.database,
+            using_schema=left.using_schema,
+            table=left.table,
+        )
+        self._left = left
+        self._right = right
+        self._op = op
+
+    def _clone(self) -> "CombinedQuerySet":
+        queryset = cast("CombinedQuerySet", super()._clone())
+        queryset._left = self._left
+        queryset._right = self._right
+        queryset._op = self._op
+        return queryset
+
+    def _build_select(self) -> Any:
+        queryset = self._clone()
+
+        if queryset.filter_clauses or queryset.or_clauses:
+            raise QuerySetError(
+                detail="Filter/exclude/or_ are not supported after combining querysets. "
+                "Apply filters before union/intersect/except."
+            )
+
+        if queryset._select_related or queryset._prefetch_related:
+            raise QuerySetError(
+                detail="select_related/prefetch_related are not supported on combined querysets."
+            )
+
+        if queryset._for_update:
+            raise QuerySetError(
+                detail="select_for_update() is not supported on combined querysets."
+            )
+
+        left_expression = queryset._left._clone()._build_select()
+        right_expression = queryset._right._clone()._build_select()
+
+        if len(left_expression.selected_columns) != len(right_expression.selected_columns):
+            raise QuerySetError(
+                detail="Combined querysets must select the same number of columns."
+            )
+
+        if queryset._op == "union":
+            combined_expression = left_expression.union(right_expression)
+        elif queryset._op == "union_all":
+            combined_expression = left_expression.union_all(right_expression)
+        elif queryset._op == "intersect":
+            combined_expression = left_expression.intersect(right_expression)
+        elif queryset._op == "intersect_all":
+            combined_expression = left_expression.intersect_all(right_expression)
+        elif queryset._op == "except":
+            combined_expression = left_expression.except_(right_expression)
+        elif queryset._op == "except_all":
+            combined_expression = left_expression.except_all(right_expression)
+        else:
+            raise QuerySetError(detail=f"Unsupported set operation: {queryset._op}")
+
+        subquery = combined_expression.subquery("saffier_combined")
+        expression = sqlalchemy.select(subquery)
+
+        if queryset._order_by:
+            ordering = []
+            for value in queryset._order_by:
+                reverse = value.startswith("-")
+                field_name = value.lstrip("-")
+                try:
+                    column = subquery.c[field_name]
+                except KeyError as exc:
+                    raise QuerySetError(
+                        detail=f"Cannot order combined queryset by unknown field '{field_name}'."
+                    ) from exc
+                ordering.append(column.desc() if reverse else column.asc())
+            expression = expression.order_by(*ordering)
+
+        if queryset._group_by:
+            groups = []
+            for value in queryset._group_by:
+                field_name = value.lstrip("-")
+                try:
+                    groups.append(subquery.c[field_name])
+                except KeyError as exc:
+                    raise QuerySetError(
+                        detail=f"Cannot group combined queryset by unknown field '{field_name}'."
+                    ) from exc
+            expression = expression.group_by(*groups)
+
+        if queryset.distinct_on:
+            try:
+                distinct_fields = [subquery.c[field] for field in queryset.distinct_on]
+            except KeyError as exc:
+                raise QuerySetError(
+                    detail=f"Unknown field in distinct() for combined queryset: {exc.args[0]}"
+                ) from exc
+            expression = expression.distinct(*distinct_fields)
+
+        if queryset.limit_count:
+            expression = expression.limit(queryset.limit_count)
+
+        if queryset._offset:
+            expression = expression.offset(queryset._offset)
+
+        queryset._expression = expression  # type: ignore
+        return expression

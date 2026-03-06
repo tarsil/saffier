@@ -37,7 +37,7 @@ Saffier is currently revamped to be more powerful and flexible, while maintainin
 The new version will be released as **Saffier 2.0** and the versioning will grow from there. The supported version will always be the latest released,
 so if you are using Saffier, make sure to keep it updated to the latest version to get the best experience and all the new features.
 
-Why this now? Saffier plays an important role in the ecosystem of tools I am building and I want to make sure it is the best it can be for everyone. 
+Why this now? Saffier plays an important role in the ecosystem of tools I am building and I want to make sure it is the best it can be for everyone.
 The new version will be more powerful, flexible and easier to use, while maintaining the same familiar interface.
 
 Saffier was never neglected, or at least intentionally neglected, but it was always a challenge to maintain
@@ -45,12 +45,9 @@ it while also working on other projects and tools.
 
 This will no longer be the case and Saffier will come to stay.
 
-Where is different from its sibling [Edgy](https://edgy.dymmond.com)? Well, for starters, Saffier is not Pydantic oriented,
-in fact, it is 100% independent and pure Python.
-
-Edgy is part of Dymmond ecosystem and Saffier is more "rebel" and independent and lives under the heart of [tarsil](https://github.com/tarsil).
-
-Saffier has the same feel, same look as Edgy and that is intentional but **Saffier was the first** not the way around.
+Saffier is intentionally Python-native and ORM-focused.
+It is designed to stay framework-agnostic, lightweight in validation concerns,
+and aligned with the developer ergonomics that made Saffier popular.
 
 Now, if you are interested in helping and maintaining Saffier, please don't hesitate to reach out and contribute, it is always welcome and appreciated.
 
@@ -68,29 +65,8 @@ are done into a more common and familiar interface.
 
 ## Before continuing
 
-If you are looking for something more **Pydantic** oriented where you can take literally advantage
-of everything that Pydantic can offer, then instead of continuing with Saffier, have a look at
-its ***data ORM brother***, [Edgy](https://edgy.tarsild.io).
-
-**Edgy** its extremely powerful as well with a key difference that its **100% Pydantic** which means
-you can leverage the technology if you already familiar with it.
-
-No worries, it is not completely different from Saffier, in fact, it was designed with the same principles and what it changes for you
-are essentially the ***imports***.
-
-### Thinking of moving to Edgy?
-
-If you are considering of moving to Edgy but you don't want to be bothered about learning a new
-tool and afraid of breaking changes, then fear not!
-
-Edgy was designed to also make your migration feel seemless, which means that essentially you would
-only need to install it and change the imports in your project from `saffier` to `edgy` and it should
-work automatically for you.
-
-Even the documentation structure its almost the same, intentionally, so what you already know with
-Saffier, you will know with **Edgy**.
-
-**This discards any custom code done by you, of course.**
+Saffier is built for teams that want a direct SQLAlchemy-core-powered ORM workflow
+without introducing a Pydantic-centric architecture in the model layer.
 
 ## Why this ORM
 

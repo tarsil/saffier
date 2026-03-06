@@ -14,19 +14,19 @@ async def create_data():
     saffier = await User.query.create(name="Saffier", email="saffier@esmerald.dev")
 
     # Tenant
-    edgy_tenant = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
+    tenant = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
 
     # HubUser - A user specific inside the saffier schema
-    edgy_schema_user = await HubUser.query.using(edgy_tenant.schema_name).create(
+    tenant_schema_user = await HubUser.query.using(tenant.schema_name).create(
         name="saffier", email="saffier@esmerald.dev"
     )
 
-    await TenantUser.query.create(user=saffier, tenant=edgy_tenant)
+    await TenantUser.query.create(user=saffier, tenant=tenant)
 
     # Products for Saffier HubUser specific
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(
-            name=f"Product-{i}", user=edgy_schema_user
+        await Product.query.using(tenant.schema_name).create(
+            name=f"Product-{i}", user=tenant_schema_user
         )
 
     # Products for the John without a tenant associated

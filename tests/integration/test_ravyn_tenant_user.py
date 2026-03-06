@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
 from ravyn import Gateway, JSONResponse, Ravyn, Request, get
@@ -87,21 +87,15 @@ class TenantMiddleware(MiddlewareProtocol):
         await self.app(scope, receive, send)
 
 
-@pytest.fixture(autouse=True, scope="module")
-async def create_test_database():
-    try:
-        await models.create_all()
-        yield
-        await models.drop_all()
-    except Exception:
-        pytest.skip("No database available")
-
-
 @pytest.fixture(autouse=True)
-async def rollback_connections():
+async def database_session():
+    set_tenant(None)
     with database.force_rollback():
         async with database:
+            await models.create_all()
             yield
+    await models.drop_all()
+    set_tenant(None)
 
 
 def blocking_function():
@@ -138,14 +132,16 @@ def another_app():
 
 @pytest.fixture()
 async def async_cli(another_app) -> AsyncGenerator:
-    async with AsyncClient(app=another_app, base_url="http://test") as acli:
+    async with AsyncClient(
+        transport=ASGITransport(app=another_app), base_url="http://test"
+    ) as acli:
         await to_thread.run_sync(blocking_function)
         yield acli
 
 
 @pytest.fixture()
 async def async_client(app) -> AsyncGenerator:
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await to_thread.run_sync(blocking_function)
         yield ac
 
@@ -155,18 +151,21 @@ async def create_data():
     Creates mock data
     """
     saffier = await User.query.create(name="saffier", email="saffier@ravyn.dev")
-    user = await User.query.create(name="edgy", email="edgy@ravyn.dev")
-    edgy_tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
+    user = await User.query.create(name="tenant-user", email="tenant@ravyn.dev")
+    tenant_schema = "saffier_alt_user"
+    alt_tenant = await Tenant.query.create(schema_name=tenant_schema, tenant_name="saffier-alt")
 
-    edgy = await User.query.using(edgy_tenant.schema_name).create(
-        name="edgy", email="edgy@ravyn.dev"
+    tenant_schema_user = await User.query.using(alt_tenant.schema_name).create(
+        name="tenant-user", email="tenant@ravyn.dev"
     )
 
-    await TenantUser.query.create(user=user, tenant=edgy_tenant)
+    await TenantUser.query.create(user=user, tenant=alt_tenant)
 
-    # Products for Edgy
+    # Products for tenant schema
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
+        await Product.query.using(alt_tenant.schema_name).create(
+            name=f"Product-{i}", user=tenant_schema_user
+        )
 
     # Products for Saffier
     for i in range(25):
@@ -176,27 +175,27 @@ async def create_data():
 async def test_user_query_tenant_data(async_client, async_cli):
     await create_data()
 
-    # Test Edgy Response intercepted in the
-    response_edgy = await async_client.get(
-        "/products", headers={"tenant": "edgy", "email": "edgy@ravyn.dev"}
+    # Test tenant response intercepted in the middleware
+    response_tenant = await async_client.get(
+        "/products", headers={"tenant": "saffier_alt_user", "email": "tenant@ravyn.dev"}
     )
-    assert response_edgy.status_code == 200
+    assert response_tenant.status_code == 200
 
-    assert len(response_edgy.json()) == 10
+    assert len(response_tenant.json()) == 10
 
-    # Test Edgy Response intercepted in the
+    # Test default schema response
     response_saffier = await async_client.get("/products")
     assert response_saffier.status_code == 200
 
     assert len(response_saffier.json()) == 25
 
-    # Check edgy again
-    response_edgy = await async_client.get(
-        "/products", headers={"tenant": "edgy", "email": "edgy@ravyn.dev"}
+    # Check tenant schema again
+    response_tenant = await async_client.get(
+        "/products", headers={"tenant": "saffier_alt_user", "email": "tenant@ravyn.dev"}
     )
-    assert response_edgy.status_code == 200
+    assert response_tenant.status_code == 200
 
-    assert len(response_edgy.json()) == 10
+    assert len(response_tenant.json()) == 10
 
     response = await async_cli.get("/no-tenant/products")
     assert response.status_code == 200

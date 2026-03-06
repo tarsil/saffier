@@ -6,13 +6,13 @@ from saffier.core.db.models import Model
 
 class TenantModel(Model, metaclass=BaseTenantMeta):
     """
-    Base for a multi tenant model from the Edgy contrib.
+    Base for a multi-tenant model from the Saffier contrib.
     This is **not mandatory** and can be used as a possible
     out of the box solution for multi tenancy.
 
     This design is not meant to be "the one" but instead an
     example of how to achieve the multi-tenancy in a simple fashion
-    using Edgy and Edgy models.
+    using Saffier models.
     """
 
     meta: ClassVar[TenantMeta] = TenantMeta(None)
