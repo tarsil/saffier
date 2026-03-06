@@ -62,12 +62,13 @@ jobs:
           key: ${{ runner.os }}-python-${{ env.pythonLocation }}-${{ hashFiles('pyproject.toml') }}-test-v03
       - name: "Install dependencies"
         if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          pip install hatch
+        run: "scripts/install"
+      - name: "Install Hatch"
+        run: "python -m pip install --upgrade pip hatch"
       - name: "Run lint checks"
-        run: "hatch run python -m ruff check saffier tests docs_src --line-length 99"
+        run: "python -m hatch run python -m ruff check saffier tests docs_src --line-length 99"
       - name: "Run type checks (Ty)"
-        run: "hatch run test:check_types"
+        run: "python -m hatch run test:check_types"
       - name: "Run tests"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/saffier"
