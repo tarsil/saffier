@@ -62,7 +62,8 @@ jobs:
           key: ${{ runner.os }}-python-${{ env.pythonLocation }}-${{ hashFiles('pyproject.toml') }}-test-v03
       - name: "Install dependencies"
         if: steps.cache.outputs.cache-hit != 'true'
-        run: "scripts/install"
+        run: |
+          pip install hatch
       - name: "Run lint checks"
         run: "hatch run python -m ruff check saffier tests docs_src --line-length 99"
       - name: "Run type checks (Ty)"
