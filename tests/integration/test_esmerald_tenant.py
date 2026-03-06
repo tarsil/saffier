@@ -2,8 +2,8 @@ from typing import Any, AsyncGenerator, Coroutine
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from esmerald import Esmerald, Gateway, JSONResponse, Request, get
-from esmerald.protocols.middleware import MiddlewareProtocol
+from ravyn import Ravyn, Gateway, JSONResponse, Request, get
+from ravyn.core.protocols.middleware import MiddlewareProtocol
 from httpx import AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
@@ -103,7 +103,7 @@ async def get_products() -> JSONResponse:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[Gateway(handler=get_products)],
         middleware=[TenantMiddleware],
         on_startup=[database.connect],
@@ -114,7 +114,7 @@ def app():
 
 @pytest.fixture()
 def another_app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[Gateway("/no-tenant", handler=get_products)],
         on_startup=[database.connect],
         on_shutdown=[database.disconnect],

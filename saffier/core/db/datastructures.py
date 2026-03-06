@@ -1,7 +1,5 @@
-from typing import Any, ClassVar, List, Optional, Sequence
-
-from pydantic import model_validator
-from pydantic.dataclasses import dataclass
+from dataclasses import dataclass
+from typing import ClassVar, List, Optional, Sequence
 
 
 @dataclass
@@ -15,26 +13,20 @@ class Index:
     name: Optional[str] = None
     fields: Optional[Sequence[str]] = None
 
-    @model_validator(mode="before")
-    def validate_data(cls, values: Any) -> Any:
-        name = values.kwargs.get("name")
-
-        if name is not None and len(name) > cls.__max_name_length__:
+    def __post_init__(self) -> None:
+        if self.name is not None and len(self.name) > self.__max_name_length__:
             raise ValueError(
-                f"The max length of the index name must be {cls.__max_name_length__}. Got {len(name)}"
+                f"The max length of the index name must be {self.__max_name_length__}. Got {len(self.name)}"
             )
 
-        fields = values.kwargs.get("fields")
-        if not isinstance(fields, (tuple, list)):
+        if not isinstance(self.fields, (tuple, list)):
             raise ValueError("Index.fields must be a list or a tuple.")
 
-        if fields and not all(isinstance(field, str) for field in fields):
+        if self.fields and not all(isinstance(field, str) for field in self.fields):
             raise ValueError("Index.fields must contain only strings with field names.")
 
-        if name is None:
-            suffix = values.kwargs.get("suffix", cls.suffix)
-            values.kwargs["name"] = f"{suffix}_{'_'.join(fields)}"
-        return values
+        if self.name is None:
+            self.name = f"{self.suffix}_{'_'.join(self.fields)}"
 
 
 @dataclass
@@ -47,18 +39,15 @@ class UniqueConstraint:
     name: Optional[str] = None
     __max_name_length__: ClassVar[int] = 63
 
-    @model_validator(mode="before")
-    def validate_data(cls, values: Any) -> Any:
-        name = values.kwargs.get("name")
+    def __post_init__(self) -> None:
+        if self.name is not None and len(self.name) > self.__max_name_length__:
+            raise ValueError(
+                f"The max length of the constraint name must be {self.__max_name_length__}. Got {len(self.name)}"
+            )
 
-        if name is not None and len(name) > cls.__max_name_length__:
-            raise ValueError(f"The max length of the constraint name must be 30. Got {len(name)}")
-
-        fields = values.kwargs.get("fields")
-        if not isinstance(fields, (tuple, list)):
+        if not isinstance(self.fields, (tuple, list)):
             raise ValueError("UniqueConstraint.fields must be a list or a tuple.")
 
-        if fields and not all(isinstance(field, str) for field in fields):
+        if self.fields and not all(isinstance(field, str) for field in self.fields):
             raise ValueError("UniqueConstraint.fields must contain only strings with field names.")
-
-        return values
+        self.fields = list(self.fields)

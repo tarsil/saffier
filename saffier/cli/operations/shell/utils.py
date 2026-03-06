@@ -2,8 +2,6 @@ import datetime
 from collections import OrderedDict
 from typing import Any, Dict
 
-import pydantic
-
 import saffier
 from saffier import Registry
 from saffier.core.terminal import OutputColour, Print
@@ -16,8 +14,7 @@ defaults.update(
     {
         "datetime": datetime.datetime,
         "timedelta": datetime.timedelta,
-        "BaseModel": pydantic.BaseModel,
-        "ConfigDict": pydantic.ConfigDict,
+        "Model": saffier.Model,
         "settings": saffier.settings,
     }
 )

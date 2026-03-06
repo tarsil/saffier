@@ -1,5 +1,5 @@
 import pytest
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 import saffier
 from saffier import Migrate, Registry
@@ -54,7 +54,7 @@ class ReflectedContact(saffier.ReflectModel):
     ids=["dict", "tuple", "list"],
 )
 def test_migrate_with_model_apps(model_apps):
-    app = Esmerald()
+    app = Ravyn()
     models.models = {}
 
     assert len(models.models) == 0
@@ -71,7 +71,7 @@ def test_migrate_with_model_apps(model_apps):
     ids=["set", "fronzenset", "int", "float", "string"],
 )
 def test_raises_assertation_error_on_model_apps(model_apps):
-    app = Esmerald()
+    app = Ravyn()
     models.models = {}
 
     assert len(models.models) == 0

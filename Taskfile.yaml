@@ -1,0 +1,62 @@
+version: "3"
+
+tasks:
+  install:
+    desc: Install project and development dependencies
+    cmds:
+      - scripts/install
+
+  format:
+    desc: Apply formatting fixes
+    cmds:
+      - scripts/lint
+
+  lint:
+    desc: Run lint checks without modifying files
+    cmds:
+      - ruff check saffier tests docs_src --line-length 99
+      - ruff format saffier tests docs_src --check
+
+  typecheck:
+    desc: Run static type checks
+    cmds:
+      - ty check saffier
+      - mypy saffier
+
+  test:
+    desc: Run test suite
+    cmds:
+      - scripts/test
+
+  test-unit:
+    desc: Run unit-focused test selection
+    cmds:
+      - pytest tests/models tests/managers tests/foreign_keys tests/clauses tests/indexes tests/uniques --disable-pytest-warnings
+
+  test-integration:
+    desc: Run integration and CLI tests
+    cmds:
+      - pytest tests/integration tests/cli tests/contrib --disable-pytest-warnings
+
+  docs:
+    desc: Build docs with Zensical
+    cmds:
+      - python scripts/docs.py build --clean
+
+  docs-serve:
+    desc: Serve docs with live reload
+    cmds:
+      - python scripts/docs.py serve
+
+  clean:
+    desc: Remove local caches and docs artifacts
+    cmds:
+      - scripts/clean
+      - python scripts/docs.py clean
+
+  ci:
+    desc: Run local CI checks
+    cmds:
+      - task lint
+      - task typecheck
+      - task test

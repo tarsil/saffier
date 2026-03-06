@@ -4,13 +4,13 @@ import shutil
 
 import pytest
 import sqlalchemy
-from esmerald import Esmerald
+from ravyn import Ravyn
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.cli.utils import run_cmd
 from tests.settings import DATABASE_URL
 
-app = Esmerald(routes=[])
+app = Ravyn(routes=[])
 
 
 @pytest.fixture(scope="module")
