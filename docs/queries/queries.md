@@ -130,6 +130,16 @@ users = await User.query.filter(User.columns.email.contains("foo"))
 users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
 ```
 
+#### Q expressions
+
+For nested boolean predicates, use [`Q`](q.md).
+
+```python
+from saffier import Q
+
+users = await User.query.filter((Q(name="Adam") & Q(email__icontains="saffier")) | ~Q(id=1))
+```
+
 ### Local OR
 
 Use `local_or()` to combine OR clauses with existing queryset filters:

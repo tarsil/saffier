@@ -10,10 +10,10 @@ from typing import (
 import sqlalchemy
 
 import saffier
-from saffier.conf import settings
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.context_vars import get_schema
 from saffier.core.db.fields import CharField, TextField
+from saffier.core.db.querysets.clauses import Q, build_lookup_clauses
 from saffier.core.db.querysets.mixins import QuerySetPropsMixin, SaffierModel, TenancyMixin
 from saffier.core.db.querysets.prefetch import PrefetchMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
@@ -337,89 +337,26 @@ class BaseQuerySet(
         return expression
 
     def _filter_query(self, exclude: bool = False, or_: bool = False, **kwargs: Any) -> "QuerySet":
-        from saffier.core.db.models.model import Model
-
-        clauses = []
+        clauses: list[Any] = []
         filter_clauses = self.filter_clauses
         or_clauses = self.or_clauses
         select_related = list(self._select_related)
         prefetch_related = list(self._prefetch_related)
-
-        if kwargs.get("pk"):
-            pk_name = self.model_class.pkname
-            kwargs[pk_name] = kwargs.pop("pk")
 
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
         if self.model_class.is_proxy_model:
             self.model_class = self.model_class.parent
 
-        for key, value in kwargs.items():
-            if "__" in key:
-                parts = key.split("__")
-
-                # Determine if we should treat the final part as a
-                # filter operator or as a related field.
-                if parts[-1] in settings.filter_operators:
-                    op = parts[-1]
-                    field_name = parts[-2]
-                    related_parts = parts[:-2]
-                else:
-                    op = "exact"
-                    field_name = parts[-1]
-                    related_parts = parts[:-1]
-
-                model_class = self.model_class
-                if related_parts:
-                    # Add any implied select_related
-                    related_str = "__".join(related_parts)
-                    if related_str not in select_related:
-                        select_related.append(related_str)
-
-                    # Walk the relationships to the actual model class
-                    # against which the comparison is being made.
-                    for part in related_parts:
-                        try:
-                            model_class = model_class.fields[part].target
-                        except KeyError:
-                            model_class = getattr(model_class, part).related_from
-
-                column = model_class.table.columns[field_name]
-
-            else:
-                op = "exact"
-                try:
-                    column = self.table.columns[key]
-                except KeyError as error:
-                    # Check for related fields
-                    # if an Attribute error is raised, we need to make sure
-                    # It raises the KeyError from the previous check
-                    try:
-                        model_class = getattr(self.model_class, key).related_to
-                        column = model_class.table.columns[settings.default_related_lookup_field]
-                    except AttributeError:
-                        raise KeyError(str(error)) from error
-
-            # Map the operation code onto SQLAlchemy's ColumnElement
-            # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
-            op_attr = settings.filter_operators[op]
-            has_escaped_character = False
-
-            if op in ["contains", "icontains"]:
-                has_escaped_character = any(c for c in self.ESCAPE_CHARACTERS if c in value)
-                if has_escaped_character:
-                    # enable escape modifier
-                    for char in self.ESCAPE_CHARACTERS:
-                        value = value.replace(char, f"\\{char}")
-                value = f"%{value}%"
-
-            if isinstance(value, Model):
-                value = value.pk
-
-            clause = getattr(column, op_attr)(value)
-            clause.modifiers["escape"] = "\\" if has_escaped_character else None
-
-            clauses.append(clause)
+        clauses, implied_select_related = build_lookup_clauses(
+            self.model_class,
+            self.table,
+            kwargs,
+            escape_characters=tuple(self.ESCAPE_CHARACTERS),
+        )
+        for related_path in implied_select_related:
+            if related_path not in select_related:
+                select_related.append(related_path)
 
         if exclude:
             if clauses:
@@ -554,8 +491,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def _filter_or_exclude(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
         exclude: bool = False,
+        or_: bool = False,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -564,26 +502,41 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset: QuerySet = self._clone()
 
         if clause is None:
-            if not exclude:
-                return queryset._filter_query(**kwargs)
-            return queryset._filter_query(exclude=exclude, **kwargs)
+            return queryset._filter_query(exclude=exclude, or_=or_, **kwargs)
 
-        queryset.filter_clauses.append(clause)
+        if kwargs:
+            queryset = queryset._filter_query(exclude=exclude, or_=or_, **kwargs)
+
+        if isinstance(clause, Q):
+            clause, implied_select_related = clause.resolve(queryset)
+            for related_path in implied_select_related:
+                if related_path not in queryset._select_related:
+                    queryset._select_related.append(related_path)
+
+        if exclude:
+            clause = sqlalchemy.not_(clause)
+
+        if or_:
+            queryset.or_clauses.append(clause)
+        else:
+            queryset.filter_clauses.append(clause)
+
         return queryset
 
     def filter(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
+        or_: bool = False,
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Filters the QuerySet by the given kwargs and clause.
         """
-        return self._filter_or_exclude(clause=clause, **kwargs)
+        return self._filter_or_exclude(clause=clause, or_=or_, **kwargs)
 
     def or_(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -595,7 +548,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def local_or(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -607,7 +560,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def and_(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -619,7 +572,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def not_(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -631,19 +584,20 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def exclude(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
+        or_: bool = False,
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Exactly the same as the filter but for the exclude.
         """
         queryset: QuerySet = self._clone()
-        queryset = self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
+        queryset = self._filter_or_exclude(clause=clause, exclude=True, or_=or_, **kwargs)
         return queryset
 
     def exclude_secrets(
         self,
-        clause: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
         """

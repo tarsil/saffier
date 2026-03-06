@@ -35,7 +35,7 @@ from .core.db.fields import (
 )
 from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import BaseManager, Manager, RedirectManager
-from .core.db.querysets import QuerySet, and_, not_, or_
+from .core.db.querysets import Q, QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
 from .core.signals import Signal
@@ -46,6 +46,7 @@ __all__ = [
     "and_",
     "not_",
     "or_",
+    "Q",
     "BigIntegerField",
     "BooleanField",
     "CASCADE",
