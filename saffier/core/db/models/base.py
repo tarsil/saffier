@@ -190,7 +190,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     @classmethod
     def get_real_class(cls) -> type["Model"]:
         if getattr(cls, "is_proxy_model", False):
-            return cast("type[Model]", getattr(cls, "parent"))
+            return cast("type[Model]", cls.parent)
         return cast("type[Model]", cls)
 
     @functools.cached_property
