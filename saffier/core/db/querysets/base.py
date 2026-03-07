@@ -1121,7 +1121,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a boolean indicating if a record exists or not.
         """
-        queryset: QuerySet = self._clone()
+        queryset: QuerySet = self.filter(**kwargs) if kwargs else self._clone()
         expression = queryset._build_select()
         expression = sqlalchemy.exists(expression).select()
         queryset._set_query_expression(expression)
@@ -1132,7 +1132,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns an indicating the total records.
         """
-        queryset: QuerySet = self._clone()
+        queryset: QuerySet = self.filter(**kwargs) if kwargs else self._clone()
         expression = queryset._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         queryset._set_query_expression(expression)

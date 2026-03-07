@@ -54,6 +54,10 @@ class RelatedField:
         return self.related_from.meta.fields[self.get_foreign_key_field_name()]  # type: ignore[index]
 
     @property
+    def name(self) -> str:
+        return self.related_name
+
+    @property
     def is_m2m(self) -> bool:
         return bool(getattr(self.related_from.meta, "is_multi", False))  # type: ignore[union-attr]
 
@@ -195,6 +199,21 @@ class RelatedField:
             self.get_foreign_key_field_name(),
             path.removeprefix(self.related_name).removeprefix("__"),
         )
+
+    def is_cross_db(self, owner_database: Any | None = None) -> bool:
+        if owner_database is None:
+            owner_database = getattr(self.related_to, "database", None)
+            if owner_database is None:
+                owner_registry = getattr(getattr(self.related_to, "meta", None), "registry", None)
+                owner_database = getattr(owner_registry, "database", None)
+        return bool(self.foreign_key.is_cross_db(owner_database))
+
+    def get_related_model_for_admin(self) -> Any | None:
+        registry = getattr(getattr(self.related_from, "meta", None), "registry", None)
+        admin_models = getattr(registry, "admin_models", ())
+        if registry and self.related_from.__name__ in admin_models:
+            return self.related_from
+        return None
 
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)

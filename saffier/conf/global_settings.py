@@ -61,6 +61,7 @@ class SaffierSettings(BaseSettings):
         "gte": "__ge__",
         "lt": "__lt__",
         "lte": "__le__",
+        "isempty": "isempty",
         "isnull": "isnull",
     }
     many_to_many_relation: str = "relation_{key}"

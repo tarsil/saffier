@@ -108,6 +108,7 @@ The same special operators are also automatically added on every column.
 * **lte** - Filter instances having values `Less Than Equal`.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
+* **isempty** - Filter instances where a field holds its Edgy-style empty value.
 * **isnull** - Filter instances where a column is `NULL` or not `NULL`.
 
 ##### Example
@@ -116,6 +117,8 @@ The same special operators are also automatically added on every column.
 users = await User.query.filter(email__icontains="foo")
 
 users = await User.query.filter(id__in=[1, 2, 3])
+
+users = await User.query.filter(name__isempty=True)
 
 users = await User.query.filter(last_login__isnull=True)
 ```
@@ -516,6 +519,7 @@ Returns a boolean confirming if a specific record exists.
 
 ```python
 exists = await User.query.filter(email="foo@bar.com").exists()
+exists = await User.query.exists(email__isnull=True)
 ```
 
 ### Count
@@ -524,6 +528,7 @@ Returns an integer with the total of records.
 
 ```python
 total = await User.query.count()
+total = await User.query.count(email__icontains="@example.com")
 ```
 
 ### Contains

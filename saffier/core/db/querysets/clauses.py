@@ -45,6 +45,7 @@ def build_lookup_clauses(
 
     for raw_key, value in clean_kwargs.items():
         key = _normalize_lookup_path(raw_key, embed_parent)
+        field_obj = None
         if "__" in key:
             crawl_result = crawl_relationship(model_class, key)
             op = crawl_result.operator or "exact"
@@ -52,6 +53,7 @@ def build_lookup_clauses(
             field_name = (
                 related_model.pkname if crawl_result.field_name == "pk" else crawl_result.field_name
             )
+            field_obj = related_model.fields.get(field_name)
             if crawl_result.forward_path and crawl_result.forward_path not in select_related:
                 select_related.append(crawl_result.forward_path)
             related_table = (
@@ -65,21 +67,25 @@ def build_lookup_clauses(
                 attr = getattr(related_model, field_name, None)
                 if isinstance(attr, RelatedField):
                     column = related_table.columns[settings.default_related_lookup_field]
+                    field_obj = related_model.fields.get(settings.default_related_lookup_field)
                 else:
                     raise KeyError(str(error)) from error
         else:
             op = "exact"
+            field_name = key
+            field_obj = model_class.fields.get(field_name)
             try:
-                column = table.columns[key]
+                column = table.columns[field_name]
             except KeyError as error:
                 try:
-                    related_model = getattr(model_class, key).related_to
+                    related_model = getattr(model_class, field_name).related_to
                     related_table = (
                         related_model.table_schema(using_schema)
                         if using_schema is not None
                         else related_model.table
                     )
                     column = related_table.columns[settings.default_related_lookup_field]
+                    field_obj = related_model.fields.get(settings.default_related_lookup_field)
                 except AttributeError:
                     raise KeyError(str(error)) from error
 
@@ -96,8 +102,13 @@ def build_lookup_clauses(
         if hasattr(value, "pk"):
             value = value.pk
 
-        if op == "isnull":
-            clause = column.is_(None) if value else column.is_not(None)
+        if op in {"isnull", "isempty"} and field_obj is not None:
+            clause = field_obj.operator_to_clause(
+                field_name=column.key,
+                operator=op,
+                table=column.table,
+                value=value,
+            )
         else:
             clause = getattr(column, op_attr)(value)
         if hasattr(clause, "modifiers"):

@@ -1,13 +1,15 @@
 import copy
+import decimal
 import enum
 import typing
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import sqlalchemy
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.mutable import MutableList
 
 import saffier
+from saffier.conf import settings
 from saffier.contrib.sqlalchemy.fields import IPAddress
 from saffier.core.db.constants import CASCADE, NEW_M2M_NAMING, OLD_M2M_NAMING, RESTRICT, SET_NULL
 from saffier.core.db.fields._internal import (
@@ -141,6 +143,32 @@ class Field:
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
 
+    def get_is_null_clause(self, column: typing.Any) -> typing.Any:
+        return column == None  # noqa: E711
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return self.get_is_null_clause(column)
+
+    def operator_to_clause(
+        self,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: typing.Any,
+    ) -> typing.Any:
+        column = table.columns[field_name]
+        mapped_operator = settings.filter_operators.get(operator, operator)
+
+        if mapped_operator == "isnull":
+            is_null = self.get_is_null_clause(column)
+            return is_null if value else sqlalchemy.not_(is_null)
+
+        if mapped_operator == "isempty":
+            is_empty = self.get_is_empty_clause(column)
+            return is_empty if value else sqlalchemy.not_(is_empty)
+
+        return getattr(column, mapped_operator)(value)
+
 
 class CharField(Field):
     """
@@ -156,6 +184,9 @@ class CharField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == "")
 
 
 class TextField(Field):
@@ -181,6 +212,9 @@ class IntegerField(Field):
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Integer()
 
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == 0)
+
 
 class SmallIntegerField(IntegerField):
     """
@@ -201,6 +235,9 @@ class FloatField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Float()
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == 0.0)
 
 
 class BigIntegerField(Field):
@@ -225,6 +262,9 @@ class BooleanField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Boolean()
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column.is_(False))
 
 
 class AutoNowMixin(Field):
@@ -295,6 +335,9 @@ class DurationField(Field):
     def get_column_type(self) -> sqlalchemy.Interval:
         return sqlalchemy.Interval()
 
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == timedelta())
+
 
 class JSONField(Field):
     """
@@ -306,6 +349,17 @@ class JSONField(Field):
 
     def get_column_type(self) -> sqlalchemy.JSON:
         return sqlalchemy.JSON()
+
+    def get_is_null_clause(self, column: typing.Any) -> typing.Any:
+        casted = sqlalchemy.cast(column, sqlalchemy.Text())
+        return sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "null")
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        casted = sqlalchemy.cast(column, sqlalchemy.Text())
+        return sqlalchemy.or_(
+            column.is_(sqlalchemy.null()),
+            casted.in_(["null", "[]", "{}", "0", "0.0", '""']),
+        )
 
 
 class CompositeField(Field):
@@ -497,13 +551,14 @@ class ForeignKey(Field):
         force_cascade_deletion_relation: bool = False,
         **kwargs: Any,
     ):
-        assert on_delete is not None, "on_delete must not be null."
+        if on_delete is None:
+            raise FieldDefinitionError("on_delete must not be null.")
 
         if on_delete == SET_NULL and not null:
-            raise AssertionError("When SET_NULL is enabled, null must be True.")
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
 
         if on_update and (on_update == SET_NULL and not null):
-            raise AssertionError("When SET_NULL is enabled, null must be True.")
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
 
         primary_key = bool(kwargs.pop("primary_key", False))
         index = bool(kwargs.pop("index", False))
@@ -599,6 +654,32 @@ class ForeignKey(Field):
                     return None
                 return value
         return target(pk=value)
+
+    def is_cross_db(self, owner_database: typing.Any | None = None) -> bool:
+        if owner_database is None:
+            owner_database = getattr(self.owner, "database", None)
+            if owner_database is None:
+                owner_registry = getattr(getattr(self.owner, "meta", None), "registry", None)
+                owner_database = getattr(owner_registry, "database", None)
+
+        target = self.target
+        target_database = getattr(target, "database", None)
+        if target_database is None:
+            target_registry = getattr(getattr(target, "meta", None), "registry", None)
+            target_database = getattr(target_registry, "database", None)
+
+        if owner_database is None or target_database is None:
+            return False
+
+        return str(owner_database.url) != str(target_database.url)
+
+    def get_related_model_for_admin(self) -> typing.Any | None:
+        target = self.target
+        registry = getattr(getattr(target, "meta", None), "registry", None)
+        admin_models = getattr(registry, "admin_models", ())
+        if registry and target.__name__ in admin_models:
+            return target
+        return None
 
 
 class ManyToManyField(Field):
@@ -1074,6 +1155,9 @@ class DecimalField(Field):
     def get_column_type(self) -> sqlalchemy.Numeric:
         return sqlalchemy.Numeric(precision=self.max_digits, scale=self.decimal_places)
 
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == decimal.Decimal("0"))
+
 
 class UUIDField(Field):
     """
@@ -1142,6 +1226,9 @@ class BinaryField(Field):
 
     def get_column_type(self) -> sqlalchemy.LargeBinary:
         return sqlalchemy.LargeBinary(length=self.max_length)
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == b"")
 
 
 class ExcludeField(Field):
