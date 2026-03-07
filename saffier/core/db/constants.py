@@ -6,12 +6,6 @@ SET_DEFAULT = "SET DEFAULT"
 PROTECT = "PROTECT"
 
 
-class OLD_M2M_NAMING:
-    """
-    Compatibility marker kept only so Saffier can raise a clear error.
-    """
-
-
 class NEW_M2M_NAMING:
     """
     Marker for the field-oriented through-table naming convention.

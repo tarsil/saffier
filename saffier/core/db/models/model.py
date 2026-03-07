@@ -12,6 +12,7 @@ from saffier.core.db.models.base import SaffierBaseReflectModel
 from saffier.core.db.models.mixins.admin import AdminMixin
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
+from saffier.core.utils.db import check_db_connection
 from saffier.core.utils.schemas import Schema
 from saffier.core.utils.sync import run_sync
 
@@ -229,7 +230,9 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         if db_kwargs:
             pk_column = getattr(self.table.c, self.pkname)
             expression = self.table.update().values(**db_kwargs).where(pk_column == self.pk)
-            await self.database.execute(expression)
+            check_db_connection(self.database)
+            async with self.database as database:
+                await database.execute(expression)
         await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Update the model instance.
@@ -323,11 +326,14 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         pk_column = getattr(self.table.c, self.pkname)
         count_expression = sqlalchemy.func.count().select().select_from(self.table)
         count_expression = count_expression.where(pk_column == self.pk)
-        row_count = cast("int", await self.database.fetch_val(count_expression) or 0)
+        check_db_connection(self.database)
+        async with self.database as database:
+            row_count = cast("int", await database.fetch_val(count_expression) or 0)
 
         if row_count:
             expression = self.table.delete().where(pk_column == self.pk)
-            await self.database.execute(expression)
+            async with self.database as database:
+                await database.execute(expression)
 
         self.__dict__["_db_deleted"] = bool(row_count)
 
@@ -379,7 +385,9 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         expression = self.table.select().where(pk_column == self.pk)
 
         # Perform the fetch.
-        row = await self.database.fetch_one(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            row = await database.fetch_one(expression)
 
         # Update the instance.
         for key, value in dict(row._mapping).items():
@@ -390,7 +398,9 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        autoincrement_value = await self.database.execute(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            autoincrement_value = await database.execute(expression)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column

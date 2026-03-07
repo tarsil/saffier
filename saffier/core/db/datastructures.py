@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar
 
 
 @dataclass
@@ -52,3 +52,90 @@ class UniqueConstraint:
         if self.fields and not all(isinstance(field, str) for field in self.fields):
             raise ValueError("UniqueConstraint.fields must contain only strings with field names.")
         self.fields = list(self.fields)
+
+
+class QueryModelResultCache:
+    """
+    Lightweight queryset result cache keyed by model attributes.
+    """
+
+    def __init__(
+        self,
+        attrs: Sequence[str],
+        prefix: str = "",
+        cache: dict[str, dict[tuple[Any, ...], Any]] | None = None,
+    ) -> None:
+        self.attrs = tuple(attrs)
+        self.prefix = prefix
+        self.cache: dict[str, dict[tuple[Any, ...], Any]] = {} if cache is None else cache
+
+    def create_category(self, model_class: type[Any], prefix: str | None = None) -> str:
+        prefix = self.prefix if prefix is None else prefix
+        return f"{prefix}_{model_class.__name__}"
+
+    def create_sub_cache(self, attrs: Sequence[str], prefix: str = "") -> "QueryModelResultCache":
+        return self.__class__(attrs=attrs, prefix=prefix, cache=self.cache)
+
+    def clear(self, model_class: type[Any] | None = None, prefix: str | None = None) -> None:
+        if model_class is None:
+            self.cache.clear()
+            return
+
+        category = self.create_category(model_class, prefix=prefix)
+        cached = self.cache.get(category)
+        if cached is not None:
+            cached.clear()
+
+    def create_cache_key(
+        self,
+        model_class: type[Any],
+        instance: Any,
+        attrs: Sequence[str] | None = None,
+        prefix: str | None = None,
+    ) -> tuple[Any, ...]:
+        key: list[Any] = [self.create_category(model_class, prefix=prefix)]
+        attrs = self.attrs if attrs is None else tuple(attrs)
+
+        if isinstance(instance, dict):
+            for attr in attrs:
+                key.append(str(instance[attr]))
+        else:
+            for attr in attrs:
+                key.append(str(getattr(instance, attr)))
+        return tuple(key)
+
+    def get_category(self, model_class: type[Any], prefix: str | None = None) -> dict[tuple[Any, ...], Any]:
+        return self.cache.setdefault(self.create_category(model_class, prefix=prefix), {})
+
+    def update(
+        self,
+        model_class: type[Any],
+        values: Sequence[Any],
+        cache_keys: Sequence[tuple[Any, ...]] | None = None,
+        prefix: str | None = None,
+    ) -> None:
+        if cache_keys is None:
+            cache_keys = []
+            for instance in values:
+                try:
+                    cache_key = self.create_cache_key(model_class, instance, prefix=prefix)
+                except (AttributeError, KeyError):
+                    cache_key = ()
+                cache_keys.append(cache_key)
+
+        for cache_key, instance in zip(cache_keys, values, strict=False):
+            if len(cache_key) <= 1:
+                continue
+            self.cache.setdefault(cache_key[0], {})[cache_key] = instance
+
+    def get(
+        self,
+        model_class: type[Any],
+        row_or_model: Any,
+        prefix: str | None = None,
+    ) -> Any | None:
+        try:
+            cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
+        except (AttributeError, KeyError):
+            return None
+        return self.cache.get(cache_key[0], {}).get(cache_key)

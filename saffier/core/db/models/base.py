@@ -665,11 +665,23 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return values
 
     def __eq__(self, other: Any) -> bool:
-        if self.__class__ != other.__class__:
+        if not isinstance(other, SaffierBaseModel):
             return False
-        original = self.__get_instance_values(instance=self)
-        other_values = self.__get_instance_values(instance=other)
-        return original == other_values
+        if self.meta.registry is not other.meta.registry:
+            return False
+        if self.meta.tablename != other.meta.tablename:
+            return False
+
+        for field_name in self.identifying_db_fields:
+            left = getattr(self, field_name, None)
+            right = getattr(other, field_name, None)
+            if hasattr(left, "pk"):
+                left = left.pk
+            if hasattr(right, "pk"):
+                right = right.pk
+            if left != right:
+                return False
+        return True
 
 
 class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):

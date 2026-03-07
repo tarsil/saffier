@@ -1,5 +1,9 @@
 __version__ = "2.0.0"
 
+import importlib
+import sys
+from types import MethodType
+
 from saffier.conf import (
     _monkay as monkay,
 )
@@ -109,6 +113,42 @@ def get_migration_prepared_registry(registry: Registry | None = None) -> Registr
     return registry
 
 
+def _package_find_missing(
+    self,
+    *,
+    all_var: bool | object = True,
+    search_pathes: object | None = None,
+    ignore_deprecated_import_errors: bool = False,
+    require_search_path_all_var: bool = True,
+) -> dict[str, set[str]]:
+    del ignore_deprecated_import_errors
+
+    missing: dict[str, set[str]] = {}
+    module = sys.modules[__name__]
+    if all_var is True:
+        export_names = set(__all__)
+    elif all_var is False:
+        export_names = set()
+    else:
+        export_names = set(all_var)
+
+    for name in export_names:
+        if not hasattr(module, name):
+            missing.setdefault(name, set()).add("missing_attr")
+
+    for search_path in search_pathes or ():
+        module_name = f"{__name__}{search_path}" if str(search_path).startswith(".") else str(search_path)
+        try:
+            imported = importlib.import_module(module_name)
+        except Exception:
+            missing.setdefault(str(search_path), set()).add("search_path_import")
+            continue
+        if require_search_path_all_var and not hasattr(imported, "__all__"):
+            missing.setdefault(str(search_path), set()).add("missing_all_var")
+
+    return missing
+
+
 __all__ = [
     "Instance",
     "get_migration_prepared_registry",
@@ -203,3 +243,5 @@ __all__ = [
     "evaluate_settings_once_ready",
     "with_settings",
 ]
+
+monkay.find_missing = MethodType(_package_find_missing, monkay)

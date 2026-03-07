@@ -11,7 +11,7 @@ from sqlalchemy.ext.mutable import MutableList
 import saffier
 from saffier.conf import settings
 from saffier.contrib.sqlalchemy.fields import IPAddress
-from saffier.core.db.constants import CASCADE, NEW_M2M_NAMING, OLD_M2M_NAMING, RESTRICT, SET_NULL
+from saffier.core.db.constants import CASCADE, NEW_M2M_NAMING, RESTRICT, SET_NULL
 from saffier.core.db.fields._internal import (
     URL,
     UUID,
@@ -697,11 +697,6 @@ class ManyToManyField(Field):
         embed_through: str | bool = False,
         **kwargs: typing.Any,
     ):
-        if through_tablename is OLD_M2M_NAMING:
-            raise FieldDefinitionError(
-                '"through_tablename" no longer supports OLD_M2M_NAMING in Saffier. '
-                "Use NEW_M2M_NAMING or a non-empty string."
-            )
         if through_tablename is not None and (
             not isinstance(through_tablename, str) and through_tablename is not NEW_M2M_NAMING
         ):

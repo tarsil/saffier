@@ -1,7 +1,6 @@
 import pytest
 
 import saffier
-from saffier.core.db.constants import OLD_M2M_NAMING
 
 database = saffier.Database("sqlite+aiosqlite:///m2m_naming.db")
 models = saffier.Registry(database=database)
@@ -96,12 +95,12 @@ def test_string_through_tablename_supports_field_formatting() -> None:
     assert Member.meta.fields["teams"].through.meta.tablename == "custom_member_teams"
 
 
-def test_old_m2m_naming_is_rejected() -> None:
+def test_non_string_non_marker_through_tablename_is_rejected() -> None:
     test_registry = saffier.Registry(
         database=saffier.Database("sqlite+aiosqlite:///m2m_naming_old.db")
     )
 
-    with pytest.raises(saffier.FieldDefinitionError, match="OLD_M2M_NAMING"):
+    with pytest.raises(saffier.FieldDefinitionError, match="through_tablename"):
 
         class Team(saffier.StrictModel):
             name = saffier.CharField(max_length=100)
@@ -110,7 +109,7 @@ def test_old_m2m_naming_is_rejected() -> None:
                 registry = test_registry
 
         class Member(saffier.StrictModel):
-            teams = saffier.ManyToMany(Team, through_tablename=OLD_M2M_NAMING)
+            teams = saffier.ManyToMany(Team, through_tablename=object())
 
             class Meta:
                 registry = test_registry

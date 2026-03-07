@@ -12,11 +12,13 @@ import sqlalchemy
 import saffier
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.context_vars import get_schema
+from saffier.core.db.datastructures import QueryModelResultCache
 from saffier.core.db.fields import CharField, TextField
 from saffier.core.db.querysets.clauses import Q, build_lookup_clauses
 from saffier.core.db.querysets.mixins import QuerySetPropsMixin, SaffierModel, TenancyMixin
 from saffier.core.db.querysets.prefetch import PrefetchMixin
 from saffier.core.db.querysets.protocols import AwaitableQuery
+from saffier.core.utils.db import check_db_connection, hash_tablekey
 from saffier.core.utils.models import DateParser
 from saffier.core.utils.schemas import Schema
 from saffier.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
@@ -71,7 +73,9 @@ class BaseQuerySet(
         self._only = [] if only_fields is None else only_fields
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
-        self._cache = None
+        cache_attrs = tuple(getattr(self.model_class, "pkcolumns", ())) if model_class else ()
+        self._cache = QueryModelResultCache(attrs=cache_attrs)
+        self._cached_select_with_tables = None
         self._cached_select_related_expression = None
         self._source_queryset = self
         self._m2m_related = m2m_related  # type: ignore
@@ -92,6 +96,34 @@ class BaseQuerySet(
             self.table = table
         if database is not None:
             self.database = database
+
+        self._clear_cache(keep_result_cache=False)
+
+    @property
+    def _has_dynamic_clauses(self) -> bool:
+        return any(callable(clause) for clause in (*self.filter_clauses, *self.or_clauses))
+
+    def _clear_cache(
+        self,
+        *,
+        keep_result_cache: bool = False,
+        keep_cached_selected: bool = False,
+    ) -> None:
+        if not keep_result_cache:
+            self._cache.clear()
+        if not keep_cached_selected:
+            self._cached_select_with_tables = None
+        self._cache_count: int | None = None
+        self._cache_first: SaffierModel | None = None
+        self._cache_last: SaffierModel | None = None
+        self._cache_fetch_all = False
+
+    def _cache_or_return_result(self, result: SaffierModel) -> SaffierModel:
+        cached = self._cache.get(self.model_class, result)
+        if cached is not None:
+            return cast("SaffierModel", cached)
+        self._cache.update(self.model_class, [result])
+        return result
 
     def _build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
@@ -242,6 +274,7 @@ class BaseQuerySet(
                 join_lookup_field: str | None = None
                 reverse_join = False
                 current_related_field: Any = None
+                through_model: Any = None
                 through_table = None
                 through_from_field: str | None = None
                 through_to_field: str | None = None
@@ -272,12 +305,25 @@ class BaseQuerySet(
                     join_lookup_field = previous_model_class.meta.related_names_mapping.get(part)
                     has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
 
+                next_prefix = part if not prefix else f"{prefix}__{part}"
+
                 if queryset.using_schema is not None:
                     table = model_class.table_schema(queryset.using_schema)
                 else:
                     table = model_class.table
+                table = table.alias(
+                    hash_tablekey(tablekey=model_class.meta.tablename, prefix=next_prefix)
+                )
 
                 if isinstance(current_related_field, saffier_fields.ManyToManyField):
+                    assert through_table is not None
+                    assert through_model is not None
+                    through_table = through_table.alias(
+                        hash_tablekey(
+                            tablekey=through_model.meta.tablename,
+                            prefix=f"{next_prefix}__through",
+                        )
+                    )
                     left_column = getattr(previous_table.c, previous_model_class.pkname, None)
                     through_left = (
                         getattr(through_table.c, through_from_field, None)
@@ -312,7 +358,7 @@ class BaseQuerySet(
                         table,
                         through_right == right_column,
                     )
-                    prefix = part if not prefix else f"{prefix}__{part}"
+                    prefix = next_prefix
                     tables_and_models[prefix] = (table, model_class)
                     current_table = table
                     tables.append(table)
@@ -373,7 +419,7 @@ class BaseQuerySet(
                             left_column == getattr(table.c, lookup_field),
                         )
 
-                prefix = part if not prefix else f"{prefix}__{part}"
+                prefix = next_prefix
                 tables_and_models[prefix] = (table, model_class)
                 current_table = table
                 tables.append(table)
@@ -411,7 +457,10 @@ class BaseQuerySet(
         """
         Builds the query select based on the given parameters and filters.
         """
-        queryset: QuerySet = self._clone()
+        if self._cached_select_with_tables is not None:
+            return self._cached_select_with_tables
+
+        queryset = self
 
         queryset._validate_only_and_defer()
         tables, select_from, tables_and_models = queryset._build_tables_select_from_relationship()
@@ -452,8 +501,14 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*columns)
 
         if queryset._exclude_secrets:
-            model_columns = queryset._secret_recursive_names(model_class=queryset.model_class)
-            columns = [column for column in select_from.columns if column.name in model_columns]
+            columns = []
+            for _, (table, model_class) in tables_and_models.items():
+                for field_name, field in model_class.fields.items():
+                    if field.secret or not field.has_column():
+                        continue
+                    column = getattr(table.c, field_name, None)
+                    if column is not None:
+                        columns.append(column)
             expression = expression.with_only_columns(*columns)
 
         if queryset.filter_clauses:
@@ -500,7 +555,8 @@ class BaseQuerySet(
         if queryset._select_related:
             queryset._cached_select_related_expression = expression
             queryset._source_queryset._cached_select_related_expression = expression
-        return expression, tables_and_models
+        queryset._cached_select_with_tables = (expression, tables_and_models)
+        return queryset._cached_select_with_tables
 
     def _build_select(self) -> Any:
         return self._build_select_with_tables()[0]
@@ -689,7 +745,8 @@ class BaseQuerySet(
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = self._expression
-        queryset._cache = self._cache
+        queryset._cache = QueryModelResultCache(attrs=self._cache.attrs, prefix=self._cache.prefix)
+        queryset._cached_select_with_tables = None
         queryset._cached_select_related_expression = self._cached_select_related_expression
         queryset._source_queryset = getattr(self, "_source_queryset", self)
         queryset._m2m_related = self._m2m_related
@@ -702,7 +759,7 @@ class BaseQuerySet(
             queryset.table = self.model_class.table
         else:
             queryset.table = self.table
-        queryset.extra = self.extra
+        queryset.extra = copy.copy(self.extra)
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = effective_schema
         queryset._for_update = copy.copy(self._for_update)
@@ -711,6 +768,10 @@ class BaseQuerySet(
         queryset._reference_select = copy.copy(self._reference_select)
         queryset.embed_parent = self.embed_parent
         queryset.embed_parent_filters = self.embed_parent_filters
+        queryset._cache_count = None
+        queryset._cache_first = None
+        queryset._cache_last = None
+        queryset._cache_fetch_all = False
 
         return queryset
 
@@ -725,7 +786,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     @property
     def sql(self) -> str:
-        return str(self._expression)
+        if self._expression is None:
+            self._expression = self._build_select()
+        database = getattr(self, "_database", None)
+        engine = getattr(database, "engine", None)
+        if engine is None:
+            return str(self._expression)
+        compiled = self._expression.compile(engine, compile_kwargs={"literal_binds": True})
+        return str(compiled)
 
     @sql.setter
     def sql(self, value: Any) -> None:
@@ -906,6 +974,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._order_by = tuple(
             value[1:] if value.startswith("-") else f"-{value}" for value in queryset._order_by
         )
+        queryset._cache_first = self._cache_last
+        queryset._cache_last = self._cache_first
+        queryset._cache_count = self._cache_count
+        if self._cache_fetch_all:
+            values = list(reversed(tuple(self._cache.get_category(self.model_class).values())))
+            queryset._cache.update(queryset.model_class, values)
+            queryset._cache_fetch_all = True
         return queryset
 
     def batch_size(self, batch_size: int | None = None) -> "QuerySet":
@@ -1121,62 +1196,64 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a boolean indicating if a record exists or not.
         """
+        if kwargs:
+            cached = self._cache.get(self.model_class, kwargs)
+            if cached is not None:
+                return True
+        elif self._cache_count is not None:
+            return self._cache_count > 0
+
         queryset: QuerySet = self.filter(**kwargs) if kwargs else self._clone()
         expression = queryset._build_select()
         expression = sqlalchemy.exists(expression).select()
         queryset._set_query_expression(expression)
-        _exists = await queryset.database.fetch_val(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            _exists = await database.fetch_val(expression)
         return cast("bool", _exists)
 
     async def count(self, **kwargs: Any) -> int:
         """
         Returns an indicating the total records.
         """
+        if not kwargs and self._cache_count is not None:
+            return self._cache_count
+
         queryset: QuerySet = self.filter(**kwargs) if kwargs else self._clone()
         expression = queryset._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         queryset._set_query_expression(expression)
-        _count = await queryset.database.fetch_val(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            _count = await database.fetch_val(expression)
+        if not kwargs:
+            self._cache_count = cast("int", _count)
         return cast("int", _count)
 
     async def get_or_none(self, **kwargs: Any) -> SaffierModel | None:
         """
         Fetch one object matching the parameters or returns None.
         """
-        queryset: QuerySet = self.filter(**kwargs)
-        expression, tables_and_models = queryset._build_select_with_tables()
-        expression = expression.limit(2)
-        queryset._set_query_expression(expression)
-        rows = await queryset.database.fetch_all(expression)
-        if queryset._select_related:
-            self._cached_select_related_expression = expression
-        is_only_fields = bool(queryset._only)
-        is_defer_fields = bool(queryset._defer)
-
-        if not rows:
+        try:
+            return await self.get(**kwargs)
+        except ObjectNotFound:
             return None
-        if len(rows) > 1:
-            raise MultipleObjectsReturned()
-        result = await queryset._hydrate_row(
-            queryset,
-            rows[0],
-            tables_and_models,
-            is_only_fields=is_only_fields,
-            is_defer_fields=is_defer_fields,
-        )
-        return queryset._embed_parent_in_result(result)
 
     async def _all(self, **kwargs: Any) -> list[SaffierModel]:
         """
         Returns the queryset records based on specific filters
         """
-        queryset: QuerySet = self._clone()
-
-        if queryset.is_m2m:
-            queryset.distinct_on = [queryset.m2m_related]
-
         if kwargs:
-            return await queryset.filter(**kwargs).all()
+            queryset = self.filter(**kwargs)
+            queryset._cache = self._cache
+            return await queryset._all()
+
+        if self._cache_fetch_all:
+            return list(self._cache.get_category(self.model_class).values())
+
+        queryset = self
+        if queryset.is_m2m:
+            queryset = queryset.distinct(queryset.m2m_related)
 
         expression, tables_and_models = queryset._build_select_with_tables()
         queryset._set_query_expression(expression)
@@ -1184,7 +1261,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if queryset._select_related:
             self._cached_select_related_expression = expression
 
-        rows = await queryset.database.fetch_all(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            rows = await database.fetch_all(expression)
 
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
@@ -1192,26 +1271,35 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Attach the raw query to the object
         queryset.model_class.raw_query = queryset.sql
 
-        results = [
-            await queryset._hydrate_row(
+        results: list[SaffierModel] = []
+        for row in rows:
+            result = await queryset._hydrate_row(
                 queryset,
                 row,
                 tables_and_models,
                 is_only_fields=is_only_fields,
                 is_defer_fields=is_defer_fields,
             )
-            for row in rows
-        ]
+            if not queryset.is_m2m:
+                results.append(queryset._cache_or_return_result(queryset._embed_parent_in_result(result)))
+            else:
+                related_result = getattr(result, queryset.m2m_related)
+                results.append(queryset._cache_or_return_result(related_result))
 
-        if not queryset.is_m2m:
-            return [queryset._embed_parent_in_result(result) for result in results]
+        queryset._cache_count = len(results)
+        queryset._cache_first = results[0] if results else None
+        queryset._cache_last = results[-1] if results else None
+        queryset._cache_fetch_all = True
 
-        return [getattr(result, queryset.m2m_related) for result in results]
+        return results
 
-    def all(self, **kwargs: Any) -> "QuerySet":
+    def all(self, clear_cache: bool = False, **kwargs: Any) -> "QuerySet":
         """
         Returns the queryset records based on specific filters
         """
+        if clear_cache:
+            self._clear_cache(keep_cached_selected=not self._has_dynamic_clauses)
+            return self
         queryset: QuerySet = self._clone()
         queryset.extra = kwargs
         return queryset
@@ -1220,14 +1308,28 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a single record based on the given kwargs.
         """
-        queryset: QuerySet = self._clone()
-
         if kwargs:
-            return await queryset.filter(**kwargs).get()
+            cached = self._cache.get(self.model_class, kwargs)
+            if cached is not None:
+                return cast("SaffierModel", cached)
+            queryset = self.filter(**kwargs)
+            queryset._cache = self._cache
+            return await queryset.get()
+
+        if self._cache_count == 1 and self._cache_first is not None:
+            return self._cache_first
+        if self._cache_count == 0:
+            raise ObjectNotFound()
+        if self._cache_fetch_all and self._cache_count and self._cache_count > 1:
+            raise MultipleObjectsReturned()
+
+        queryset = self
 
         expression, tables_and_models = queryset._build_select_with_tables()
         expression = expression.limit(2)
-        rows = await queryset.database.fetch_all(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            rows = await database.fetch_all(expression)
         queryset._set_query_expression(expression)
         if queryset._select_related:
             self._cached_select_related_expression = expression
@@ -1246,12 +1348,22 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_only_fields=is_only_fields,
             is_defer_fields=is_defer_fields,
         )
-        return queryset._embed_parent_in_result(result)
+        result = queryset._cache_or_return_result(queryset._embed_parent_in_result(result))
+        queryset._cache_count = 1
+        queryset._cache_first = result
+        queryset._cache_last = result
+        return result
 
     async def first(self, **kwargs: Any) -> SaffierModel | None:
         """
         Returns the first record of a given queryset.
         """
+        if not kwargs:
+            if self._cache_count == 0:
+                return None
+            if self._cache_first is not None:
+                return self._cache_first
+
         queryset: QuerySet = self._clone()
         if kwargs:
             queryset = queryset.filter(**kwargs)
@@ -1265,7 +1377,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if queryset._select_related:
             self._cached_select_related_expression = expression
 
-        rows = await queryset.database.fetch_all(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            rows = await database.fetch_all(expression)
         if not rows:
             return None
 
@@ -1276,15 +1390,23 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_only_fields=bool(queryset._only),
             is_defer_fields=bool(queryset._defer),
         )
-        result = queryset._embed_parent_in_result(result)
+        result = queryset._cache_or_return_result(queryset._embed_parent_in_result(result))
         if queryset.is_m2m:
             return getattr(result, queryset.m2m_related)
+        if not kwargs:
+            self._cache_first = result
         return result
 
     async def last(self, **kwargs: Any) -> SaffierModel | None:
         """
         Returns the last record of a given queryset.
         """
+        if not kwargs:
+            if self._cache_count == 0:
+                return None
+            if self._cache_last is not None:
+                return self._cache_last
+
         queryset: QuerySet = self._clone()
         if kwargs:
             queryset = queryset.filter(**kwargs)
@@ -1298,7 +1420,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if queryset._select_related:
             self._cached_select_related_expression = expression
 
-        rows = await queryset.database.fetch_all(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            rows = await database.fetch_all(expression)
         if not rows:
             return None
 
@@ -1309,9 +1433,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_only_fields=bool(queryset._only),
             is_defer_fields=bool(queryset._defer),
         )
-        result = queryset._embed_parent_in_result(result)
+        result = queryset._cache_or_return_result(queryset._embed_parent_in_result(result))
         if queryset.is_m2m:
             return getattr(result, queryset.m2m_related)
+        if not kwargs:
+            self._cache_last = result
         return result
 
     def _filter_lookup_kwargs(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1345,6 +1471,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         queryset: QuerySet = self._clone()
+        check_db_connection(queryset.database)
         many_to_many_values: dict[str, list[Any]] = {}
         for field_name, field in queryset.model_class.fields.items():
             if not isinstance(field, saffier_fields.ManyToManyField):
@@ -1374,6 +1501,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     )
                 await relation.add(related_value)
 
+        self._clear_cache(keep_result_cache=True, keep_cached_selected=True)
+        self._cache.update(self.model_class, [instance])
         return instance
 
     async def bulk_create(self, objs: list[dict]) -> None:
@@ -1396,7 +1525,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return
         expression = queryset.table.insert()
         queryset._set_query_expression(expression)
-        await queryset.database.execute_many(expression, new_objs)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            await database.execute_many(expression, new_objs)
 
     async def bulk_update(self, objs: list[SaffierModel], fields: list[str]) -> None:
         """
@@ -1449,7 +1580,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         expression = expression.values(kwargs)
         queryset._set_query_expression(expression)
-        await queryset.database.execute_many(expression, query_list)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            await database.execute_many(expression, query_list)
 
     async def raw_delete(
         self,
@@ -1480,7 +1613,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 queryset.or_clauses, expression=count_expression
             )
 
-        row_count = cast("int", await queryset.database.fetch_val(count_expression) or 0)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            row_count = cast("int", await database.fetch_val(count_expression) or 0)
         expression = queryset.table.delete()
 
         if queryset.filter_clauses:
@@ -1492,7 +1627,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             expression = queryset._build_or_clauses_expression(queryset.or_clauses, expression)
 
         queryset._set_query_expression(expression)
-        await queryset.database.execute(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            await database.execute(expression)
         return row_count
 
     async def delete(self, use_models: bool = False) -> int:
@@ -1553,7 +1690,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             expression = expression.where(filter_clause)
 
         queryset._set_query_expression(expression)
-        await queryset.database.execute(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            await database.execute(expression)
 
         await self.model_class.signals.post_update.send(sender=self.__class__, instance=self)
 
@@ -1772,8 +1911,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the SQLAlchemy select expression together with the table mapping.
         """
-        queryset: QuerySet = self._clone()
-        return queryset._build_select_with_tables()
+        return self._build_select_with_tables()
 
     async def as_select(self) -> Any:
         """
@@ -1782,8 +1920,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return (await self.as_select_with_tables())[0]
 
     async def _execute(self) -> Any:
-        queryset: QuerySet = self._clone()
-        records = await queryset._all(**queryset.extra)
+        records = await self._all(**self.extra)
         return records
 
     async def _execute_iterate(self) -> AsyncIterator[SaffierModel]:
@@ -1802,19 +1939,21 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         is_defer_fields = bool(queryset._defer)
         queryset.model_class.raw_query = queryset.sql
 
-        async for row in queryset.database.iterate(expression, chunk_size=queryset._batch_size):
-            result = await queryset._hydrate_row(
-                queryset,
-                row,
-                tables_and_models,
-                is_only_fields=is_only_fields,
-                is_defer_fields=is_defer_fields,
-            )
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            async for row in database.iterate(expression, chunk_size=queryset._batch_size):
+                result = await queryset._hydrate_row(
+                    queryset,
+                    row,
+                    tables_and_models,
+                    is_only_fields=is_only_fields,
+                    is_defer_fields=is_defer_fields,
+                )
 
-            if not queryset.is_m2m:
-                yield queryset._embed_parent_in_result(result)
-            else:
-                yield getattr(result, queryset.m2m_related)
+                if not queryset.is_m2m:
+                    yield queryset._embed_parent_in_result(result)
+                else:
+                    yield getattr(result, queryset.m2m_related)
 
     def __await__(
         self,

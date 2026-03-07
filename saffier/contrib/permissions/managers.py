@@ -36,6 +36,21 @@ def _in_or_null(column: Any, values: list[Any | None]) -> Any:
     return column.in_(non_null_values)
 
 
+def _matches_model_instance(source: Any, model_class: type[Any]) -> bool:
+    if isinstance(source, model_class):
+        return True
+
+    source_meta = getattr(source.__class__, "meta", None)
+    target_meta = getattr(model_class, "meta", None)
+    if source_meta is None or target_meta is None:
+        return False
+
+    return (
+        getattr(source_meta, "registry", None) is getattr(target_meta, "registry", None)
+        and getattr(source_meta, "tablename", None) == getattr(target_meta, "tablename", None)
+    )
+
+
 class PermissionManager(Manager):
     inherit_query = True
 
@@ -77,7 +92,7 @@ class PermissionManager(Manager):
         clauses: list[dict[str, Any]] = []
 
         for source in sources:
-            if isinstance(source, user_field.target):
+            if _matches_model_instance(source, user_field.target):
                 user_direct_subquery = sqlalchemy.select(
                     user_field.through.table.c[permission_column_name]
                 ).where(user_field.through.table.c[user_column_name] == source.pk)
@@ -94,7 +109,7 @@ class PermissionManager(Manager):
                         group_field.through.table.c[permission_column_name]
                     ).where(group_field.through.table.c[group_column_name].in_(group_ids_subquery))
                     clauses.append({"pk__in": permission_from_group_subquery})
-            elif group_field is not None and isinstance(source, group_field.target):
+            elif group_field is not None and _matches_model_instance(source, group_field.target):
                 group_column_name = group_field.target.__name__.lower()
                 permission_from_group_subquery = sqlalchemy.select(
                     group_field.through.table.c[permission_column_name]

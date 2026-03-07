@@ -17,6 +17,7 @@
 - Query and model `delete()` now return deleted row counts.
 - Saffier settings docs refreshed for current behavior and runtime helpers.
 - Documentation tooling now follows the Zensical workflow with Edgy-aligned Hatch/Taskfile docs commands (`docs_prepare`, `docs_build`, `docs_clean`, `serve`).
+- `NEW_M2M_NAMING` is now the only supported many-to-many naming marker; the old compatibility sentinel was removed from Saffier.
 
 ### Fixed
 
@@ -24,6 +25,8 @@
 - QuerySet `raw_delete()` added and delete filtering now respects accumulated OR clauses.
 - Removed `loguru`; Saffier now uses Python standard-library logging in core modules.
 - Removed core runtime dependence on Pydantic (`saffier/core/datastructures.py` and `saffier/core/db/models/model_proxy.py` are now Python-native).
+- QuerySet cache parity improved for `all(clear_cache=True)`, cached `get()`, SQL rendering, and `select_for_update(...)`.
+- Permission, pagination, lazy-import, and nested `exclude_secrets()` compatibility now align more closely with Edgy behavior.
 
 ## 1.4.2
 
