@@ -454,6 +454,9 @@ from `saffier`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.
+* **no_constraint** - Disable the database-level foreign key constraint while still keeping the
+  Saffier relation. This is useful for shared registries, cross-database links, and tenant models
+  that point at shared content type rows.
 
     ```python
     from saffier import CASCADE, SET_NULL, RESTRICT

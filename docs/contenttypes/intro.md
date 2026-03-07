@@ -18,6 +18,8 @@ When enabled:
 * Saffier registers a concrete `ContentType` model in the registry.
 * Regular models get an auto-managed `content_type` relation unless they opt out.
 * `ContentType` records are created automatically on save.
+* Tenant models store their active schema in `ContentType.schema_name`, so
+  `await content_type.get_instance()` resolves back into the correct tenant schema.
 
 ## Default Behavior
 
@@ -30,6 +32,40 @@ class Company(saffier.Model):
 ```
 
 Each `Company` instance receives its own `content_type` row.
+
+## Custom Content Type Models
+
+You can provide either an abstract or a concrete content type model:
+
+```python
+from saffier.contrib.contenttypes.models import ContentType as BaseContentType
+
+
+class CustomContentType(BaseContentType):
+    marker = saffier.CharField(max_length=1, null=True)
+
+    class Meta:
+        abstract = True
+
+
+models = saffier.Registry(database=database, with_content_type=CustomContentType)
+```
+
+Concrete custom models are reused directly. Abstract custom models are turned into a concrete
+registry-local `ContentType` model.
+
+## Shared Content Type Registries
+
+Saffier can also point one registry at another registry's content type model:
+
+```python
+shared = saffier.Registry(database=other_database, with_content_type=True)
+models = saffier.Registry(database=database, with_content_type=shared.content_type)
+```
+
+In that setup Saffier keeps the shared `ContentType` model instead of cloning it, disables the
+database-level foreign key constraint where needed, and uses model-based deletes so removing shared
+content type rows still removes the referencing Saffier models.
 
 ## Custom Content Type Field
 

@@ -456,6 +456,7 @@ class ForeignKey(Field):
         on_delete: str = RESTRICT,
         on_update: str = CASCADE,
         related_name: str | None = None,
+        no_constraint: bool = False,
         **kwargs: Any,
     ):
         assert on_delete is not None, "on_delete must not be null."
@@ -480,12 +481,18 @@ class ForeignKey(Field):
         self.on_delete = on_delete
         self.on_update = on_update or CASCADE
         self.related_name = related_name
+        self.no_constraint = no_constraint
 
     @property
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models.get(self.to) or self.registry.reflected[self.to]
+                try:
+                    self._target = self.registry.get_model(self.to)
+                except LookupError:
+                    self._target = self.registry.models.get(self.to) or self.registry.reflected[
+                        self.to
+                    ]
             else:
                 self._target = self.to
         return self._target
@@ -498,15 +505,26 @@ class ForeignKey(Field):
         to_field = target.fields[target.pkname]
 
         column_type = to_field.get_column_type()
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=self.on_delete,
-                onupdate=self.on_update,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+        owner_registry = getattr(self.owner.meta, "registry", None)
+        target_registry = getattr(target.meta, "registry", None)
+        owner_database = getattr(self.owner, "database", None)
+        target_database = getattr(target, "database", None)
+        use_constraint = not (
+            self.no_constraint
+            or (owner_registry not in (None, False) and target_registry not in (None, False) and owner_registry is not target_registry)
+            or (owner_database is not None and target_database is not None and owner_database is not target_database)
+        )
+        constraints = []
+        if use_constraint:
+            constraints.append(
+                sqlalchemy.schema.ForeignKey(
+                    f"{target.meta.tablename}.{target.pkname}",
+                    ondelete=self.on_delete,
+                    onupdate=self.on_update,
+                    name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
+                    f"_{target.pkname}_{name}",
+                )
             )
-        ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
 
     def expand_relationship(self, value: typing.Any) -> typing.Any:
@@ -842,11 +860,24 @@ class OneToOneField(ForeignKey):
         to_field = target.fields[target.pkname]
 
         column_type = to_field.get_column_type()
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
+        owner_registry = getattr(self.owner.meta, "registry", None)
+        target_registry = getattr(target.meta, "registry", None)
+        owner_database = getattr(self.owner, "database", None)
+        target_database = getattr(target, "database", None)
+        use_constraint = not (
+            self.no_constraint
+            or (owner_registry not in (None, False) and target_registry not in (None, False) and owner_registry is not target_registry)
+            or (owner_database is not None and target_database is not None and owner_database is not target_database)
+        )
+        constraints = []
+        if use_constraint:
+            constraints.append(
+                sqlalchemy.schema.ForeignKey(
+                    f"{target.meta.tablename}.{target.pkname}",
+                    ondelete=self.on_delete,
+                    onupdate=self.on_update,
+                )
             )
-        ]
         return sqlalchemy.Column(
             name,
             column_type,

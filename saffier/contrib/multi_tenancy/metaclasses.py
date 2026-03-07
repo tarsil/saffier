@@ -52,6 +52,8 @@ class BaseTenantMeta(BaseModelMeta):
     """
 
     def __new__(cls, name: str, bases: tuple[type, ...], attrs: Any) -> Any:
+        from saffier.contrib.contenttypes.fields import ContentTypeField
+
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
         new_model = super().__new__(cls, name, bases, attrs)
         meta: TenantMeta = TenantMeta(new_model.meta)
@@ -78,6 +80,17 @@ class BaseTenantMeta(BaseModelMeta):
         if hasattr(meta_class, "register_default"):
             register_default = meta_class.register_default
         new_model.meta.register_default = register_default
+
+        if new_model.meta.is_tenant:
+            for field in new_model.fields.values():
+                if not isinstance(field, ContentTypeField):
+                    continue
+                field.no_constraint = True
+                registry_content_type = getattr(registry, "content_type", None)
+                if registry_content_type is not None:
+                    registry_content_type.__require_model_based_deletion__ = True
+            if registry and hasattr(registry, "_clear_model_table_cache"):
+                registry._clear_model_table_cache(new_model)
 
         if registry:
             try:

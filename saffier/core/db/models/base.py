@@ -231,6 +231,9 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         explicit = self.__dict__.get("__using_schema__", None)
         if explicit is not None:
             return cast("str | None", explicit)
+        table = self.__dict__.get("_table", None)
+        if table is not None:
+            return cast("str | None", getattr(table, "schema", None))
         return self.__class__.get_active_class_schema()
 
     async def load_recursive(
@@ -711,6 +714,7 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
             return sqlalchemy.Table(
                 tablename,
                 metadata,
+                schema=metadata.schema,
                 autoload_with=autoload_with,
             )
         except Exception as e:

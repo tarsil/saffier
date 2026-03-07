@@ -14,6 +14,9 @@ class ContentTypeField(ForeignKey):
         self,
         to: type[Any] | str = "ContentType",
         on_delete: str = CASCADE,
+        no_constraint: bool = False,
+        remove_referenced: bool = True,
+        use_model_based_deletion: bool = False,
         **kwargs: Any,
     ) -> None:
         for argument in ("unique", "null"):
@@ -24,9 +27,12 @@ class ContentTypeField(ForeignKey):
 
         kwargs["unique"] = True
         kwargs["null"] = False
+        self.remove_referenced = remove_referenced
+        self.use_model_based_deletion = use_model_based_deletion
         super().__init__(
             to=to,
             on_delete=on_delete,
+            no_constraint=no_constraint,
             **kwargs,
         )
 

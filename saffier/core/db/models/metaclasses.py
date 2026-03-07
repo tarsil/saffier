@@ -376,10 +376,9 @@ class BaseModelMeta(type):
 
                 _check_manager_for_bases(base, inherited_attrs)  # type: ignore[arg-type]
             else:
-                # Abstract classes inherit all fields.
-                # Concrete classes only propagate fields explicitly marked as inheritable.
+                # Both abstract and concrete bases respect `inherit=False`.
                 for key, value in meta.fields.items():
-                    if meta.abstract or getattr(value, "inherit", True):
+                    if getattr(value, "inherit", True):
                         inherited_attrs[key] = value
                     else:
                         inherited_attrs.pop(key, None)
@@ -767,8 +766,16 @@ class BaseModelMeta(type):
                 raise AttributeError("No parent model found for proxy model.")
             return parent.table_schema(schema=schema, update_cache=update_cache)
 
+        table = getattr(cls, "_table", None)
+        if (
+            not update_cache
+            and table is not None
+            and table.name.lower() == cls.meta.tablename
+            and getattr(table, "schema", None) == schema
+        ):
+            return table
+
         if schema is None or (cls.get_db_schema() or "") == schema:
-            table = getattr(cls, "_table", None)
             if update_cache or table is None or table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build(schema=schema)
             return cls.table

@@ -1224,6 +1224,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def raw_delete(self, use_models: bool = False) -> int:
         queryset: QuerySet = self._clone()
+        if getattr(queryset.model_class, "__require_model_based_deletion__", False):
+            use_models = True
 
         if use_models:
             row_count = 0
@@ -1259,6 +1261,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def delete(self, use_models: bool = False) -> int:
         queryset: QuerySet = self._clone()
+        if getattr(queryset.model_class, "__require_model_based_deletion__", False):
+            use_models = True
         await self.model_class.signals.pre_delete.send(sender=self.__class__, instance=self)
 
         row_count = await queryset.raw_delete(use_models=use_models)

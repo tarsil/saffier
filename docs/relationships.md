@@ -140,6 +140,10 @@ also be removed.
 instances pointing to that object will set to null. When this `SET_NULL` is true, the `null=True`
 must be also provided or an `AssertationError` is raised.
 
+If you need to keep the Python-side relation without a database-level foreign key constraint, pass
+`no_constraint=True`. Saffier uses this for shared content type registries and tenant content type
+links where the target row lives outside the current table metadata.
+
 ## OneToOneField
 
 Creating an `OneToOneField` relationship between models is basically the same as the

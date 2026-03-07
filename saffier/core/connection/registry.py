@@ -343,7 +343,10 @@ class Registry:
             with_content_type = registry_copy.models.get(
                 "ContentType"
             ) or registry_copy.reflected.get("ContentType")
+            if with_content_type is None:
+                with_content_type = self.content_type
             registry_copy.content_type = with_content_type
+            registry_copy._attach_content_type_to_registered_models()
         return registry_copy
 
     def _set_content_type(self, with_content_type: bool | type[Any]) -> None:
@@ -363,16 +366,10 @@ class Registry:
                 },
             )
             content_type_model = type("ContentType", (content_type_model,), {"Meta": meta})
-        elif getattr(content_type_model.meta, "registry", None) is not self:
-            meta = type(
-                "Meta",
-                (),
-                {
-                    "registry": self,
-                    "tablename": getattr(content_type_model.meta, "tablename", "contenttypes"),
-                },
-            )
-            content_type_model = type("ContentType", (content_type_model,), {"Meta": meta})
+        elif getattr(content_type_model.meta, "registry", None) in (None, False):
+            if not getattr(content_type_model.meta, "tablename", None):
+                content_type_model.meta.tablename = "contenttypes"
+            content_type_model = content_type_model.add_to_registry(self, name="ContentType")
 
         self.content_type = content_type_model
         self._attach_content_type_to_registered_models()
@@ -405,6 +402,16 @@ class Registry:
 
         if "content_type" in model_class.fields:
             if isinstance(model_class.fields["content_type"], ContentTypeField):
+                if getattr(model_class.meta, "is_tenant", False):
+                    model_class.fields["content_type"].no_constraint = True
+                target_registry = getattr(self.content_type.meta, "registry", None)
+                if (
+                    getattr(model_class.meta, "registry", None) is not target_registry
+                    or getattr(model_class, "database", None)
+                    is not getattr(self.content_type, "database", None)
+                    or getattr(model_class.meta, "is_tenant", False)
+                ):
+                    self.content_type.__require_model_based_deletion__ = True
                 self._bind_content_type_pre_save(model_class)
             return
 
@@ -420,6 +427,12 @@ class Registry:
             for field_name, field in content_type_fields.items():
                 field.owner = model_class
                 field.registry = self
+                if getattr(model_class.meta, "is_tenant", False):
+                    field.no_constraint = True
+                if isinstance(field.to, str) and field.to == "ContentType":
+                    field.to = self.content_type
+                    if hasattr(field, "_target"):
+                        delattr(field, "_target")
                 auto_related_name = f"{model_class.__name__.lower()}s_set"
                 desired_related_name = (
                     f"reverse_{model_class.__name__.lower()}"
@@ -453,6 +466,14 @@ class Registry:
                         cast(Any, model_class),
                     )
                     model_class.meta.related_names.update(related_names)
+                target_registry = getattr(self.content_type.meta, "registry", None)
+                if (
+                    getattr(model_class.meta, "registry", None) is not target_registry
+                    or getattr(model_class, "database", None)
+                    is not getattr(self.content_type, "database", None)
+                    or getattr(model_class.meta, "is_tenant", False)
+                ):
+                    self.content_type.__require_model_based_deletion__ = True
             self._bind_content_type_pre_save(model_class)
             return
 
@@ -466,6 +487,10 @@ class Registry:
             to=self.content_type,
             related_name=related_name,
             on_delete=CASCADE,
+            no_constraint=(
+                getattr(self.content_type, "no_constraint", False)
+                or getattr(model_class.meta, "is_tenant", False)
+            ),
         )
         # ContentType is managed by registry pre-save hooks.
         field.validator.read_only = True
@@ -481,6 +506,15 @@ class Registry:
             cast(Any, model_class),
         )
         model_class.meta.related_names.update(model_related_names)
+
+        if (
+            getattr(model_class.meta, "registry", None)
+            is not getattr(self.content_type.meta, "registry", None)
+            or getattr(model_class, "database", None)
+            is not getattr(self.content_type, "database", None)
+            or getattr(model_class.meta, "is_tenant", False)
+        ):
+            self.content_type.__require_model_based_deletion__ = True
 
         self._bind_content_type_pre_save(model_class)
 
@@ -527,7 +561,7 @@ class Registry:
             for field_name, field in sender.fields.items():
                 if not isinstance(field, ContentTypeField):
                     continue
-                current_content_type = getattr(instance, field_name, None)
+                current_content_type = instance.__dict__.get(field_name)
                 if current_content_type is None and field.null:
                     continue
                 if (
@@ -542,6 +576,7 @@ class Registry:
                     payload = current_content_type.extract_db_fields()
 
                 payload["name"] = sender.__name__
+                payload["schema_name"] = instance.get_active_instance_schema()
                 content_type_obj = await self.content_type.query.create(**payload)
                 setattr(instance, field_name, content_type_obj)
 
