@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import logging
+from collections.abc import Callable
 from functools import cached_property
 from typing import Any, cast
 
@@ -110,6 +111,7 @@ class Registry:
         )
         self._pattern_reflected_dbs: set[str | None] = set()
         self._content_type_models_bound: set[str] = set()
+        self._model_callbacks: dict[str, list[tuple[Callable[[type[Any]], None], bool]]] = {}
 
         self.schema = Schema(registry=self)
         self._metadata = self._make_metadata()
@@ -285,7 +287,7 @@ class Registry:
         )
 
     def __copy__(self) -> "Registry":
-        registry_copy = Registry(
+        registry_copy = type(self)(
             self.database,
             schema=self.db_schema,
             extra=self.extra,
@@ -328,6 +330,13 @@ class Registry:
             )
 
         registry_copy.pattern_models = dict(self.pattern_models)
+        if hasattr(self, "tenant_models") and hasattr(registry_copy, "tenant_models"):
+            registry_copy.tenant_models = {
+                name: model
+                for name in self.tenant_models
+                if (model := registry_copy.models.get(name) or registry_copy.reflected.get(name))
+                is not None
+            }
         registry_copy._pattern_reflected_dbs = set(self._pattern_reflected_dbs)
         registry_copy._content_type_models_bound = set(self._content_type_models_bound)
         if self.content_type is not None:
@@ -640,6 +649,44 @@ class Registry:
                 del model_dict[model_name]
                 return True
         return False
+
+    def register_callback(
+        self,
+        model_reference: str | type[Any],
+        callback: Callable[[type[Any]], None],
+        *,
+        one_time: bool = False,
+    ) -> None:
+        model_name = model_reference if isinstance(model_reference, str) else model_reference.__name__
+        callbacks = self._model_callbacks.setdefault(model_name, [])
+        callbacks.append((callback, one_time))
+
+        model_class = self.models.get(model_name) or self.reflected.get(model_name)
+        if model_class is None or getattr(model_class, "is_proxy_model", False):
+            return
+        callback(model_class)
+        if one_time:
+            callbacks.remove((callback, one_time))
+            if not callbacks:
+                self._model_callbacks.pop(model_name, None)
+
+    def execute_model_callbacks(self, model_class: type[Any]) -> None:
+        if getattr(model_class, "is_proxy_model", False):
+            return
+        callbacks = list(self._model_callbacks.get(model_class.__name__, ()))
+        if not callbacks:
+            return
+
+        remaining: list[tuple[Callable[[type[Any]], None], bool]] = []
+        for callback, one_time in callbacks:
+            callback(model_class)
+            if not one_time:
+                remaining.append((callback, one_time))
+
+        if remaining:
+            self._model_callbacks[model_class.__name__] = remaining
+        else:
+            self._model_callbacks.pop(model_class.__name__, None)
 
     def get_tablenames(self) -> set[str]:
         tables = set()

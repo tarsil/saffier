@@ -59,6 +59,23 @@ class Product(saffier.StrictModel):
 Use `Model` when you want the looser Saffier behavior. Use `StrictModel` when you want Edgy-like
 runtime discipline without introducing Pydantic.
 
+## Runtime schema selection
+
+Saffier query managers also respect an explicit `__using_schema__` override on the model class or
+instance.
+
+```python
+User.__using_schema__ = "tenant_a"
+rows = await User.query.all()
+
+user = User(id=1)
+user.__using_schema__ = "tenant_b"
+await user.load()
+```
+
+This keeps schema selection on the pure-Python model side and avoids mutating the registry-wide
+default schema just to run a scoped query.
+
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 

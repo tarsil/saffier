@@ -79,6 +79,10 @@ Did you notice that a `TenantRegistry` was used? Nothing to worry about, it is n
 new to you, it is just an inherited [registry](../registry.md) with extra properties specifically
 created for this purpose 😁.
 
+If you want a tenant model to exist only inside tenant schemas, set `register_default = False` on
+the model `Meta`. Saffier now applies that consistently to copied tenant models and to the
+auto-generated ManyToMany through models created from tenant models.
+
 ## TenantRegistry
 
 The `TenantRegistry` as mentioned above, it is just an inherited [registry](../registry.md) with extra properties specifically

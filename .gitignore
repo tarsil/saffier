@@ -19,6 +19,7 @@ docs-generated/
 .cache/
 target/
 venv
+appendix/
 
 # files
 **/*.so

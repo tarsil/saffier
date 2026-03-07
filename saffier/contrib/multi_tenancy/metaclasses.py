@@ -1,9 +1,11 @@
 from typing import Any
 
+from saffier.core.db import fields as saffier_fields
 from saffier.core.db.models.metaclasses import (
     BaseModelMeta,
     MetaInfo,
     _check_model_inherited_registry,
+    get_model_meta_attr,
 )
 
 
@@ -30,9 +32,12 @@ def _check_model_inherited_tenancy(bases: tuple[type, ...]) -> bool | None:
 
 
 class TenantMeta(MetaInfo):
+    __slots__ = ("is_tenant", "register_default")
+
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(meta, **kwargs)
         self.is_tenant: bool = getattr(meta, "is_tenant", False)
+        self.register_default: bool | None = getattr(meta, "register_default", None)
 
     def set_tenant(self, is_tenant: bool) -> None:
         self.is_tenant = is_tenant
@@ -69,10 +74,26 @@ class BaseTenantMeta(BaseModelMeta):
         if is_tenant:
             new_model.meta.is_tenant = is_tenant
 
+        register_default = get_model_meta_attr("register_default", bases, meta_class)
+        if hasattr(meta_class, "register_default"):
+            register_default = meta_class.register_default
+        new_model.meta.register_default = register_default
+
         if registry:
             try:
                 if meta.is_tenant and not meta.abstract:
+                    if meta.register_default is False:
+                        registry.models.pop(new_model.__name__, None)
                     registry.tenant_models[new_model.__name__] = new_model
+                    for value in new_model.fields.values():
+                        if not isinstance(value, saffier_fields.ManyToManyField):
+                            continue
+                        through_model = getattr(value, "through", None)
+                        if not isinstance(through_model, type):
+                            continue
+                        registry.tenant_models[through_model.__name__] = through_model
+                        if meta.register_default is False:
+                            registry.models.pop(through_model.__name__, None)
             except KeyError:
                 ...  # pragma: no cover
         return new_model

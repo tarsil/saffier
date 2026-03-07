@@ -90,13 +90,16 @@ class RelatedField:
         If there is no field with the related_name declared, find the first field
         with the FK to the related_to.
         """
-        field_name: str | None = None
-
         for field, value in self.related_from.fields.items():  # type: ignore
             if isinstance(value, (fields.ForeignKey, fields.OneToOneField)) and (
                 value.related_name == self.related_name
-                or not value.related_name
-                or value.related_name is None
+            ):
+                return field
+
+        field_name: str | None = None
+        for field, value in self.related_from.fields.items():  # type: ignore
+            if isinstance(value, (fields.ForeignKey, fields.OneToOneField)) and (
+                not value.related_name or value.related_name is None
             ):
                 field_name = field
                 break

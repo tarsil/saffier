@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, cast
 
-from saffier.core.db.context_vars import get_tenant, set_tenant
+from saffier.core.db.context_vars import get_schema, get_tenant, set_tenant
 from saffier.core.db.querysets.base import QuerySet
 from saffier.exceptions import ImproperlyConfigured
 
@@ -78,13 +78,38 @@ class Manager(BaseManager):
         """
         if getattr(self.model_class.meta, "abstract", False):
             raise ImproperlyConfigured("Cannot query abstract models.")
-        tenant = get_tenant()
-        if tenant:
-            set_tenant(None)
+        schema = None
+        database = getattr(self.model_class, "database", None)
+
+        if self.instance is not None:
+            if hasattr(self.instance, "get_active_instance_schema"):
+                schema = self.instance.get_active_instance_schema()
+            else:
+                schema = getattr(self.instance, "__using_schema__", None)
+            database = getattr(self.instance, "database", database)
+        else:
+            if hasattr(self.model_class, "get_active_class_schema"):
+                schema = self.model_class.get_active_class_schema()
+            else:
+                schema = getattr(self.model_class, "__using_schema__", None)
+
+        if schema is None:
+            tenant = get_tenant()
+            if tenant:
+                set_tenant(None)
+                schema = tenant
+            else:
+                schema = get_schema()
+
+        if schema is not None:
             return self.queryset_class(
-                self.model_class, table=self.model_class.table_schema(tenant)
+                self.model_class,
+                using_schema=schema,
+                table=self.model_class.table_schema(schema),
+                database=database,
             )  # type: ignore[arg-type]
-        return self.queryset_class(self.model_class)
+
+        return self.queryset_class(self.model_class, database=database)
 
     def __getattr__(self, item: Any) -> Any:
         """

@@ -11,9 +11,16 @@ import saffier
 from saffier.conf import settings
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.models.managers import Manager, RedirectManager
-from saffier.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
+from saffier.core.db.models.metaclasses import (
+    BaseModelMeta,
+    BaseModelReflectMeta,
+    MetaInfo,
+    _register_model_signals,
+    _set_many_to_many_relation,
+    _set_related_name_for_foreign_keys,
+)
 from saffier.core.db.models.model_proxy import ProxyModel
-from saffier.core.utils.models import DateParser, generify_model_fields
+from saffier.core.utils.models import DateParser, create_saffier_model, generify_model_fields
 from saffier.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -21,6 +28,16 @@ if TYPE_CHECKING:
     from saffier.core.signals import Broadcaster
 
 saffier_setattr = object.__setattr__
+
+_MODEL_COPY_EXCLUDED_ATTRS = {
+    "fields",
+    "meta",
+    "_table",
+    "_db_schemas",
+    "__proxy_model__",
+    "_pknames",
+    "_pkcolumns",
+}
 
 
 class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
@@ -36,6 +53,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[str | None] = None
     __proxy_model__: ClassVar[type["Model"] | None] = None
+    __using_schema__: ClassVar[str | None] = None
 
     def __init__(self, *model_refs: Any, **kwargs: Any) -> None:
         self.setup_model_fields_from_kwargs(model_refs, kwargs)
@@ -147,6 +165,9 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     @property
     def table(self) -> sqlalchemy.Table:
         if getattr(self, "_table", None) is None:
+            schema = self.get_active_instance_schema()
+            if schema is not None:
+                return cast("sqlalchemy.Table", self.__class__.table_schema(schema))
             return cast("sqlalchemy.Table", self.__class__.table)
         return self._table
 
@@ -202,6 +223,16 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             if field.has_column()
         )
 
+    @classmethod
+    def get_active_class_schema(cls) -> str | None:
+        return cast("str | None", getattr(cls, "__using_schema__", None))
+
+    def get_active_instance_schema(self) -> str | None:
+        explicit = self.__dict__.get("__using_schema__", None)
+        if explicit is not None:
+            return cast("str | None", explicit)
+        return self.__class__.get_active_class_schema()
+
     async def load_recursive(
         self,
         only_needed: bool = False,
@@ -240,6 +271,198 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Returns the name of the class in lowercase.
         """
         return self.__class__.__name__.lower()
+
+    @classmethod
+    def _copy_model_definitions(
+        cls,
+        *,
+        registry: "saffier.Registry | None" = None,
+        unlink_same_registry: bool = True,
+    ) -> dict[str, Any]:
+        from saffier.core.db.fields.base import ForeignKey, ManyToManyField
+
+        definitions: dict[str, Any] = {}
+        source_registry = getattr(cls.meta, "registry", None)
+
+        for field_name, field in cls.fields.items():
+            if getattr(field, "no_copy", False):
+                continue
+            field_copy = copy.copy(field)
+            if hasattr(field_copy, "_target"):
+                delattr(field_copy, "_target")
+
+            if source_registry not in (None, False):
+                if isinstance(field_copy, ForeignKey):
+                    target = field.target
+                    if getattr(target.meta, "registry", None) is source_registry:
+                        if unlink_same_registry:
+                            field_copy.to = target.__name__
+                        elif registry is not None:
+                            field_copy.related_name = False
+                elif isinstance(field_copy, ManyToManyField):
+                    target = field.target
+                    if getattr(target.meta, "registry", None) is source_registry and unlink_same_registry:
+                        field_copy.to = target.__name__
+                    through = getattr(field_copy, "through", None)
+                    if isinstance(through, type) and getattr(through.meta, "registry", None) is source_registry:
+                        if unlink_same_registry:
+                            field_copy.through = through.__name__
+
+            definitions[field_name] = field_copy
+
+        for manager_name in getattr(cls.meta, "managers", []):
+            manager = getattr(cls, manager_name, None)
+            if isinstance(manager, Manager):
+                definitions[manager_name] = copy.copy(manager)
+
+        return definitions
+
+    @classmethod
+    def copy_saffier_model(
+        cls,
+        registry: "saffier.Registry | None" = None,
+        name: str = "",
+        unlink_same_registry: bool = True,
+        on_conflict: str = "error",
+    ) -> type["Model"]:
+        definitions = {
+            key: value
+            for key, value in cls.__dict__.items()
+            if key not in _MODEL_COPY_EXCLUDED_ATTRS and not key.startswith("__")
+        }
+        definitions.update(
+            cls._copy_model_definitions(registry=registry, unlink_same_registry=unlink_same_registry)
+        )
+        definitions["__skip_registry__"] = True
+
+        meta = type(
+            "Meta",
+            (),
+            {
+                "registry": False,
+                "tablename": getattr(cls.meta, "tablename", None),
+                "table_prefix": getattr(cls.meta, "table_prefix", None),
+                "unique_together": list(getattr(cls.meta, "unique_together", []) or []),
+                "indexes": list(getattr(cls.meta, "indexes", []) or []),
+                "constraints": list(getattr(cls.meta, "constraints", []) or []),
+                "reflect": getattr(cls.meta, "reflect", False),
+                "abstract": getattr(cls.meta, "abstract", False),
+                "is_tenant": getattr(cls.meta, "is_tenant", None),
+                "register_default": getattr(cls.meta, "register_default", None),
+            },
+        )
+
+        copied_model = create_saffier_model(
+            name or cls.__name__,
+            cls.__module__,
+            __definitions__=definitions,
+            __metadata__=meta,
+            __qualname__=cls.__qualname__,
+            __bases__=cls.__bases__,
+        )
+        copied_model.database = getattr(cls, "database", None)
+        copied_model.__using_schema__ = getattr(cls, "__using_schema__", None)
+
+        if registry is None:
+            copied_model.meta.registry = False
+            return copied_model
+        return copied_model.add_to_registry(registry, on_conflict=on_conflict)
+
+    copy_model = copy_saffier_model
+    copy_edgy_model = copy_saffier_model
+
+    @classmethod
+    def real_add_to_registry(
+        cls,
+        *,
+        registry: "saffier.Registry",
+        name: str = "",
+        database: bool | Any | str = "keep",
+        on_conflict: str = "error",
+    ) -> type["Model"]:
+        if getattr(cls.meta, "registry", None) not in (None, False, registry):
+            return cls.copy_saffier_model(
+                registry=registry,
+                name=name or cls.__name__,
+                on_conflict=on_conflict,
+            )
+
+        model_name = name or cls.__name__
+        if model_name in registry.models:
+            if on_conflict == "keep":
+                return cast("type[Model]", registry.models[model_name])
+            if on_conflict == "replace":
+                registry.delete_model(model_name)
+            else:
+                raise ImproperlyConfigured(
+                    f'A model with the same name is already registered: "{model_name}".'
+                )
+
+        cls.meta.registry = registry
+        cls.__name__ = model_name
+
+        if database is True:
+            cls.database = registry.database
+        elif database not in (False, "keep"):
+            cls.database = database
+        elif getattr(cls, "database", None) is None:
+            cls.database = registry.database
+
+        registry.models[model_name] = cls
+        cls.__db_model__ = True
+        cls.meta.model = cls
+        cls.fields = cls.meta.fields
+        cls._table = None
+        cls._db_schemas = {}
+
+        for field_name, field in cls.fields.items():
+            field.owner = cls
+            field.registry = registry
+            if field.primary_key:
+                cls.pkname = field_name
+
+        for manager_name in getattr(cls.meta, "managers", []):
+            manager = getattr(cls, manager_name, None)
+            if isinstance(manager, Manager):
+                manager.name = manager_name
+                manager.model_class = cls
+
+        if getattr(cls.meta, "foreign_key_fields", None) and not cls.is_proxy_model:
+            related_names = _set_related_name_for_foreign_keys(cls.meta.foreign_key_fields, cls)
+            cls.meta.related_names.update(related_names)
+
+        for field_name, field in list(cls.fields.items()):
+            if isinstance(field, saffier.ManyToManyField):
+                _set_many_to_many_relation(field, cls, field_name)
+
+        _register_model_signals(cls)
+        cls.__proxy_model__ = None
+        if not cls.is_proxy_model and not cls.meta.abstract:
+            proxy_model = cls.generate_proxy_model()
+            cls.__proxy_model__ = proxy_model
+            cls.__proxy_model__.parent = cls
+            registry.models[model_name] = cls
+
+        if hasattr(registry, "_handle_model_registration"):
+            registry._handle_model_registration(cls)
+        registry.execute_model_callbacks(cls)
+        return cast("type[Model]", cls)
+
+    @classmethod
+    def add_to_registry(
+        cls,
+        registry: "saffier.Registry",
+        name: str = "",
+        database: bool | Any | str = "keep",
+        *,
+        on_conflict: str = "error",
+    ) -> type["Model"]:
+        return cls.real_add_to_registry(
+            registry=registry,
+            name=name,
+            database=database,
+            on_conflict=on_conflict,
+        )
 
     @classmethod
     def generate_proxy_model(cls) -> type["Model"]:
@@ -377,6 +600,8 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         }
 
     def __setattr__(self, key: Any, value: Any) -> Any:
+        if key == "__using_schema__":
+            self.__dict__.pop("_table", None)
         if key in self.fields:
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.

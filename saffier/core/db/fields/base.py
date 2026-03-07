@@ -485,7 +485,7 @@ class ForeignKey(Field):
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]
+                self._target = self.registry.models.get(self.to) or self.registry.reflected[self.to]
             else:
                 self._target = self.to
         return self._target
@@ -533,7 +533,7 @@ class ManyToManyField(Field):
     def __init__(
         self,
         to: type["Model"] | str,
-        through: type["Model"] | None = None,
+        through: type["Model"] | str | None = None,
         through_tablename: str | type[NEW_M2M_NAMING] | None = NEW_M2M_NAMING,
         **kwargs: typing.Any,
     ):
@@ -561,16 +561,17 @@ class ManyToManyField(Field):
         self.through_tablename = through_tablename
         self.related_name = related_name
 
-        if self.related_name:
+        if self.related_name not in (None, False):
             assert isinstance(self.related_name, str), "related_name must be a string."
 
-        self.related_name = self.related_name.lower() if self.related_name else None
+        if isinstance(self.related_name, str):
+            self.related_name = self.related_name.lower()
 
     @property
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]
+                self._target = self.registry.models.get(self.to) or self.registry.reflected[self.to]
             else:
                 self._target = self.to
         return self._target
@@ -619,7 +620,8 @@ class ManyToManyField(Field):
 
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.owner.meta.registry.models[self.through]
+                registry = self.owner.meta.registry
+                self.through = registry.models.get(self.through) or registry.reflected[self.through]
 
             # M2M through models in Saffier are always required to expose an
             # auto-incrementing integer "id" primary key.
@@ -680,13 +682,6 @@ class ManyToManyField(Field):
 
         new_meta = type("MetaInfo", (), new_meta_namespace)
 
-        # Define the related names
-        owner_related_name = (
-            f"{self.related_name}_{class_name.lower()}s_set"
-            if self.related_name
-            else f"{owner_name.lower()}_{class_name.lower()}s_set"
-        )
-
         to_related_name = (
             f"{self.related_name}"
             if self.related_name
@@ -703,16 +698,26 @@ class ManyToManyField(Field):
                     self.owner,
                     on_delete=saffier.CASCADE,
                     null=True,
-                    related_name=owner_related_name,
+                    related_name=False,
                 ),
                 f"{to_name.lower()}": ForeignKey(
-                    self.to, on_delete=saffier.CASCADE, null=True, related_name=to_related_name
+                    self.to,
+                    on_delete=saffier.CASCADE,
+                    null=True,
+                    related_name=(False if self.related_name is False else to_related_name),
                 ),
             },
         )
         self.through = typing.cast(type["Model"], through_model)
 
         self.add_model_to_register(self.through)
+        tenant_models = getattr(self.registry, "tenant_models", None)
+        if tenant_models is not None and (
+            getattr(self.owner.meta, "is_tenant", False) or getattr(self.to.meta, "is_tenant", False)
+        ):
+            tenant_models[self.through.__name__] = self.through
+            if getattr(self.owner.meta, "register_default", None) is False:
+                self.registry.models.pop(self.through.__name__, None)
 
 
 ManyToMany = ManyToManyField

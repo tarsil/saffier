@@ -447,6 +447,7 @@ class MyModel(saffier.Model):
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
 * **related_name** - The name to use for the relation from the related object back to this one.
+  Set it to `False` to disable the reverse relation entirely.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.

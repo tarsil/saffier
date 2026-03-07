@@ -82,6 +82,19 @@ The copied registry keeps:
 That makes it safe to prepare migration metadata without leaving copied relationship state attached
 to the original registry.
 
+## Dynamic model registration
+
+Saffier models can also be copied and attached to another registry at runtime.
+
+```python
+user_copy = User.copy_saffier_model()
+tenant_user = user_copy.add_to_registry(tenant_registry)
+```
+
+This is useful for migration preparation, extension-driven model composition, and tests that need
+isolated registries. If a copied model still references models that are added later, Saffier now
+defers the reverse-relation wiring until those models are registered in the target registry.
+
 ## Automigration
 
 For managed runtimes, a registry can also opt into running migrations on first connect:

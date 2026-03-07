@@ -181,11 +181,16 @@ def _set_related_name_for_foreign_keys(
     for name, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
+        if default_related_name is False:
+            continue
+
         if not default_related_name:
             default_related_name = f"{model_class.__name__.lower()}s_set"
 
-        else:
-            existing_related = getattr(foreign_key.target, default_related_name, None)
+        foreign_key.related_name = default_related_name
+
+        def bind_related_name(target_model: type[Any]) -> None:
+            existing_related = getattr(target_model, default_related_name, None)
             if existing_related is not None:
                 if (
                     isinstance(existing_related, RelatedField)
@@ -200,46 +205,57 @@ def _set_related_name_for_foreign_keys(
                         )
                     model_class.meta.related_fields[default_related_name] = existing_related
                     model_class.meta.related_names_mapping[default_related_name] = name
-                    related_names.add(default_related_name)
-                    continue
+                    return
                 if not isinstance(existing_related, RelatedField):
                     raise ForeignKeyBadConfigured(
                         f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
                     )
 
-        foreign_key.related_name = default_related_name
-
-        related_field = RelatedField(
-            related_name=default_related_name,
-            related_to=foreign_key.target,
-            related_from=model_class,
-        )
-
-        # Set the related name on target model and proxy model.
-        target_models = [foreign_key.target]
-        proxy_target = getattr(foreign_key.target, "proxy_model", None)
-        if proxy_target is not None and proxy_target not in target_models:
-            target_models.append(proxy_target)
-        for target_model in target_models:
-            setattr(target_model, default_related_name, related_field)
-
-        model_class.meta.related_fields[default_related_name] = related_field
-        target_meta = cast("MetaInfo", foreign_key.target.meta)
-        target_meta.related_fields[default_related_name] = related_field
-        if default_related_name not in target_meta.fields:
-            placeholder = saffier_fields.PlaceholderField(
-                name=default_related_name,
-                no_copy=True,
-                inherit=False,
+            related_field = RelatedField(
+                related_name=default_related_name,
+                related_to=target_model,
+                related_from=model_class,
             )
-            placeholder.owner = foreign_key.target
-            placeholder.registry = target_meta.registry
-            target_meta.fields[default_related_name] = placeholder
-            target_meta.fields_mapping[default_related_name] = placeholder
 
-        # Set the fields mapping where a related name maps a specific foreign key
-        model_class.meta.related_names_mapping[default_related_name] = name
-        target_meta.related_names_mapping[default_related_name] = name
+            target_models = [target_model]
+            proxy_target = getattr(target_model, "proxy_model", None)
+            if proxy_target is not None and proxy_target not in target_models:
+                target_models.append(proxy_target)
+            for candidate in target_models:
+                setattr(candidate, default_related_name, related_field)
+
+            model_class.meta.related_fields[default_related_name] = related_field
+            target_meta = cast("MetaInfo", target_model.meta)
+            target_meta.related_fields[default_related_name] = related_field
+            if default_related_name not in target_meta.fields:
+                placeholder = saffier_fields.PlaceholderField(
+                    name=default_related_name,
+                    no_copy=True,
+                    inherit=False,
+                )
+                placeholder.owner = target_model
+                placeholder.registry = target_meta.registry
+                target_meta.fields[default_related_name] = placeholder
+                target_meta.fields_mapping[default_related_name] = placeholder
+
+            model_class.meta.related_names_mapping[default_related_name] = name
+            target_meta.related_names_mapping[default_related_name] = name
+
+        registry = getattr(model_class.meta, "registry", None)
+        target_model = None
+        if isinstance(foreign_key.to, str):
+            if registry is not None:
+                target_model = registry.models.get(foreign_key.to) or registry.reflected.get(
+                    foreign_key.to
+                )
+                if target_model is None:
+                    registry.register_callback(foreign_key.to, bind_related_name, one_time=True)
+        else:
+            target_model = foreign_key.target
+
+        if target_model is not None:
+            bind_related_name(target_model)
+
         related_names.add(default_related_name)
 
     return related_names
@@ -250,9 +266,49 @@ def _set_many_to_many_relation(
     model_class: Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
+    registry = cast("Registry | None", getattr(model_class.meta, "registry", None))
+    relation_name = settings.many_to_many_relation.format(key=field)
+
+    if isinstance(m2m.to, str) and registry is not None:
+        target_name = m2m.to
+        target_model = registry.models.get(target_name) or registry.reflected.get(target_name)
+        if target_model is None:
+            setattr(model_class, relation_name, Relation(through=m2m.through, to=target_name, owner=m2m.owner))
+
+            def finalize_target(resolved_target: type[Any]) -> None:
+                m2m.to = resolved_target
+                _set_many_to_many_relation(m2m, model_class, field)
+
+            registry.register_callback(target_name, finalize_target, one_time=True)
+            return
+
+        m2m.to = target_model
+
+    if isinstance(m2m.through, str):
+        if registry is not None: # type: ignore
+            through_name = m2m.through
+            through_model = registry.models.get(through_name) or registry.reflected.get(through_name)
+            if through_model is None:
+                setattr(
+                    model_class,
+                    relation_name,
+                    Relation(through=through_name, to=m2m.to, owner=m2m.owner),
+                )
+
+                def finalize_relation(resolved_through: type[Any]) -> None:
+                    m2m.through = resolved_through
+                    setattr(
+                        model_class,
+                        relation_name,
+                        Relation(through=resolved_through, to=m2m.to, owner=m2m.owner),
+                    )
+
+                registry.register_callback(through_name, finalize_relation, one_time=True)
+                return
+
     m2m.create_through_model()
     relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
-    setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
+    setattr(model_class, relation_name, relation)
 
 
 def _register_model_signals(model_class: type["Model"]) -> None:
@@ -286,6 +342,7 @@ class BaseModelMeta(type):
         meta_info_class: type[MetaInfo] = MetaInfo,
         register_content_type: bool = True,
     ) -> Any:
+        allow_concrete_without_registry = bool(attrs.pop("__skip_registry__", False))
         fields: dict[str, Field] = {}
         one_to_one_fields: set[saffier_fields.OneToOneField] = set()
         foreign_key_fields: dict[
@@ -509,7 +566,7 @@ class BaseModelMeta(type):
 
         # Handle the registry of models
         skip_registry_lookup = getattr(meta_class, "registry", None) is False
-        if skip_registry_lookup and not meta.abstract:
+        if skip_registry_lookup and not meta.abstract and not allow_concrete_without_registry:
             raise ImproperlyConfigured(
                 "Meta.registry = False can only be used on abstract models."
             )
@@ -616,6 +673,8 @@ class BaseModelMeta(type):
             and hasattr(registry, "_handle_model_registration")
         ):
             registry._handle_model_registration(new_class)
+        if registry is not None and hasattr(registry, "execute_model_callbacks"):
+            registry.execute_model_callbacks(new_class)
 
         return new_class
 
