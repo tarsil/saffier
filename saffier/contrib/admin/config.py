@@ -11,10 +11,8 @@ class AdminConfig:
     admin_extra_templates: list[str | os.PathLike[str]] = field(default_factory=list)
     title: str = "Saffier Admin"
     menu_title: str = "Saffier Admin"
-    favicon: str = (
-        "https://raw.githubusercontent.com/dymmond/saffier/main/docs/overrides/favicon.png"
-    )
-    sidebar_bg_colour: str = "#1f2937"
+    favicon: str = "https://raw.githubusercontent.com/tarsil/saffier/main/docs/overrides/assets/img/favicon.ico"
+    sidebar_bg_colour: str = "#ab47bd"
     dashboard_title: str = "Saffier Admin Dashboard"
     secret_key: str | bytes = field(default_factory=lambda: os.urandom(64))
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
+from saffier._instance import Instance
 from saffier.cli.constants import SAFFIER_DB, SAFFIER_EXTRA
 from saffier.conf import _monkay
 from saffier.core.extras.base import BaseExtra
@@ -43,10 +43,9 @@ class SaffierExtra(BaseExtra):
         object_setattr(app, SAFFIER_EXTRA, {})
         app._saffier_extra["extra"] = config
         _monkay.set_instance(
-            SimpleNamespace(
-                app=app,
-                extra=config,
-                path=getattr(app, "__saffier_path__", None),
+            Instance(
                 registry=registry,
+                app=app,
+                path=getattr(app, "__saffier_path__", None),
             )
         )

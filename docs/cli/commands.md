@@ -10,9 +10,12 @@ Most commands need an application context.
 
 Provide it via:
 
-* `--app path.to.module:app`
-* `SAFFIER_DEFAULT_APP=path.to.module:app`
+* `--app path.to.module`
+* `SAFFIER_DEFAULT_APP=path.to.module`
 * `preloads` in [Settings](../settings.md)
+
+The legacy `path.to.module:app` form still works for older projects, but current Saffier prefers
+module-based discovery where the module sets `saffier.monkay.instance`.
 
 See [Discovery](../migrations/discovery.md) for details.
 

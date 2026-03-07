@@ -45,6 +45,7 @@ def test_shell_executes_stdin_in_non_interactive_mode(monkeypatch: pytest.Monkey
     )
 
     monkeypatch.setattr(shell_base, "get_migration_app", lambda: fake_app)
+    monkeypatch.setattr(shell_base, "get_migration_registry", lambda: "registry")
     monkeypatch.setattr(shell_base.sys, "platform", "linux")
     monkeypatch.setattr(shell_base.sys, "stdin", fake_stdin)
     monkeypatch.setattr(shell_base.select, "select", lambda *_: ([fake_stdin], [], []))
@@ -66,6 +67,7 @@ def test_shell_uses_extra_registry_and_runs_execsync(monkeypatch: pytest.MonkeyP
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(shell_base, "get_migration_app", lambda: fake_app)
+    monkeypatch.setattr(shell_base, "get_migration_registry", lambda: "extra-registry")
     monkeypatch.setattr(shell_base.sys, "platform", "linux")
     monkeypatch.setattr(shell_base.sys, "stdin", SimpleNamespace(isatty=lambda: True))
     monkeypatch.setattr(

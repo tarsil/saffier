@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from functools import cached_property
 from pathlib import Path
 from typing import Any, ClassVar
@@ -26,6 +27,10 @@ class SaffierSettings(BaseSettings):
     use_tz: bool = True
     preloads: list[str] | tuple[str, ...] = ()
     extensions: list[SettingsExtensionDefinition] | tuple[SettingsExtensionDefinition, ...] = ()
+    allow_automigrations: bool = True
+    multi_schema: bool | re.Pattern[str] | str = False
+    ignore_schema_pattern: re.Pattern[str] | str | None = "information_schema"
+    migrate_databases: list[str | None] | tuple[str | None, ...] = (None,)
     migration_directory: str | os.PathLike[str] = Path("migrations")
     alembic_ctx_kwargs: dict[str, Any] = {
         "compare_type": True,

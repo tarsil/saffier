@@ -28,7 +28,7 @@ admin_app = create_admin_app(registry=models, auth_username="admin", auth_passwo
 ## CLI
 
 ```bash
-saffier --app yourmodule:app admin_serve --admin-path /admin
+saffier --app yourmodule admin_serve --admin-path /admin
 ```
 
 Optional extra dependencies:

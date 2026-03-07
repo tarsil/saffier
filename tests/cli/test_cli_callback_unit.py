@@ -103,16 +103,16 @@ def test_cli_callback_uses_preloaded_app(tmp_path: Path, monkeypatch: pytest.Mon
     _write_module(
         tmp_path / "preloaded_cli_app.py",
         """
-        from types import SimpleNamespace
-
-        from saffier.conf import _monkay
+        import saffier
 
         class App:
             pass
 
         app = App()
-        app._saffier_db = {"migrate": object()}
-        _monkay.set_instance(SimpleNamespace(app=app, path="preloaded_cli_app:app"), apply_extensions=False)
+        saffier.monkay.set_instance(
+            saffier.Instance(registry=object(), app=app, path="preloaded_cli_app:app"),
+            apply_extensions=False,
+        )
         """,
     )
     _write_module(

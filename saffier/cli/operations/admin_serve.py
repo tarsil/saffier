@@ -6,8 +6,7 @@ from typing import Annotated, Any
 from sayer import Option, command
 
 import saffier
-from saffier.cli.constants import SAFFIER_DB
-from saffier.cli.state import get_migration_app
+from saffier.cli.state import get_migration_app, get_migration_registry
 from saffier.contrib.admin import AdminConfig, create_admin_app
 
 
@@ -88,14 +87,7 @@ def admin_serve(
         raise RuntimeError("Palfrey is required to run `saffier admin_serve`.") from exc
 
     app = get_migration_app()
-    if not hasattr(app, SAFFIER_DB):
-        raise RuntimeError("Loaded app does not expose Saffier migration state.")
-
-    migrate_state = getattr(app, SAFFIER_DB).get("migrate")
-    if migrate_state is None:
-        raise RuntimeError("Could not resolve Saffier registry from the loaded app.")
-
-    registry = migrate_state.registry
+    registry = get_migration_registry()
     if auth_pw is None:
         auth_pw = secrets.token_urlsafe(24)
         print(f"Saffier admin password: {auth_pw}")
@@ -114,13 +106,10 @@ def admin_serve(
     except ImportError:
         final_app: Any = admin_app
     else:
-        final_app = Starlette(
-            debug=debug,
-            routes=[
-                Mount(admin_path, app=admin_app),
-                Mount("/", app=app),
-            ],
-        )
+        routes = [Mount(admin_path, app=admin_app)]
+        if app is not None:
+            routes.append(Mount("/", app=app))
+        final_app = Starlette(debug=debug, routes=routes)
 
     if create_all:
         saffier.run_sync(registry.create_all())

@@ -49,8 +49,8 @@ Imagine the following folder and file structure:
 !!! Tip
     The `application` can be anything from Ravyn, Starlette, Sanic and even FastAPI.
 
-The structure above of `myproject` has a lot of files and the one higlighted is the one that
-contains the application object with the [Migration](./migrations.md#migration) from Saffier.
+The structure above of `myproject` has a lot of files and the one highlighted is the one that
+contains the application bootstrap where Saffier sets the active `Instance`.
 
 ### How does it work?
 
@@ -67,8 +67,8 @@ When no `--app` or no `SAFFIER_DEFAULT_APP` environment variable is provided, Sa
         and repeats the same process. If no files are found then throws an `CommandEnvironmentError`
         exception.
 
-* Once one of those files is found, Saffier will analised the type of objects contained in the
-module and will check if any of them contains the `Migration` object attached and return it.
+* Once one of those files is found, Saffier analyses the imported module and first checks whether
+  it set the active `saffier.monkay.instance`.
 
 * If Saffier understand that none of those objects contain the `Migration`, it will
 do one last attempt and try to find specific function declarations:
@@ -108,7 +108,7 @@ instead.
 Example:
 
 ```shell
-$ saffier --app myproject.main:app init
+$ saffier --app myproject.main init
 ```
 
 ## Using Preloads
@@ -125,9 +125,11 @@ class Settings(SaffierSettings):
     preloads = ("myproject.main",)
 ```
 
-If `myproject.main` wires `Migrate(...)` or `SaffierExtra(...)`, the preload import sets the
-active Saffier Monkay instance. Commands such as `saffier shell`, `saffier makemigrations`, and
+If `myproject.main` calls `saffier.monkay.set_instance(saffier.Instance(...))`, the preload import
+sets the active Saffier instance. Commands such as `saffier shell`, `saffier makemigrations`, and
 `saffier migrate` can then resolve the app without an explicit `--app`.
+
+`Migrate(...)` still works as a compatibility layer, but it is no longer the preferred setup.
 
 ## How to use and when to use it
 
@@ -165,7 +167,7 @@ Let us see again the structure, in case you have forgotten already.
     └── urls.py
 ```
 
-The `main.py` is the file that contains the saffier migration. A file that could look like
+The `main.py` is the file that contains the Saffier bootstrap. A file that could look like
 this:
 
 ```python title="myproject/src/main.py"
@@ -205,14 +207,15 @@ it followed the [discovery pattern](#how-does-it-work).
 ##### Using the --app or SAFFIER_DISCOVERY_APP
 
 This is the other way to tell Saffier where to find your application. Since the application is
-inside the `src/main.py` we need to provide the proper location is a `<module>:<app>` format.
+inside `src/main.py` the preferred value is the module path itself. The legacy `<module>:<app>`
+form remains supported for older projects.
 
 ###### --app
 
 With the `--app` flag.
 
 ```shell
-$ saffier --app src.main:app init
+$ saffier --app src.main init
 ```
 
 ###### SAFFIER_DEFAULT_APP
@@ -222,7 +225,7 @@ With the `SAFFIER_DEFAULT_APP`.
 Export the env var first:
 
 ```shell
-$ export SAFFIER_DEFAULT_APP=src.main:app
+$ export SAFFIER_DEFAULT_APP=src.main
 ```
 
 And then run:
@@ -253,7 +256,7 @@ it triggered the auto discovery of the application.
 With the `--app` flag.
 
 ```shell
-$ saffier --app src.main:app makemigrations
+$ saffier --app src.main makemigrations
 ```
 
 ###### SAFFIER_DEFAULT_APP
@@ -263,7 +266,7 @@ With the `SAFFIER_DEFAULT_APP`.
 Export the env var first:
 
 ```shell
-$ export SAFFIER_DEFAULT_APP=src.main:app
+$ export SAFFIER_DEFAULT_APP=src.main
 ```
 
 And then run:

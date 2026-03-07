@@ -13,6 +13,27 @@ from saffier.core.connection.schemas import Schema
 from saffier.core.db.constants import CASCADE
 
 
+class MetaDataByUrlDict(dict[str, sqlalchemy.MetaData]):
+    def __init__(self, registry: "Registry") -> None:
+        self.registry = registry
+        super().__init__()
+        self.process()
+
+    def process(self) -> None:
+        self.clear()
+        self[str(self.registry.database.url)] = self.registry._metadata_by_name[None]
+        for name, database in self.registry.extra.items():
+            self[str(database.url)] = self.registry._metadata_by_name[name]
+
+    def get_name(self, key: str) -> str | None:
+        if key == str(self.registry.database.url):
+            return None
+        for name, database in self.registry.extra.items():
+            if key == str(database.url):
+                return name
+        raise KeyError(key)
+
+
 class Registry:
     """
     The command center for the models being generated
@@ -43,6 +64,14 @@ class Registry:
             if self.db_schema is not None
             else sqlalchemy.MetaData()
         )
+        self._metadata_by_name: dict[str | None, sqlalchemy.MetaData] = {None: self._metadata}
+        for name in self.extra:
+            self._metadata_by_name[name] = (
+                sqlalchemy.MetaData(schema=self.db_schema)
+                if self.db_schema is not None
+                else sqlalchemy.MetaData()
+            )
+        self._metadata_by_url = MetaDataByUrlDict(self)
 
         if with_content_type is not False:
             self._set_content_type(with_content_type)
@@ -253,11 +282,34 @@ class Registry:
     def metadata(self) -> Any:
         for model_class in self.models.values():
             model_class.build(schema=self.db_schema)
-        return self._metadata
+        return self.metadata_by_name[None]
 
     @metadata.setter
     def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
+        self._metadata_by_name[None] = value
+        self._metadata_by_url.process()
+
+    @property
+    def metadata_by_name(self) -> dict[str | None, sqlalchemy.MetaData]:
+        for model_class in self.models.values():
+            model_class.build(schema=self.db_schema)
+        for model_class in self.reflected.values():
+            try:
+                model_class.build(schema=self.db_schema)
+            except Exception:
+                # Reflected models may require an active engine or an existing table.
+                # Migration preparation should not fail just because reflection is unavailable.
+                continue
+        return self._metadata_by_name
+
+    @property
+    def metadata_by_url(self) -> MetaDataByUrlDict:
+        return self._metadata_by_url
+
+    @property
+    def metadatas(self) -> dict[str | None, sqlalchemy.MetaData]:
+        return self.metadata_by_name
 
     @cached_property
     def declarative_base(self) -> Any:
@@ -280,16 +332,18 @@ class Registry:
         self._attach_content_type_to_registered_models()
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
-        async with Database(self.database, force_rollback=False) as database:  # noqa: SIM117
-            async with database.transaction():
-                await database.create_all(self.metadata)
+        for name, target in self._iter_databases():
+            async with Database(target, force_rollback=False) as database:  # noqa: SIM117
+                async with database.transaction():
+                    await database.create_all(self.metadata_by_name[name])
 
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
-        async with Database(self.database, force_rollback=False) as database:  # noqa: SIM117
-            async with database.transaction():
-                await database.drop_all(self.metadata)
+        for name, target in self._iter_databases():
+            async with Database(target, force_rollback=False) as database:  # noqa: SIM117
+                async with database.transaction():
+                    await database.drop_all(self.metadata_by_name[name])
 
     def _iter_databases(self) -> list[tuple[str | None, Database]]:
         databases: list[tuple[str | None, Database]] = [(None, self.database)]
@@ -419,3 +473,40 @@ class Registry:
         for _, database in reversed(self._iter_databases()):
             if database.is_connected:
                 await database.disconnect()
+
+    def refresh_metadata(
+        self,
+        *,
+        multi_schema: bool | str | object = False,
+        ignore_schema_pattern: str | object | None = None,
+    ) -> "Registry":
+        """
+        Rebuild metadata containers used by migrations and schema reflection.
+
+        The current Saffier implementation keeps the refresh intentionally simple:
+        it clears cached table objects and reinitialises the per-database metadata
+        containers so subsequent `build()` calls recreate the SQLAlchemy tables.
+        """
+        del multi_schema, ignore_schema_pattern
+
+        self._metadata = (
+            sqlalchemy.MetaData(schema=self.db_schema)
+            if self.db_schema is not None
+            else sqlalchemy.MetaData()
+        )
+        self._metadata_by_name = {None: self._metadata}
+        for name in self.extra:
+            self._metadata_by_name[name] = (
+                sqlalchemy.MetaData(schema=self.db_schema)
+                if self.db_schema is not None
+                else sqlalchemy.MetaData()
+            )
+        self._metadata_by_url.process()
+        self._schema_metadata_cache = {}
+
+        for collection in (self.models, self.reflected):
+            for model_class in collection.values():
+                model_class._table = None
+                model_class._db_schemas = {}
+
+        return self

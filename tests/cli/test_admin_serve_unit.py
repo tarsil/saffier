@@ -23,6 +23,7 @@ def test_admin_serve_builds_and_runs(monkeypatch):
     palfrey_calls = {}
 
     monkeypatch.setattr(admin_serve_module, "get_migration_app", lambda: app)
+    monkeypatch.setattr(admin_serve_module, "get_migration_registry", lambda: registry)
     monkeypatch.setattr(admin_serve_module, "create_admin_app", lambda **kwargs: "admin-app")
     monkeypatch.setattr(admin_serve_module.saffier, "run_sync", lambda coro: coro.close())
     monkeypatch.setitem(
@@ -51,9 +52,10 @@ def test_admin_serve_builds_and_runs(monkeypatch):
 
 
 def test_admin_serve_auto_generates_password(monkeypatch, capsys):
-    app, _ = _make_app()
+    app, registry = _make_app()
 
     monkeypatch.setattr(admin_serve_module, "get_migration_app", lambda: app)
+    monkeypatch.setattr(admin_serve_module, "get_migration_registry", lambda: registry)
     monkeypatch.setattr(admin_serve_module, "create_admin_app", lambda **kwargs: "admin")
     monkeypatch.setitem(
         __import__("sys").modules,

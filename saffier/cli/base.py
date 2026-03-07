@@ -5,13 +5,13 @@ import typing
 import warnings
 from collections.abc import Callable
 from importlib import import_module
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
 from alembic.config import Config as AlembicConfig
 
+from saffier._instance import Instance, get_active_instance
 from saffier.cli.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
 from saffier.cli.decorators import catch_errors
 from saffier.conf import _monkay, settings
@@ -52,6 +52,70 @@ class Config(AlembicConfig):
         package_dir = os.path.abspath(os.path.dirname(__file__))
         return os.path.join(package_dir, "templates")
 
+    @classmethod
+    def get_instance(
+        cls,
+        *,
+        directory: str | os.PathLike[str] | None = None,
+        args: typing.Sequence[str] | str | None = None,
+        options: typing.Any | None = None,
+        app: typing.Any | None = None,
+    ) -> "Config":
+        directory = str(directory or settings.migration_directory)
+        config = cls(os.path.join(directory, "alembic.ini"))
+        config.set_main_option("script_location", directory)
+
+        if config.cmd_opts is None:
+            config.cmd_opts = argparse.Namespace()
+
+        for option in options or []:
+            setattr(config.cmd_opts, option, True)
+
+        if not hasattr(config.cmd_opts, "x"):
+            if args is not None:
+                config.cmd_opts.x = []
+                if isinstance(args, list | tuple):
+                    for arg in args:
+                        config.cmd_opts.x.append(arg)
+                else:
+                    config.cmd_opts.x.append(args)
+            else:
+                config.cmd_opts.x = None
+
+        migrate_wrapper = _get_migrate_wrapper(app)
+        if migrate_wrapper is not None:
+            config = migrate_wrapper.call_configure_callbacks(config)
+        return config
+
+
+def _get_migrate_wrapper(app: typing.Any | None = None) -> "Migrate | None":
+    if app is not None and hasattr(app, SAFFIER_DB):
+        migrate_state = getattr(app, SAFFIER_DB).get("migrate")
+        if migrate_state is not None and hasattr(migrate_state, "migrate"):
+            return cast("Migrate", migrate_state.migrate)
+
+    instance = get_active_instance()
+    active_app = getattr(instance, "app", None) if instance is not None else None
+    if active_app is not None and hasattr(active_app, SAFFIER_DB):
+        migrate_state = getattr(active_app, SAFFIER_DB).get("migrate")
+        if migrate_state is not None and hasattr(migrate_state, "migrate"):
+            return cast("Migrate", migrate_state.migrate)
+
+    return None
+
+
+def _get_config(
+    app: typing.Any | None = None,
+    directory: str | os.PathLike[str] | None = None,
+    *,
+    arg: typing.Any | None = None,
+    options: typing.Any | None = None,
+) -> Config:
+    migrate_wrapper = _get_migrate_wrapper(app)
+    if migrate_wrapper is not None:
+        return cast("Config", migrate_wrapper.get_config(directory, arg=arg, options=options))
+    return Config.get_instance(directory=directory, args=arg, options=options, app=app)
+
 
 class Migrate(BaseExtra):
     """
@@ -73,6 +137,12 @@ class Migrate(BaseExtra):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        warnings.warn(
+            "`Migrate(...)` is deprecated. Prefer `saffier.Instance(...)` and "
+            "`saffier.monkay.set_instance(...)` for application discovery and migrations.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         self.app = app
         self.configure_callbacks: list[Callable] = []
@@ -141,11 +211,10 @@ class Migrate(BaseExtra):
         object_setattr(app, SAFFIER_DB, {})
         app._saffier_db["migrate"] = migrate
         _monkay.set_instance(
-            SimpleNamespace(
-                app=app,
-                migrate=migrate,
-                path=getattr(app, "__saffier_path__", None),
+            Instance(
                 registry=self.registry,
+                app=app,
+                path=getattr(app, "__saffier_path__", None),
             )
         )
 
@@ -220,8 +289,9 @@ def init(
     config = Config(template_directory=template_directory)
     config.set_main_option("script_location", directory)
     config.config_file_name = os.path.join(directory, "alembic.ini")
-    if app is not None and hasattr(app, SAFFIER_DB):
-        config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)  # type: ignore
+    migrate_wrapper = _get_migrate_wrapper(app)
+    if migrate_wrapper is not None:
+        config = migrate_wrapper.call_configure_callbacks(config)
 
     if template is None:
         template = DEFAULT_TEMPLATE_NAME
@@ -245,7 +315,7 @@ def revision(
     Creates a new revision file
     """
     options = ["autogenerate"] if autogenerate else None
-    config = app._saffier_db["migrate"].migrate.get_config(directory, options)  # type: ignore
+    config = _get_config(app, directory, options=options)
 
     command.revision(
         config,
@@ -274,9 +344,7 @@ def migrate(
     arg: typing.Any | None = None,
 ) -> None:
     """Alias for 'revision --autogenerate'"""
-    config = app._saffier_db["migrate"].migrate.get_config(  # type: ignore
-        directory, options=["autogenerate"], arg=arg
-    )
+    config = _get_config(app, directory, options=["autogenerate"], arg=arg)
 
     command.revision(
         config,
@@ -295,7 +363,7 @@ def migrate(
 def edit(app: typing.Any | None, directory: str | None = None, revision: str = "current") -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
-        config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+        config = _get_config(app, directory)
         command.edit(config, revision)
     else:
         raise RuntimeError("Alembic 1.9.4 or greater is required")
@@ -311,7 +379,7 @@ def merge(
     revision_id: str | None = None,
 ) -> None:
     """Merge two revisions together.  Creates a new migration file"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.merge(
         config, revisions, message=message, branch_label=branch_label, rev_id=revision_id
     )
@@ -327,7 +395,7 @@ def upgrade(
     arg: typing.Any | None = None,
 ) -> None:
     """Upgrade to a later version"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
+    config = _get_config(app, directory, arg=arg)
     command.upgrade(config, revision, sql=sql, tag=tag)
 
 
@@ -341,7 +409,7 @@ def downgrade(
     arg: typing.Any | None = None,
 ) -> None:
     """Revert to a previous version"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
+    config = _get_config(app, directory, arg=arg)
     if sql and revision == "-1":
         revision = "head:-1"
     command.downgrade(config, revision, sql=sql, tag=tag)
@@ -354,7 +422,7 @@ def show(
     revision: str = "head",
 ) -> None:
     """Show the revision denoted by the given symbol."""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.show(config, revision)
 
 
@@ -367,7 +435,7 @@ def history(
     indicate_current: bool = False,
 ) -> None:
     """List changeset scripts in chronological order."""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.history(config, rev_range, verbose=verbose, indicate_current=indicate_current)
 
 
@@ -379,21 +447,21 @@ def heads(
     resolve_dependencies: bool = False,
 ) -> None:
     """Show current available heads in the script directory"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
 @catch_errors
 def branches(app: typing.Any | None, directory: str | None = None, verbose: bool = False) -> None:
     """Show current branch points"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.branches(config, verbose=verbose)
 
 
 @catch_errors
 def current(app: typing.Any | None, directory: str | None = None, verbose: bool = False) -> None:
     """Display the current revision for each database."""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.current(config, verbose=verbose)
 
 
@@ -407,7 +475,7 @@ def stamp(
 ) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.stamp(config, revision, sql=sql, tag=tag)
 
 
@@ -417,5 +485,5 @@ def check(
     directory: str | None = None,
 ) -> None:
     """Check if there are any new operations to migrate"""
-    config = app._saffier_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = _get_config(app, directory)
     command.check(config)

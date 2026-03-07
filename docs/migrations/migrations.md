@@ -12,6 +12,11 @@ models and corresponding migrations.
 Heavily inspired by the way Flask-Migration approached the problem, Saffier took it to the next
 level and makes it framework agnostic, which means you can use it **anywhere**.
 
+!!! Important
+    The current migration bootstrap is `saffier.Instance(...)` plus
+    `saffier.monkay.set_instance(...)`.
+    `Migrate(...)` is kept only as a deprecated compatibility wrapper for older codebases.
+
 ## Important
 
 Before reading this section, you should get familiar with the ways Saffier handles the discovery
@@ -60,43 +65,22 @@ make visually clear.
     └── urls.py
 ```
 
-## Migration
+## Instance Bootstrap
 
-This is the object that Saffier requires to make sure you can manage the migrations in a consistent,
-clean and simple manner. Much like Django migrations type of feeling.
-
-This `Migration` class is not depending of any framework specifically, in fact, Saffier makes sure
-when this object is created, it will plug it into any framework you desire.
-
-This makes Saffier unique and extremely flexible to be used within any of the Frameworks out there,
-such as [Ravyn](https://ravyn.dymmond.com), Starlette, FastAPI, Sanic... You choose.
+Saffier manages migrations from the active `Instance`, which holds the registry and optional app.
+That keeps discovery, shell usage, admin tooling, and Alembic generation aligned around one runtime
+object.
 
 ```python
-from saffier import Migration
+from saffier import Instance, monkay
 ```
 
-### Parameters
+Compatibility note:
 
-The parameters availabe when using instantiating a [Migrate](#migration) object are the following:
-
-* **app** - The application instance. Any application you want your migrations to be attached to.
-* **registry** - The registry being used for your models. The registry **must be** an instance
-of `saffier.Registry` or an `AssertationError` is raised.
-* **compare_type** - Flag option that configures the automatic migration generation subsystem
-to detect column type changes.
-
-    <sup>Default: `True`</sup>
-
-* **render_as_batch** - This option generates migration scripts using batch mode, an operational
-mode that works around limitations of many ALTER commands in the SQLite database by implementing
-a "move and copy" workflow. Enabling this mode should make no difference when working with other
-databases.
-
-    <sup>Default: `True`</sup>
-
-* **kwargs** - A python dictionary with any context variables to be added to alembic.
-
-    <sup>Default: `None`</sup>
+* `Migrate(app=..., registry=...)` still works for older projects.
+* New code should set `monkay.set_instance(Instance(registry=..., app=...))`.
+* Migration options such as `migration_directory`, `alembic_ctx_kwargs`, `preloads`, and
+  `migrate_databases` live in settings.
 
 ### Settings-driven defaults
 
@@ -142,8 +126,8 @@ Something like this:
 
 This will make sure we don't create objects. Nice technique and quite practical.
 
-Now that we have our details about the database and registry, it is time to use the
-[Migration](#migration) object in the application.
+Now that we have our details about the database and registry, it is time to register the active
+Saffier `Instance` in the application.
 
 #### Using Ravyn
 
@@ -181,7 +165,7 @@ Since Saffier is framework agnostic, there is no way sometimes to tell where the
 you are using them somewhere and this can be annoying if you want to generate migrations and manage
 them without passing the models into the `__init__.py` of a python module
 
-The **Migrate** object allows also to pass an extra parameter called `model_apps`. This is nothing
+The deprecated **Migrate** object allows also to pass an extra parameter called `model_apps`. This is nothing
 more nothing less than the location of the file containing the models used by your same application.
 
 There are **three ways of passing values into the model_apps**.
@@ -237,7 +221,7 @@ There is where your models for the `accounts` application will be placed. Someth
 {!> ../docs_src/migrations/accounts_models.py !}
 ```
 
-Now we want to tell the **Migrate** object to make sure it knows about this.
+Now we want to tell the compatibility `Migrate` wrapper to make sure it knows about this.
 
 ##### Via dictionary
 
@@ -357,7 +341,7 @@ It is now time to generate the migrations folder. As mentioned before in the
 our `migrations`.
 
 ```shell
-saffier --app myproject.main:app init
+saffier --app myproject.main init
 ```
 
 What is happenening here? Well, `saffier` is always expecting an `--app` parameter to be
@@ -476,7 +460,7 @@ There are many ways of exposing your models of course, so feel free to use any a
 Now it is time to generate the migration.
 
 ```shell
-$ saffier --app my_project.main:app makemigrations
+$ saffier --app my_project.main makemigrations
 ```
 
 Yes, it is this simple 😁
@@ -501,7 +485,7 @@ Your new migration should now be inside `migrations/versions/`. Something like t
 Or you can attach a message your migration that will then added to the file name as well.
 
 ```shell
-$ saffier --app my_project.main:app makemigrations -m "Initial migrations"
+$ saffier --app my_project.main makemigrations -m "Initial migrations"
 ```
 
 ```shell hl_lines="10"
@@ -526,7 +510,7 @@ Now comes the easiest part where you need to apply the migrations.
 Simply run:
 
 ```shell
-$ saffier --app my_project.main:app migrate
+$ saffier --app my_project.main migrate
 ```
 
 And that is about it 🎉🎉
@@ -541,13 +525,13 @@ for any other ORM and when you are happy run the migrations and apply them again
 **Generate new migrations**
 
 ```shell
-$ saffier --app my_project.main:app makemigrations
+$ saffier --app my_project.main makemigrations
 ```
 
 **Apply them to your database**
 
 ```shell
-$ saffier --app my_project.main:app migrate
+$ saffier --app my_project.main migrate
 ```
 
 ### More migration commands

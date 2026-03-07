@@ -1,169 +1,112 @@
+# Default env template
+
 import asyncio
 import logging
 import os
-import sys
+from collections.abc import Generator
 from logging.config import fileConfig
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from alembic import context
-from databasez import DatabaseURL
 from migrations.generator import create_migration_filename  # type: ignore
 from rich.console import Console
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine
 
-from saffier import settings
-from saffier.cli.constants import APP_PARAMETER
-from saffier.cli.env import MigrationEnv
-from saffier.exceptions import SaffierException
+import saffier
+from saffier.core.connection.database import Database
+from saffier.core.connection.registry import Registry
 
-# The console used for the outputs
+if TYPE_CHECKING:
+    import sqlalchemy
+
 console = Console()
-
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
 config: Any = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
 fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
+MAIN_DATABASE_NAME: str = " "
 
 
-def get_app_location(argv: Any) -> Any:
-    """
-    Manually checks for the --app parameter.
-    """
-    if APP_PARAMETER in argv:
+def iter_databases(
+    registry: Registry,
+) -> Generator[tuple[str | None, Database, "sqlalchemy.MetaData"], None, None]:
+    url: str | None = os.environ.get("SAFFIER_DATABASE_URL")
+    name: str | Literal[False] | None = os.environ.get("SAFFIER_DATABASE") or False
+    if url and not name:
         try:
-            return argv[argv.index(APP_PARAMETER) + 1]
-        except IndexError as e:
-            raise SaffierException(detail=str(e))  # noqa
-    return None
+            name = registry.metadata_by_url.get_name(url)
+        except KeyError:
+            name = None
 
+    if name is False:
+        for name in saffier.monkay.settings.migrate_databases:
+            if name is None:
+                yield (None, registry.database, registry.metadata_by_name[None])
+            else:
+                yield (name, registry.extra[name], registry.metadata_by_name[name])
+    else:
+        if name == MAIN_DATABASE_NAME:
+            name = None
 
-def get_app() -> Any:
-    """
-    Gets the app via environment variable or via console parameter.
-    """
-    app_path = get_app_location(sys.argv[1:])
-    migration = MigrationEnv()
-    app_env = migration.load_from_env(path=app_path, enable_logging=False)
-    return app_env.app
+        if url:
+            database = Database(url)
+        elif name is None:
+            database = registry.database
+        else:
+            database = registry.extra[name]
 
-
-def get_engine_url() -> str | None:
-    return os.environ.get("SAFFIER_DATABASE_URL")
-
-
-app: Any = get_app()
-
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-config.set_main_option("sqlalchemy.url", get_engine_url())
-
-target_db = app._saffier_db["migrate"].registry
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
-
-def get_metadata() -> Any:
-    if hasattr(target_db, "metadatas"):
-        return target_db.metadatas[None]
-    return target_db.metadata
+        yield (name, database, registry.metadata_by_name[name])
 
 
 def run_migrations_offline() -> Any:
-    """Run migrations in 'offline' mode.
+    registry = saffier.get_migration_prepared_registry()
+    for name, db, metadata in iter_databases(registry):
+        context.configure(
+            url=str(db.url),
+            target_metadata=metadata,
+            literal_binds=True,
+            **saffier.monkay.settings.alembic_ctx_kwargs,
+        )
 
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    """
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=get_metadata(),
-        literal_binds=True,
-        **settings.alembic_ctx_kwargs,
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
+        with context.begin_transaction():
+            context.run_migrations(engine_name=name or "")
 
 
-def do_run_migrations(connection: Any) -> Any:
-    # this callback is used to prevent an auto-migration from being generated
-    # when there are no changes to the schema
-    # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
+def do_run_migrations(connection: Any, name: str | None, metadata: "sqlalchemy.MetaData") -> Any:
     def process_revision_directives(context, revision, directives) -> Any:  # type: ignore
         if getattr(config.cmd_opts, "autogenerate", False):
             script = directives[0]
             script.rev_id = create_migration_filename(slug=script.message)
-            if script.upgrade_ops.is_empty():
+            empty = True
+            for upgrade_ops in script.upgrade_ops_list:
+                if not upgrade_ops.is_empty():
+                    empty = False
+                    break
+            if empty:
                 directives[:] = []
                 console.print("[bright_red]No changes in schema detected.")
 
     context.configure(
         connection=connection,
-        target_metadata=get_metadata(),
+        target_metadata=metadata,
+        upgrade_token=f"{name or ''}_upgrades",
+        downgrade_token=f"{name or ''}_downgrades",
         process_revision_directives=process_revision_directives,
-        **settings.alembic_ctx_kwargs,
-        **app._saffier_db["migrate"].kwargs,
+        **saffier.monkay.settings.alembic_ctx_kwargs,
     )
 
     with context.begin_transaction():
-        context.run_migrations()
-
-
-def is_async_connection(url: DatabaseURL) -> bool:
-    """
-    Verifies if is an async connection string.
-
-    Validates the type of driver against the ones supported by Saffier.
-    """
-    if not url.driver:
-        return False
-
-    return (
-        (url.driver in settings.postgres_drivers)
-        or (url.driver in settings.mysql_drivers)
-        or (url.driver in settings.sqlite_drivers)
-        or url.driver in settings.mssql_drivers  # type: ignore
-    )
+        context.run_migrations(engine_name=name or "")
 
 
 async def run_migrations_online() -> Any:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    database_url = DatabaseURL(get_engine_url())
-    is_async = is_async_connection(database_url)
-
-    if is_async:
-        connectable = create_async_engine(database_url._url)
-        async with connectable.connect() as connection:
-            await connection.run_sync(do_run_migrations)
-    else:
-        connectable = create_engine(database_url._url)  # type: ignore
-        with connectable.connect() as connection:
-            do_run_migrations(connection)
+    registry = saffier.get_migration_prepared_registry()
+    async with registry:
+        for name, db, metadata in iter_databases(registry):
+            async with db as database:
+                await database.run_sync(do_run_migrations, name, metadata)
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.get_event_loop().run_until_complete(run_migrations_online())
+    asyncio.run(run_migrations_online())

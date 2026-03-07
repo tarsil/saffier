@@ -135,17 +135,22 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         provided Meta class object.
         """
         tablename = cls.meta.tablename
-        registry_metadata: sqlalchemy.MetaData = cast(
-            "sqlalchemy.MetaData", cls.meta.registry._metadata
-        )  # type: ignore
+        registry = cls.meta.registry
+        database = getattr(cls, "database", None)
+        if database is not None and hasattr(registry, "metadata_by_url"):
+            registry_metadata = cast(
+                "sqlalchemy.MetaData", registry.metadata_by_url[str(database.url)]
+            )
+        else:
+            registry_metadata = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
         schema_metadata_cache: dict[str | None, sqlalchemy.MetaData] = getattr(
-            cls.meta.registry,
+            registry,
             "_schema_metadata_cache",
             {},
         )
-        if not hasattr(cls.meta.registry, "_schema_metadata_cache"):
-            cls.meta.registry._schema_metadata_cache = schema_metadata_cache
-        registry_schema = cls.meta.registry.db_schema
+        if not hasattr(registry, "_schema_metadata_cache"):
+            registry._schema_metadata_cache = schema_metadata_cache
+        registry_schema = registry.db_schema
 
         # Keep tenant/using table generation isolated from the shared registry
         # metadata. This prevents cross-schema table/index leakage in metadata.
@@ -302,15 +307,22 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        registry_metadata = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        registry = cls.meta.registry
+        database = getattr(cls, "database", None)
+        if database is not None and hasattr(registry, "metadata_by_url"):
+            registry_metadata = cast(
+                "sqlalchemy.MetaData", registry.metadata_by_url[str(database.url)]
+            )
+        else:
+            registry_metadata = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
         schema_metadata_cache: dict[str | None, sqlalchemy.MetaData] = getattr(
-            cls.meta.registry,
+            registry,
             "_schema_metadata_cache",
             {},
         )
-        if not hasattr(cls.meta.registry, "_schema_metadata_cache"):
-            cls.meta.registry._schema_metadata_cache = schema_metadata_cache
-        registry_schema = cls.meta.registry.db_schema
+        if not hasattr(registry, "_schema_metadata_cache"):
+            registry._schema_metadata_cache = schema_metadata_cache
+        registry_schema = registry.db_schema
 
         if schema == registry_schema:
             metadata = registry_metadata

@@ -1,6 +1,9 @@
 __version__ = "1.5.0"
 
 from saffier.conf import (
+    _monkay as monkay,
+)
+from saffier.conf import (
     add_settings_extension,
     configure_settings,
     evaluate_settings_once_ready,
@@ -13,6 +16,7 @@ from saffier.conf.base import BaseSettings
 from saffier.conf.global_settings import SaffierSettings
 
 from . import files, marshalls
+from ._instance import Instance
 from .cli import Migrate
 from .core.connection.database import Database
 from .core.connection.registry import Registry
@@ -74,7 +78,32 @@ from .exceptions import (
     SuspiciousFileOperation,
 )
 
+
+def get_migration_prepared_registry(registry: Registry | None = None) -> Registry:
+    """
+    Return the active registry prepared for migration templates and CLI operations.
+
+    Saffier keeps the implementation intentionally lightweight: metadata caches are
+    refreshed on the chosen registry and the active Monkay settings are evaluated
+    before the registry is returned.
+    """
+    evaluate_settings_once_ready()
+    if registry is None:
+        instance = monkay.instance
+        if instance is None:
+            raise RuntimeError("Could not resolve the active Saffier instance.")
+        registry = instance.registry
+    registry.refresh_metadata(
+        multi_schema=monkay.settings.multi_schema,
+        ignore_schema_pattern=monkay.settings.ignore_schema_pattern,
+    )
+    return registry
+
+
 __all__ = [
+    "Instance",
+    "get_migration_prepared_registry",
+    "monkay",
     "and_",
     "not_",
     "or_",

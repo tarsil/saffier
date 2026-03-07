@@ -6,6 +6,7 @@ from importlib import import_module
 from pathlib import Path
 from types import ModuleType
 
+from saffier._instance import set_instance_from_app
 from saffier.cli.constants import (
     DISCOVERY_FILES,
     DISCOVERY_FUNCTIONS,
@@ -13,6 +14,7 @@ from saffier.cli.constants import (
     SAFFIER_DISCOVER_APP,
     SAFFIER_EXTRA,
 )
+from saffier.conf import _monkay
 from saffier.exceptions import CommandEnvironmentError
 
 
@@ -68,11 +70,27 @@ class MigrationEnv:
             raise CommandEnvironmentError(
                 detail="Path cannot be None. Set env `SAFFIER_DEFAULT_APP` or use `--app` instead."
             )
+        if ":" not in path:
+            module = import_module(path)
+            if _monkay.instance is not None:
+                app = getattr(_monkay.instance, "app", None)
+                return Scaffold(path=path, app=app)
+            scaffold = cls._find_app_in_module(module, path)
+            if scaffold is not None:
+                set_instance_from_app(scaffold.app, path=scaffold.path)
+                return scaffold
+            raise CommandEnvironmentError(
+                detail=(
+                    f'Imported module "{path}" but did not find an active Saffier instance or '
+                    "a compatible app object."
+                )
+            )
         module_str_path, app_name = path.split(":")
         module = import_module(module_str_path)
         app = getattr(module, app_name)
         if callable(app) and not hasattr(app, SAFFIER_DB) and not hasattr(app, SAFFIER_EXTRA):
             app = app()
+        set_instance_from_app(app, path=path)
         return Scaffold(path=path, app=app)
 
     def _scaffold_from_candidate(self, value: typing.Any, path: str) -> Scaffold | None:

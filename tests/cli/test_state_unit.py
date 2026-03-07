@@ -7,11 +7,20 @@ from saffier.cli.state import (
     get_migration_env,
     set_migration_env,
 )
+from saffier.conf import _monkay
 from saffier.exceptions import CommandEnvironmentError
 
 
-def test_state_errors_when_missing():
+@pytest.fixture(autouse=True)
+def clear_runtime_state():
     clear_migration_env()
+    _monkay.set_instance(None)
+    yield
+    clear_migration_env()
+    _monkay.set_instance(None)
+
+
+def test_state_errors_when_missing():
     with pytest.raises(CommandEnvironmentError):
         get_migration_env()
 

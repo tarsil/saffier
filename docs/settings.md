@@ -199,8 +199,8 @@ async def test_related_lookup_override():
 
 `preloads` lets Saffier import modules before CLI discovery continues.
 
-This is how you avoid repeating `--app` in projects where your application bootstrap already wires
-`Migrate(...)` or `SaffierExtra(...)`.
+This is how you avoid repeating `--app` in projects where your application bootstrap already sets
+`saffier.monkay.instance`.
 
 ```python title="myproject/configs/settings.py"
 from saffier.conf.global_settings import SaffierSettings
@@ -219,26 +219,28 @@ Supported preload formats:
 
 A preload should import code that sets the active Saffier instance.
 
+Preferred pattern:
+
+```python
+from saffier import Instance, monkay
+
+monkay.set_instance(Instance(registry=registry, app=app))
+```
+
+`Migrate(...)` still does this for compatibility, but it is deprecated.
+
 In practice that usually means a module that creates the app and registers Saffier against it.
 
 ```python title="myproject/main.py"
 from ravyn import Ravyn
 
-from saffier import Database, Migrate, Registry
+from saffier import Database, Instance, Registry, monkay
 
 
 database = Database("postgresql+asyncpg://postgres:postgres@localhost:5432/app")
 registry = Registry(database=database)
 app = Ravyn()
-
-Migrate(
-    app=app,
-    registry=registry,
-    model_apps=[
-        "myproject.apps.accounts.models",
-        "myproject.apps.blog.models",
-    ],
-)
+monkay.set_instance(Instance(registry=registry, app=app))
 ```
 
 With the preload in settings, these commands can run without `--app`:
@@ -290,7 +292,8 @@ class Settings(SaffierSettings):
 
 Extensions are registered when `evaluate_settings_once_ready()` is called.
 
-If a Saffier instance already exists because a preload imported an app that wired `Migrate(...)`,
+If a Saffier instance already exists because a preload imported an app that already set
+`saffier.monkay.instance`,
 Saffier applies those extensions immediately to that active instance.
 
 ### Dynamic Registration
@@ -486,13 +489,13 @@ class Settings(SaffierSettings):
 ```python title="myproject/main.py"
 from ravyn import Ravyn
 
-from saffier import Database, Migrate, Registry
+from saffier import Database, Instance, Registry, monkay
 
 
 database = Database("postgresql+asyncpg://postgres:postgres@localhost:5432/app")
 registry = Registry(database=database)
 app = Ravyn()
-Migrate(app=app, registry=registry, model_apps=["myproject.apps.accounts.models"])
+monkay.set_instance(Instance(registry=registry, app=app))
 ```
 
 Now the project can run:

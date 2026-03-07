@@ -94,9 +94,7 @@ def test_evaluate_settings_runs_preloads_and_extensions(
     _write_module(
         tmp_path / "runtime_preload.py",
         """
-        from types import SimpleNamespace
-
-        from saffier.conf import _monkay
+        import saffier
 
 
         class App:
@@ -104,8 +102,10 @@ def test_evaluate_settings_runs_preloads_and_extensions(
 
 
         app = App()
-        app._saffier_db = {"migrate": object()}
-        _monkay.set_instance(SimpleNamespace(app=app, path="runtime_preload:app"), apply_extensions=False)
+        saffier.monkay.set_instance(
+            saffier.Instance(registry=object(), app=app, path="runtime_preload:app"),
+            apply_extensions=False,
+        )
         """,
     )
     _write_module(

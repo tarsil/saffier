@@ -6,12 +6,14 @@ from __future__ import annotations
 
 import sys
 import typing
+from pathlib import Path
 
 import click
 from sayer import Sayer, error
 from sayer.params import Option
 
 import saffier
+from saffier._instance import set_instance_from_app
 from saffier.cli.constants import (
     COMMANDS_WITHOUT_APP,
     HELP_PARAMETER,
@@ -71,7 +73,17 @@ def saffier_callback(
             ),
             envvar=SAFFIER_DISCOVER_APP,
         ),
-    ],
+    ] = None,
+    path: typing.Annotated[
+        str | None,
+        Option(
+            None,
+            help=(
+                "A path to a Python package or module tree used for autodiscovery. "
+                "Defaults to the current working directory."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Perform database migration directives."""
     if HELP_PARAMETER in sys.argv:
@@ -83,6 +95,10 @@ def saffier_callback(
 
     try:
         reload_settings()
+        cwd = Path.cwd() if path is None else Path(path)
+        sys_path = getattr(sys, "path", None)
+        if sys_path is not None and str(cwd) not in sys_path:
+            sys_path.insert(0, str(cwd))
         evaluate_settings_once_ready()
         migration = MigrationEnv()
         instance_env = (
@@ -91,6 +107,9 @@ def saffier_callback(
             else migration.load_from_instance(_monkay.instance)
         )
         app_env = instance_env or migration.load_from_env(path=app)
+        app_value = getattr(app_env, "app", None)
+        if app_value is not None and _monkay.instance is None:
+            set_instance_from_app(app_value, path=getattr(app_env, "path", None))
         set_migration_env(app_env)
         ctx.obj = app_env
     except CommandEnvironmentError as exc:

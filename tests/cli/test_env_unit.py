@@ -6,6 +6,7 @@ from textwrap import dedent
 
 import pytest
 
+import saffier
 from saffier.cli.constants import SAFFIER_DB, SAFFIER_EXTRA
 from saffier.cli.env import MigrationEnv, Scaffold
 from saffier.exceptions import CommandEnvironmentError
@@ -96,3 +97,28 @@ def test_load_from_env_uses_explicit_path(tmp_path: Path, monkeypatch: pytest.Mo
     env = MigrationEnv()
     loaded = env.load_from_env(path="explicit:app")
     assert loaded.path == "explicit:app"
+
+
+def test_import_app_from_module_path_uses_active_instance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.syspath_prepend(str(tmp_path))
+    _write_module(
+        tmp_path / "instance_module.py",
+        """
+        import saffier
+
+        class App:
+            pass
+
+        app = App()
+        saffier.monkay.set_instance(saffier.Instance(registry=object(), app=app, path="instance_module"))
+        """,
+    )
+
+    scaffold = MigrationEnv().import_app_from_string("instance_module")
+
+    assert isinstance(scaffold, Scaffold)
+    assert scaffold.path == "instance_module"
+    assert scaffold.app is not None
+    saffier.monkay.set_instance(None)

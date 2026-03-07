@@ -8,7 +8,7 @@ from sayer import Option, command, error
 
 from saffier import Registry
 from saffier.cli.operations.shell.enums import ShellOption
-from saffier.cli.state import get_migration_app
+from saffier.cli.state import get_migration_app, get_migration_registry
 from saffier.core.events import AyncLifespanContextManager
 from saffier.core.sync import execsync
 
@@ -36,10 +36,7 @@ def shell(
         sys.exit(1)
 
     app = get_migration_app()
-    try:
-        registry = app._saffier_db["migrate"].registry
-    except AttributeError:
-        registry = app._saffier_extra["extra"].registry
+    registry = get_migration_registry()
 
     if (
         sys.platform != "win32"
@@ -61,6 +58,17 @@ def shell(
 
 async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) -> None:
     """Executes the database shell connection"""
+    if lifespan is None:
+        nest_asyncio.apply()
+        if kernel == ShellOption.IPYTHON:
+            from saffier.cli.operations.shell.ipython import get_ipython
+
+            get_ipython(app=app, registry=registry)()
+        else:
+            from saffier.cli.operations.shell.ptpython import get_ptpython
+
+            get_ptpython(app=app, registry=registry)()
+        return
 
     async with lifespan(app):
         if kernel == ShellOption.IPYTHON:
