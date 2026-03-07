@@ -43,12 +43,6 @@ async def create_test_database():
             await models.drop_all()
 
 
-@pytest.fixture(autouse=True, scope="function")
-async def rollback_transactions():
-    async with models:
-        yield
-
-
 async def test_permission_computed_description():
     permission = await Permission.query.create(name="View")
     assert permission.description == "VIEW"

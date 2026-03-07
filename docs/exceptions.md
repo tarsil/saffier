@@ -57,3 +57,27 @@ Or simply:
 ```python
 from saffier import ImproperlyConfigured
 ```
+
+## SuspiciousFileOperation
+
+Raised when file/path utilities detect an unsafe filename or path traversal.
+
+```python
+from saffier.exceptions import SuspiciousFileOperation
+```
+
+## FileOperationError
+
+Raised when a file operation cannot be completed safely.
+
+```python
+from saffier.exceptions import FileOperationError
+```
+
+## DatabaseNotConnectedWarning
+
+Warning category for operations that require a connected database but run disconnected.
+
+```python
+from saffier.exceptions import DatabaseNotConnectedWarning
+```

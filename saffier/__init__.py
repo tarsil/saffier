@@ -16,6 +16,7 @@ from .core.db.fields import (
     CharChoiceField,
     CharField,
     ChoiceField,
+    CompositeField,
     ComputedField,
     DateField,
     DateTimeField,
@@ -37,6 +38,7 @@ from .core.db.fields import (
     PasswordField,
     PGArrayField,
     PlaceholderField,
+    RefForeignKey,
     SmallIntegerField,
     TextField,
     TimeField,
@@ -50,7 +52,13 @@ from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
 from .core.signals import Signal
 from .core.utils.sync import run_sync
-from .exceptions import MultipleObjectsReturned, ObjectNotFound
+from .exceptions import (
+    DatabaseNotConnectedWarning,
+    FileOperationError,
+    MultipleObjectsReturned,
+    ObjectNotFound,
+    SuspiciousFileOperation,
+)
 
 __all__ = [
     "and_",
@@ -64,10 +72,12 @@ __all__ = [
     "CharChoiceField",
     "CharField",
     "ChoiceField",
+    "CompositeField",
     "ComputedField",
     "Database",
     "DateField",
     "DateTimeField",
+    "DatabaseNotConnectedWarning",
     "DecimalField",
     "DurationField",
     "ObjectNotFound",
@@ -75,6 +85,7 @@ __all__ = [
     "ExcludeField",
     "FileField",
     "FloatField",
+    "FileOperationError",
     "ForeignKey",
     "ImageField",
     "Index",
@@ -94,6 +105,7 @@ __all__ = [
     "PasswordField",
     "PGArrayField",
     "PlaceholderField",
+    "RefForeignKey",
     "SmallIntegerField",
     "Prefetch",
     "QuerySet",
@@ -115,4 +127,5 @@ __all__ = [
     "reload_settings",
     "fields",
     "run_sync",
+    "SuspiciousFileOperation",
 ]

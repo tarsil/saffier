@@ -2,7 +2,7 @@ import pytest
 
 import saffier
 from saffier.contrib.admin import AdminSite
-from saffier.contrib.admin.exceptions import AdminValidationError
+from saffier.contrib.admin.exceptions import AdminModelNotFound, AdminValidationError
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -76,3 +76,39 @@ async def test_admin_site_pagination_and_schema():
     field_names = [field["name"] for field in schema["fields"]]
     assert "name" in field_names
     assert schema["pk_name"] == "id"
+
+
+async def test_admin_site_filters_and_payload_errors():
+    site = AdminSite(registry=models, include_models={"User"})
+    assert "User" in site.get_registered_models()
+    with pytest.raises(AdminModelNotFound):
+        site.get_model("Missing")
+
+    created = await User.query.create(name="alice")
+    encoded_pk = site.create_object_pk(created)
+
+    with pytest.raises(AdminValidationError):
+        site.parse_object_pk("not-base64")
+
+    payload = site.form_to_payload(
+        type(
+            "Form",
+            (),
+            {
+                "get": lambda self, k: None,
+                "multi_items": lambda self: [("name", "john"), ("_csrf", "x")],
+            },
+        )()
+    )
+    assert payload == {"name": "john"}
+
+    with pytest.raises(AdminValidationError):
+        site.form_to_payload(
+            type("Form", (), {"get": lambda self, k: "{", "multi_items": lambda self: []})()
+        )
+
+    search_page = await site.list_objects("User", page=1, page_size=10, search="ali")
+    assert len(search_page.content) >= 1
+
+    with pytest.raises(AdminValidationError):
+        await site.update_object("User", encoded_pk, {"unknown": "value"})

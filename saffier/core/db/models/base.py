@@ -111,8 +111,9 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
         """
-        if cls.__proxy_model__:
-            return cls.__proxy_model__
+        existing_proxy = cls.__dict__.get("__proxy_model__")
+        if existing_proxy:
+            return existing_proxy
 
         fields = {key: copy.copy(field) for key, field in cls.fields.items()}
         proxy_model = ProxyModel(
@@ -242,18 +243,32 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             if getattr(field, "is_computed", False):
                 field.set_value(self, key, value)
                 return
-            if field.is_virtual:
-                super().__setattr__(key, value)
-                return
-
             if isinstance(field, saffier.ManyToManyField):
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
-            else:
-                value = self.fields[key].expand_relationship(value)
+                super().__setattr__(key, value)
+                return
+            if field.is_virtual:
+                if hasattr(field, "set_value") and not isinstance(field, saffier.ManyToManyField):
+                    field.set_value(self, key, value)
+                    return
+                super().__setattr__(key, value)
+                return
+            value = self.fields[key].expand_relationship(value)
         super().__setattr__(key, value)
 
-    def __get_instance_values(self, instance: Any) -> set[Any]:
-        return {v for k, v in instance.__dict__.items() if k in instance.fields and v is not None}
+    def __get_instance_values(self, instance: Any) -> set[tuple[str, Any]]:
+        values: set[tuple[str, Any]] = set()
+        for key, value in instance.__dict__.items():
+            if key not in instance.fields or value is None:
+                continue
+            if hasattr(value, "pk"):
+                value = value.pk
+            try:
+                hash(value)
+            except TypeError:
+                value = repr(value)
+            values.add((key, value))
+        return values
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:

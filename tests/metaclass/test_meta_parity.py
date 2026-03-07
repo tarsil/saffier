@@ -143,3 +143,25 @@ def test_manager_inherit_false_is_not_propagated() -> None:
     assert isinstance(BaseEntity.active, ActiveManager)
     assert isinstance(ChildEntity.active, ActiveManager)
     assert ChildEntity.hidden is None
+
+
+def test_composite_embedded_fields_are_registered_by_metaclass() -> None:
+    registry_obj = build_registry()
+
+    class Profile(saffier.Model):
+        first_name = saffier.CharField(max_length=100)
+        last_name = saffier.CharField(max_length=100)
+        details = saffier.CompositeField(
+            inner_fields=[
+                ("nickname", saffier.CharField(max_length=100, null=True)),
+            ],
+            prefix_embedded="details_",
+        )
+
+        class Meta:
+            registry = registry_obj
+
+    assert "details" in Profile.fields
+    assert "details_nickname" in Profile.fields
+    assert Profile.fields["details"].is_virtual
+    assert Profile.fields["details_nickname"].is_virtual is False

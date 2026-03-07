@@ -12,6 +12,7 @@ database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)
 
 pytestmark = pytest.mark.anyio
+TENANT_SCHEMAS = ("saffier", "tenant_alpha", "tenant_beta")
 
 
 def time():
@@ -21,9 +22,13 @@ def time():
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     try:
+        for schema_name in TENANT_SCHEMAS:
+            await drop_schemas(schema_name)
         await models.create_all()
         yield
         await models.drop_all()
+        for schema_name in TENANT_SCHEMAS:
+            await drop_schemas(schema_name)
     except Exception as e:
         pytest.skip(f"Error: {str(e)}")
 
@@ -36,7 +41,7 @@ async def rollback_connections():
 
 
 async def drop_schemas(name):
-    await models.schema.drop_schema(name, if_exists=True)
+    await models.schema.drop_schema(name, cascade=True, if_exists=True)
 
 
 class Tenant(TenantMixin):

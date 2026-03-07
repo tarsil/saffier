@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from saffier.core.db.context_vars import get_tenant, set_tenant
 from saffier.core.db.querysets.base import QuerySet
+from saffier.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
     pass
@@ -75,6 +76,8 @@ class Manager(BaseManager):
 
         Checks for a global possible tenant and returns the corresponding queryset.
         """
+        if getattr(self.model_class.meta, "abstract", False):
+            raise ImproperlyConfigured("Cannot query abstract models.")
         tenant = get_tenant()
         if tenant:
             set_tenant(None)

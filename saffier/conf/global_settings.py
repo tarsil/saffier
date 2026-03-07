@@ -29,6 +29,8 @@ class SaffierSettings(Settings):
 
     # General settings
     default_related_lookup_field: str = "id"
+    orm_concurrency_enabled: bool = True
+    orm_concurrency_limit: int | None = None
     filter_operators: ClassVar[dict[str, str]] = {
         "exact": "__eq__",
         "iexact": "ilike",

@@ -41,6 +41,7 @@ class ModelRow(SaffierBaseModel):
         item: dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
+        model_table = cls.table_schema(using_schema) if using_schema is not None else cls.table
 
         secret_fields = (
             [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
@@ -52,7 +53,7 @@ class ModelRow(SaffierBaseModel):
                 first_part, remainder = related.split("__", 1)
                 try:
                     model_cls = cls.fields[first_part].target
-                except KeyError:
+                except (KeyError, AttributeError):
                     model_cls = getattr(cls, first_part).related_from
 
                 item[first_part] = model_cls.from_query_result(
@@ -64,7 +65,7 @@ class ModelRow(SaffierBaseModel):
             else:
                 try:
                     model_cls = cls.fields[related].target
-                except KeyError:
+                except (KeyError, AttributeError):
                     model_cls = getattr(cls, related).related_from
                 item[related] = model_cls.from_query_result(
                     row, using_schema=using_schema, exclude_secrets=exclude_secrets
@@ -83,20 +84,20 @@ class ModelRow(SaffierBaseModel):
             # Apply the schema to the model
             model_related = cls.__apply_schema(model_related, using_schema)
 
-            child_item = {}
-            for column in model_related.table.columns:
-                if column.name in secret_fields or related in secret_fields:
-                    continue
-                if column.name not in cls.fields:
-                    continue
-                elif related not in child_item and getattr(row, related) is not None:
-                    child_item[column.name] = getattr(row, related)
+            child_item: dict[str, Any] = {}
+            if related not in secret_fields:
+                foreign_key_value = getattr(row, related, None)
+                if foreign_key_value is not None:
+                    child_item[model_related.pkname] = foreign_key_value
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
             if related not in secret_fields:
-                item[related] = model_related.proxy_model(**child_item)
+                related_instance = model_related(**child_item)
+                if using_schema is not None:
+                    related_instance.table = model_related.table_schema(using_schema)
+                item[related] = related_instance
 
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
@@ -129,7 +130,7 @@ class ModelRow(SaffierBaseModel):
             return model
         else:
             # Pull out the regular column values.
-            for column in cls.table.columns:
+            for column in model_table.columns:
                 if column.key in secret_fields:
                     continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
@@ -161,8 +162,8 @@ class ModelRow(SaffierBaseModel):
 
     @classmethod
     def __apply_schema(cls, model: type["Model"], schema: str | None = None) -> type["Model"]:
-        # Apply the schema to the model
-        if schema is not None:
+        # Apply the schema to model instances without mutating class-level table caches.
+        if schema is not None and not isinstance(model, type):
             model.table = model.build(schema)  # type: ignore
         return model
 

@@ -6,16 +6,16 @@ from typing import Any
 import sqlalchemy
 
 from saffier.core.db.models.managers import Manager
-from saffier.core.db.querysets.clauses import and_
+from saffier.core.db.querysets.clauses import Q, and_
 
 
 def _apply_or_clauses(base_queryset: Any, clauses: list[dict[str, Any]]) -> Any:
     if not clauses:
         return base_queryset.filter(and_())
-    queryset = base_queryset.filter(**clauses[0])
+    query = Q(**clauses[0])
     for clause in clauses[1:]:
-        queryset = queryset.or_(**clause)
-    return queryset
+        query = query | Q(**clause)
+    return base_queryset.filter(clause=query)
 
 
 def _normalize_model_values(values: Sequence[Any | None] | Any | None) -> list[Any | None] | None:
@@ -37,6 +37,8 @@ def _in_or_null(column: Any, values: list[Any | None]) -> Any:
 
 
 class PermissionManager(Manager):
+    inherit_query = True
+
     def _permission_pk_subquery(
         self,
         permissions: Sequence[str],

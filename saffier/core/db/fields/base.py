@@ -1,3 +1,4 @@
+import copy
 import enum
 import typing
 from datetime import date, datetime
@@ -107,6 +108,14 @@ class Field:
     def has_column(self) -> bool:
         return not self.is_virtual
 
+    def get_embedded_fields(
+        self,
+        field_name: str,
+        existing_fields: dict[str, "Field"],
+    ) -> dict[str, "Field"]:
+        del field_name, existing_fields
+        return {}
+
     def expand_relationship(self, value: typing.Any) -> typing.Any:
         return value
 
@@ -125,7 +134,7 @@ class Field:
             and not has_server_default
         ):
             raise ValueError(
-                "Primary keys other than IntegerField, SmallIntegerField and BigIntegerField must provide a default or a server_default."
+                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
 
 
@@ -295,6 +304,136 @@ class JSONField(Field):
         return sqlalchemy.JSON()
 
 
+class CompositeField(Field):
+    """
+    Virtual field that groups multiple model fields under a single logical attribute.
+
+    It can expose existing fields by name and/or inject embedded fields declared inline.
+    """
+
+    is_virtual: bool = True
+
+    def __init__(
+        self,
+        *,
+        inner_fields: typing.Any = (),
+        prefix_embedded: str = "",
+        absorb_existing_fields: bool = False,
+        **kwargs: typing.Any,
+    ) -> None:
+        kwargs.setdefault("null", True)
+        super().__init__(**kwargs)
+        self.inner_fields = inner_fields
+        self.prefix_embedded = prefix_embedded
+        self.absorb_existing_fields = absorb_existing_fields
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        raise RuntimeError(f"Virtual field '{name}' does not map to a database column.")
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        raise RuntimeError("CompositeField does not expose a column type.")
+
+    def _iter_inner_items(
+        self,
+        existing_fields: dict[str, Field],
+    ) -> list[tuple[str, Field] | str]:
+        inner = self.inner_fields
+        if hasattr(inner, "meta"):
+            inner = typing.cast("dict[str, Field]", inner.meta.fields)
+        if isinstance(inner, dict):
+            inner = list(inner.items())
+
+        collected: list[tuple[str, Field] | str] = []
+        for item in inner:
+            if isinstance(item, str) or (
+                isinstance(item, tuple)
+                and len(item) == 2
+                and isinstance(item[0], str)
+                and isinstance(item[1], Field)
+            ):
+                collected.append(item)
+            elif isinstance(item, tuple) and len(item) == 1 and isinstance(item[0], str):
+                collected.append(item[0])
+
+        del existing_fields
+        return collected
+
+    def _field_target_name(self, public_name: str) -> str:
+        if self.prefix_embedded:
+            return f"{self.prefix_embedded}{public_name}"
+        return public_name
+
+    def get_embedded_fields(
+        self,
+        field_name: str,
+        existing_fields: dict[str, Field],
+    ) -> dict[str, Field]:
+        del field_name
+        embedded: dict[str, Field] = {}
+        for item in self._iter_inner_items(existing_fields):
+            if isinstance(item, str):
+                continue
+            public_name, inner_field = item
+            if public_name == "pk":
+                raise ValueError("sub field uses reserved name pk")
+            if not getattr(inner_field, "inherit", True):
+                continue
+
+            target_name = self._field_target_name(public_name)
+            if target_name in existing_fields and not self.absorb_existing_fields:
+                continue
+
+            field_copy = (
+                inner_field if getattr(inner_field, "no_copy", False) else copy.copy(inner_field)
+            )
+            field_copy.name = target_name
+            embedded[target_name] = field_copy
+        return embedded
+
+    def _mapping(self, instance: typing.Any) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for item in self._iter_inner_items(instance.fields):
+            if isinstance(item, str):
+                target_name = self._field_target_name(item)
+                if target_name in instance.fields:
+                    mapping[item] = target_name
+                elif item in instance.fields:
+                    mapping[item] = item
+                continue
+            public_name, _ = item
+            target_name = self._field_target_name(public_name)
+            if target_name in instance.fields:
+                mapping[public_name] = target_name
+            elif public_name in instance.fields:
+                mapping[public_name] = public_name
+        return mapping
+
+    def get_value(self, instance: typing.Any, field_name: str) -> dict[str, typing.Any]:
+        del field_name
+        values: dict[str, typing.Any] = {}
+        for public_name, target_name in self._mapping(instance).items():
+            values[public_name] = getattr(instance, target_name, None)
+        return values
+
+    def set_value(self, instance: typing.Any, field_name: str, value: typing.Any) -> None:
+        del field_name
+        if value is None:
+            return
+        payload = value
+        if hasattr(payload, "model_dump"):
+            payload = payload.model_dump()
+        elif not isinstance(payload, dict):
+            payload = {
+                name: getattr(value, name) for name in dir(value) if not name.startswith("_")
+            }
+        for public_name, target_name in self._mapping(instance).items():
+            if public_name in payload:
+                setattr(instance, target_name, payload[public_name])
+
+
 class ForeignKey(Field):
     """
     ForeignKey field object
@@ -374,6 +513,13 @@ class ForeignKey(Field):
         target = self.target
         if isinstance(value, target):
             return value
+        if hasattr(value, "__db_model__"):
+            value_cls = value.__class__
+            if (
+                getattr(value_cls, "is_proxy_model", False)
+                and getattr(value_cls, "parent", None) is target
+            ):
+                return value
         return target(pk=value)
 
 
@@ -551,6 +697,22 @@ class ManyToManyField(Field):
 ManyToMany = ManyToManyField
 
 
+class RefForeignKey(ForeignKey):
+    """
+    ForeignKey variant used for explicit reference-style declarations.
+    """
+
+    def __init__(
+        self,
+        to: type["Model"] | str,
+        *,
+        ref_field: str | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        self.ref_field = ref_field
+        super().__init__(to=to, **kwargs)
+
+
 class OneToOneField(ForeignKey):
     """
     Representation of a one to one field.
@@ -585,7 +747,7 @@ class ChoiceField(Field):
 
     def __init__(
         self,
-        choices: typing.Sequence[tuple[str, str] | tuple[str, int]],
+        choices: type[enum.Enum] | typing.Sequence[tuple[str, str] | tuple[str, int] | str | int],
         **kwargs: typing.Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -594,11 +756,22 @@ class ChoiceField(Field):
     def get_validator(self, **kwargs: typing.Any) -> Any:
         return Any(**kwargs)
 
+    def _enum_name(self) -> str | None:
+        owner = getattr(self, "owner", None)
+        if owner is None or not self.name:
+            return None
+
+        table_name = getattr(getattr(owner, "meta", None), "tablename", owner.__name__.lower())
+        return f"{table_name}_{self.name}_enum"
+
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        if isinstance(self.choices, type) and issubclass(self.choices, enum.Enum):
+            return sqlalchemy.Enum(self.choices, name=self._enum_name())
+
         enum_values = [
             choice[0] if isinstance(choice, (tuple, list)) else choice for choice in self.choices
         ]
-        return sqlalchemy.Enum(*[str(value) for value in enum_values])
+        return sqlalchemy.Enum(*[str(value) for value in enum_values], name=self._enum_name())
 
 
 class CharChoiceField(Field):

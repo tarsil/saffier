@@ -1,10 +1,12 @@
 from .base import (
+    AutoNowMixin,
     BigIntegerField,
     BinaryField,
     BooleanField,
     CharChoiceField,
     CharField,
     ChoiceField,
+    CompositeField,
     ComputedField,
     DateField,
     DateTimeField,
@@ -27,6 +29,7 @@ from .base import (
     PasswordField,
     PGArrayField,
     PlaceholderField,
+    RefForeignKey,
     SmallIntegerField,
     TextField,
     TimeField,
@@ -35,12 +38,14 @@ from .base import (
 )
 
 __all__ = [
+    "AutoNowMixin",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
     "CharChoiceField",
     "CharField",
     "ChoiceField",
+    "CompositeField",
     "ComputedField",
     "DateField",
     "DateTimeField",
@@ -63,6 +68,7 @@ __all__ = [
     "PasswordField",
     "PGArrayField",
     "PlaceholderField",
+    "RefForeignKey",
     "SmallIntegerField",
     "TextField",
     "TimeField",

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from saffier.conf.module_import import import_string
+
 from .fields import FactoryField
 
 
@@ -13,6 +15,8 @@ class SubFactory(FactoryField):
     def _callback(
         self, field: FactoryField, context: dict[str, Any], parameters: dict[str, Any]
     ) -> Any:
+        if isinstance(self.factory, str):
+            self.factory = import_string(self.factory)
         factory = self.factory() if isinstance(self.factory, type) else self.factory
         return factory.build(**parameters)
 
@@ -30,5 +34,7 @@ class ListSubFactory(FactoryField):
         min_value = parameters.pop("min", self.min)
         max_value = parameters.pop("max", self.max)
         size = context["faker"].random_int(min=min_value, max=max_value)
+        if isinstance(self.factory, str):
+            self.factory = import_string(self.factory)
         factory = self.factory() if isinstance(self.factory, type) else self.factory
         return [factory.build(**parameters) for _ in range(size)]

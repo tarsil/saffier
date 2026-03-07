@@ -113,6 +113,47 @@ class Registry:
             isinstance(field, ContentTypeField) for field in model_class.fields.values()
         )
         if has_content_type_field:
+            content_type_fields = {
+                field_name: field
+                for field_name, field in model_class.fields.items()
+                if isinstance(field, ContentTypeField)
+            }
+            for field_name, field in content_type_fields.items():
+                field.owner = model_class
+                field.registry = self
+                auto_related_name = f"{model_class.__name__.lower()}s_set"
+                desired_related_name = (
+                    f"reverse_{model_class.__name__.lower()}"
+                    if field.related_name in (None, auto_related_name)
+                    else field.related_name
+                )
+
+                if desired_related_name not in model_class.meta.related_names:
+                    if field.related_name in model_class.meta.related_names:
+                        previous_related_name = cast("str", field.related_name)
+                        model_class.meta.related_names.discard(previous_related_name)
+                        model_class.meta.related_fields.pop(previous_related_name, None)
+                        model_class.meta.related_names_mapping.pop(previous_related_name, None)
+
+                        target_meta = field.target.meta
+                        target_meta.related_fields.pop(previous_related_name, None)
+                        target_meta.related_names_mapping.pop(previous_related_name, None)
+                        target_meta.fields.pop(previous_related_name, None)
+                        target_meta.fields_mapping.pop(previous_related_name, None)
+                        if hasattr(field.target, previous_related_name):
+                            delattr(field.target, previous_related_name)
+                        proxy_target = getattr(field.target, "proxy_model", None)
+                        if proxy_target is not None and hasattr(
+                            proxy_target, previous_related_name
+                        ):
+                            delattr(proxy_target, previous_related_name)
+
+                    field.related_name = desired_related_name
+                    related_names = _set_related_name_for_foreign_keys(
+                        {field_name: field},
+                        cast(Any, model_class),
+                    )
+                    model_class.meta.related_names.update(related_names)
             self._bind_content_type_pre_save(model_class)
             return
 
@@ -127,6 +168,8 @@ class Registry:
             related_name=related_name,
             on_delete=CASCADE,
         )
+        # ContentType is managed by registry pre-save hooks.
+        field.validator.read_only = True
         field.owner = model_class
         field.registry = self
         model_class.fields["content_type"] = field
@@ -142,11 +185,31 @@ class Registry:
 
         self._bind_content_type_pre_save(model_class)
 
-        model_class._table = None
+        self._clear_model_table_cache(model_class)
         model_class.__proxy_model__ = None
         proxy_model = model_class.generate_proxy_model()
         model_class.__proxy_model__ = proxy_model
         model_class.__proxy_model__.parent = model_class
+
+    def _clear_model_table_cache(self, model_class: type[Any]) -> None:
+        model_class._table = None
+        model_class._db_schemas = {}
+
+        table_name = cast("str | None", getattr(model_class.meta, "tablename", None))
+        if table_name is None:
+            return
+
+        metadata_pool = [self._metadata]
+        metadata_pool.extend(getattr(self, "_schema_metadata_cache", {}).values())
+
+        for metadata in metadata_pool:
+            table_keys = {table_name}
+            if metadata.schema:
+                table_keys.add(f"{metadata.schema}.{table_name}")
+            for table_key in table_keys:
+                existing_table = metadata.tables.get(table_key)
+                if existing_table is not None:
+                    metadata.remove(existing_table)
 
     def _bind_content_type_pre_save(self, model_class: type[Any]) -> None:
         if model_class.__name__ in self._content_type_models_bound:

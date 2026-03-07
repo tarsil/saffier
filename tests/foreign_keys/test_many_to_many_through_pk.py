@@ -79,6 +79,26 @@ async def test_auto_through_rows_have_incrementing_ids() -> None:
     assert through_ids[0] != through_ids[1]
 
 
+@pytest.mark.usefixtures("create_test_database", "rollback_connections")
+async def test_create_with_many_to_many_values_persists_rows_with_ids() -> None:
+    user_one = await User.query.create(name="alpha")
+    user_two = await User.query.create(name="beta")
+
+    group = await Group.query.create(name="crew", users=[user_one, user_two])
+    related_users = await group.users.all()
+    related_ids = sorted(user.pk for user in related_users)
+
+    through = Group.meta.fields["users"].through
+    expression = through.table.select()  # type: ignore[union-attr]
+    rows = await through.query.database.fetch_all(expression)  # type: ignore[union-attr]
+    through_ids = sorted(row._mapping["id"] for row in rows)
+
+    assert related_ids == [user_one.pk, user_two.pk]
+    assert len(through_ids) == 2
+    assert through_ids[0] > 0
+    assert through_ids[0] != through_ids[1]
+
+
 def test_custom_through_model_without_primary_key_gets_id() -> None:
     registry_obj = build_registry()
 

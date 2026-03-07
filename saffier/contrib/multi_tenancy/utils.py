@@ -1,4 +1,5 @@
 import logging
+import weakref
 from typing import TYPE_CHECKING
 
 import sqlalchemy
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
 
 
-_SCHEMA_TABLE_CACHE: dict[tuple[int, str], dict[str, sqlalchemy.Table]] = {}
+_SCHEMA_TABLE_CACHE: "weakref.WeakKeyDictionary[TenantRegistry, dict[str, dict[str, sqlalchemy.Table]]]" = weakref.WeakKeyDictionary()
 
 
 def _build_schema_tables(
@@ -40,23 +41,26 @@ def table_schema(model_class: type["TenantModel"], schema: str) -> sqlalchemy.Ta
     The use of context vars instead of using the lru_cache comes from
     a warning from `ruff` where lru can lead to memory leaks.
     """
-    cache_key = (id(model_class.meta.registry), schema)
-    if cache_key not in _SCHEMA_TABLE_CACHE:
-        _SCHEMA_TABLE_CACHE[cache_key] = _build_schema_tables(
-            registry=model_class.meta.registry,
-            schema=schema,
-            target_model=model_class,
-        )
+    registry = model_class.meta.registry
+    if registry not in _SCHEMA_TABLE_CACHE:
+        _SCHEMA_TABLE_CACHE[registry] = {}
 
     table_name = model_class.table.name
-    cached_tables = _SCHEMA_TABLE_CACHE[cache_key]
-    if table_name not in cached_tables:
-        _SCHEMA_TABLE_CACHE[cache_key] = _build_schema_tables(
-            registry=model_class.meta.registry,
+    registry_cache = _SCHEMA_TABLE_CACHE[registry]
+    if schema not in registry_cache:
+        registry_cache[schema] = _build_schema_tables(
+            registry=registry,
             schema=schema,
             target_model=model_class,
         )
-        cached_tables = _SCHEMA_TABLE_CACHE[cache_key]
+    cached_tables = registry_cache[schema]
+    if table_name not in cached_tables:
+        registry_cache[schema] = _build_schema_tables(
+            registry=registry,
+            schema=schema,
+            target_model=model_class,
+        )
+        cached_tables = registry_cache[schema]
 
     return cached_tables[table_name]
 

@@ -83,6 +83,8 @@ class Model(ModelRow, DeclarativeMixin):
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
+        for key, value in db_kwargs.items():
+            setattr(self, key, value)
 
         return self
 
@@ -149,6 +151,7 @@ class Model(ModelRow, DeclarativeMixin):
             extracted_fields.pop(self.pkname, None)
 
         self.update_from_dict(dict(extracted_fields.items()))
+        is_create = getattr(self, "pk", None) is None or force_save
 
         fields = {
             key: field.validator for key, field in self.fields.items() if key in extracted_fields
@@ -159,13 +162,32 @@ class Model(ModelRow, DeclarativeMixin):
                 for key, value in values.items()
                 if key in self.fields and self.fields[key].has_column()
             }
+            if is_create:
+                for key, field in self.fields.items():
+                    if not field.has_column() or not field.validator.read_only:
+                        continue
+                    if key in extracted_fields:
+                        expanded = field.expand_relationship(extracted_fields[key])
+                        db_values[key] = field.validator.check(expanded)
+                    elif field.validator.has_default():
+                        db_values[key] = field.validator.get_default_value()
             kwargs = self._update_auto_now_fields(db_values, self.fields)
         else:
             validator = Schema(fields=fields)
-            kwargs = self._update_auto_now_fields(validator.check(extracted_fields), self.fields)
+            validated = validator.check(extracted_fields)
+            if is_create:
+                for key, field in self.fields.items():
+                    if not field.has_column() or not field.validator.read_only:
+                        continue
+                    if key in extracted_fields:
+                        expanded = field.expand_relationship(extracted_fields[key])
+                        validated[key] = field.validator.check(expanded)
+                    elif field.validator.has_default():
+                        validated[key] = field.validator.get_default_value()
+            kwargs = self._update_auto_now_fields(validated, self.fields)
 
         # Performs the update or the create based on a possible existing primary key
-        if getattr(self, "pk", None) is None or force_save:
+        if is_create:
             await self._save(**kwargs)
         else:
             await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
@@ -195,10 +217,12 @@ class Model(ModelRow, DeclarativeMixin):
             if field.is_virtual:
                 if isinstance(field, saffier.ManyToManyField):
                     return getattr(self, settings.many_to_many_relation.format(key=name))
+                if hasattr(field, "get_value"):
+                    return field.get_value(self, name)
                 raise AttributeError(name)
             run_sync(self.load())
             return self.__dict__[name]
-        return super().__getattr__(name)
+        raise AttributeError(name)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"

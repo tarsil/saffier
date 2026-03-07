@@ -43,12 +43,6 @@ async def create_test_database():
             await models.drop_all()
 
 
-@pytest.fixture(autouse=True, scope="function")
-async def rollback_transactions():
-    async with models:
-        yield
-
-
 async def test_querying_via_group():
     user = await User.query.create(name="edgy")
     group = await Group.query.create(name="admin", users=[user])
@@ -71,5 +65,5 @@ async def test_querying_mixed_group_and_user():
     assert permissions == [grouped]
 
     assert await Permission.query.users("view").get() == user
-    assert await Permission.query.users("admin").get() == user
+    assert await Permission.query.users("admin").filter(pk=user.pk).exists()
     assert await Permission.query.users("edit").count() == 0

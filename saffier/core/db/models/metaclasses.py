@@ -1,5 +1,6 @@
 import copy
 import inspect
+from collections import deque
 from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
@@ -68,8 +69,9 @@ class MetaInfo:
         self.tablename: str | None = getattr(meta, "tablename", None)
         self.table_prefix: str | None = getattr(meta, "table_prefix", None)
         self.parents: Any = getattr(meta, "parents", [])
-        self.many_to_many_fields: set[str] = set()
-        self.foreign_key_fields: dict[str, Any] = {}
+        self.many_to_many_fields: set[str] = set(getattr(meta, "many_to_many_fields", set()))
+        self.foreign_key_fields: dict[str, Any] = dict(getattr(meta, "foreign_key_fields", {}))
+        self.one_to_one_fields: set[Any] = set(getattr(meta, "one_to_one_fields", set()))
         self.model: type[Model] | None = None
         self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -150,8 +152,13 @@ def _check_manager_for_bases(
             attrs[key] = None
             continue
 
-        if key not in attrs:
-            attrs[key] = copy.copy(value)
+        # Keep the framework default `query` manager unless a custom manager
+        # explicitly opts into overriding inherited `query`.
+        inherit_query = bool(getattr(value.__class__, "inherit_query", False))
+        if key == "query" and key in attrs and not inherit_query:
+            continue
+
+        attrs[key] = copy.copy(value)
 
 
 def _set_related_name_for_foreign_keys(
@@ -170,10 +177,28 @@ def _set_related_name_for_foreign_keys(
         if not default_related_name:
             default_related_name = f"{model_class.__name__.lower()}s_set"
 
-        elif hasattr(foreign_key.target, default_related_name):
-            raise ForeignKeyBadConfigured(
-                f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
-            )
+        else:
+            existing_related = getattr(foreign_key.target, default_related_name, None)
+            if existing_related is not None:
+                if (
+                    isinstance(existing_related, RelatedField)
+                    and existing_related.related_from is model_class
+                ):
+                    existing_mapping = model_class.meta.related_names_mapping.get(
+                        default_related_name
+                    )
+                    if existing_mapping not in (None, name):
+                        raise ForeignKeyBadConfigured(
+                            f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+                        )
+                    model_class.meta.related_fields[default_related_name] = existing_related
+                    model_class.meta.related_names_mapping[default_related_name] = name
+                    related_names.add(default_related_name)
+                    continue
+                if not isinstance(existing_related, RelatedField):
+                    raise ForeignKeyBadConfigured(
+                        f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+                    )
 
         foreign_key.related_name = default_related_name
 
@@ -183,12 +208,31 @@ def _set_related_name_for_foreign_keys(
             related_from=model_class,
         )
 
-        # Set the related name
-        setattr(foreign_key.target, default_related_name, related_field)
+        # Set the related name on target model and proxy model.
+        target_models = [foreign_key.target]
+        proxy_target = getattr(foreign_key.target, "proxy_model", None)
+        if proxy_target is not None and proxy_target not in target_models:
+            target_models.append(proxy_target)
+        for target_model in target_models:
+            setattr(target_model, default_related_name, related_field)
+
         model_class.meta.related_fields[default_related_name] = related_field
+        target_meta = cast("MetaInfo", foreign_key.target.meta)
+        target_meta.related_fields[default_related_name] = related_field
+        if default_related_name not in target_meta.fields:
+            placeholder = saffier_fields.PlaceholderField(
+                name=default_related_name,
+                no_copy=True,
+                inherit=False,
+            )
+            placeholder.owner = foreign_key.target
+            placeholder.registry = target_meta.registry
+            target_meta.fields[default_related_name] = placeholder
+            target_meta.fields_mapping[default_related_name] = placeholder
 
         # Set the fields mapping where a related name maps a specific foreign key
         model_class.meta.related_names_mapping[default_related_name] = name
+        target_meta.related_names_mapping[default_related_name] = name
         related_names.add(default_related_name)
 
     return related_names
@@ -287,6 +331,36 @@ class BaseModelMeta(type):
         if inherited_fields:
             # Making sure the inherited fields are before the new defined.
             attrs = {**inherited_fields, **attrs}
+
+        def _expand_embedded_fields(attrs_map: dict[str, Any]) -> dict[str, Any]:
+            if getattr(meta_class, "abstract", False):
+                return attrs_map
+
+            extracted_fields = {
+                field_name: field
+                for field_name, field in attrs_map.items()
+                if isinstance(field, Field)
+            }
+            to_check = deque(extracted_fields.keys())
+
+            while to_check:
+                field_name = to_check.pop()
+                field = extracted_fields[field_name]
+                embedded_fields = field.get_embedded_fields(field_name, extracted_fields)
+                if not embedded_fields:
+                    continue
+
+                for sub_field_name, sub_field in embedded_fields.items():
+                    if sub_field_name == "pk":
+                        raise ValueError("sub field uses reserved name pk")
+                    sub_field.name = sub_field_name
+                    extracted_fields[sub_field_name] = sub_field
+                    attrs_map[sub_field_name] = sub_field
+                    to_check.appendleft(sub_field_name)
+
+            return attrs_map
+
+        attrs = _expand_embedded_fields(attrs)
 
         # Handle with multiple primary keys and auto generated field if no primary key is provided
         if name != "Model":
@@ -474,7 +548,7 @@ class BaseModelMeta(type):
             related_names = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.update(related_names)
 
-        for field, value in new_class.fields.items():  # type: ignore
+        for field, value in list(new_class.fields.items()):  # type: ignore
             if isinstance(value, saffier_fields.ManyToManyField):
                 _set_many_to_many_relation(value, new_class, field)
 
@@ -547,7 +621,7 @@ class BaseModelMeta(type):
 
         db_schema = cls.get_db_schema()
 
-        if not hasattr(cls, "_table"):
+        if not hasattr(cls, "_table") or cls._table is None:
             cls._table = cls.build(db_schema)
         elif hasattr(cls, "_table"):
             table = cls._table
@@ -639,7 +713,7 @@ class BaseModelMeta(type):
         """
         if getattr(cls, "is_proxy_model", False):
             return cls
-        if getattr(cls, "__proxy_model__", None) is None:
+        if cls.__dict__.get("__proxy_model__") is None:
             proxy_model = cls.generate_proxy_model()
             proxy_model.parent = cls
             cls.__proxy_model__ = proxy_model

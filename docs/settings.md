@@ -50,6 +50,8 @@ with override_settings(default_related_lookup_field="uuid"):
 - `ipython_args`: arguments passed to `saffier shell` with IPython.
 - `ptpython_config_file`: config path for `saffier shell --kernel ptpython`.
 - `default_related_lookup_field`: default related lookup key (default: `id`).
+- `orm_concurrency_enabled`: enables/disables internal concurrent execution helpers.
+- `orm_concurrency_limit`: default batch size limit for `run_concurrently` utilities (`None` means unrestricted gather).
 - `filter_operators`: mapping of lookup suffixes to SQLAlchemy operators.
 - `many_to_many_relation`: attribute name format for generated M2M relation accessors.
 - `postgres_dialects`, `mysql_dialects`, `sqlite_dialects`, `mssql_dialects`: supported dialect aliases.

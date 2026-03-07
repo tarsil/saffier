@@ -54,18 +54,27 @@ import saffier
 From `saffier` you can access all the available fields.
 
 ```python
-from saffier.db import fields
+from saffier.core.db import fields
 ```
 
 From `fields` you should be able to access the fields directly.
 
 ```python
-from saffier.db.fields import BigIntegerField
+from saffier.core.db.fields import BigIntegerField
 ```
 
 You can import directly the desired field.
 
 All the fields have specific parameters beisdes the ones [mentioned in data types](#data-types).
+
+Saffier also exposes dedicated field modules for import ergonomics:
+
+```python
+from saffier.core.db.fields.composite_field import CompositeField
+from saffier.core.db.fields.foreign_keys import ForeignKey, RefForeignKey
+from saffier.core.db.fields.many_to_many import ManyToManyField
+from saffier.core.db.fields.one_to_one_keys import OneToOneField
+```
 
 #### BigIntegerField
 
@@ -349,6 +358,33 @@ class Permission(saffier.Model):
         return instance.name.upper()
 ```
 
+#### CompositeField
+
+Virtual grouping field that exposes multiple underlying fields as one structured attribute.
+
+```python
+import saffier
+
+
+class Customer(saffier.Model):
+    first_name = saffier.CharField(max_length=120)
+    last_name = saffier.CharField(max_length=120)
+
+    # Reads/writes both fields as one dictionary.
+    full_name = saffier.CompositeField(inner_fields=["first_name", "last_name"])
+
+    # Declares embedded real columns.
+    contact = saffier.CompositeField(
+        inner_fields=[
+            ("email", saffier.EmailField(max_length=255, null=True)),
+            ("phone", saffier.CharField(max_length=64, null=True)),
+        ],
+        prefix_embedded="contact_",
+    )
+```
+
+`CompositeField` itself is virtual and does not create a database column. Embedded inner fields do.
+
 #### FileField
 
 String-backed field for file references/paths.
@@ -421,6 +457,23 @@ from `saffier`.
     ```python
     from saffier import CASCADE, SET_NULL, RESTRICT
     ```
+
+#### RefForeignKey
+
+`RefForeignKey` is a `ForeignKey` variant that lets you attach explicit reference metadata
+through `ref_field` while keeping regular FK behavior.
+
+```python
+import saffier
+
+
+class Team(saffier.Model):
+    slug = saffier.CharField(max_length=120, unique=True)
+
+
+class Member(saffier.Model):
+    team = saffier.RefForeignKey(Team, ref_field="slug", on_delete=saffier.CASCADE)
+```
 
 #### ManyToMany
 

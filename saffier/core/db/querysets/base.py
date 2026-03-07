@@ -179,14 +179,26 @@ class BaseQuerySet(
         for item in select_related:
             # For m2m relationships
             model_class = queryset.model_class
-            has_many_fk_same_table = False
 
             for part in item.split("__"):
+                has_many_fk_same_table = False
+                keys: list[tuple[str, str, str]] = []
+                previous_model_class = model_class
+                previous_table = tables[-1]
+                join_lookup_field: str | None = None
+                reverse_join = False
                 try:
-                    model_class = model_class.fields[part].target
-                except KeyError:
+                    related_field = model_class.fields[part]
+                    model_class = related_field.target
+                    if isinstance(
+                        related_field, (saffier_fields.ForeignKey, saffier_fields.OneToOneField)
+                    ):
+                        join_lookup_field = part
+                except (KeyError, AttributeError):
                     # Check related fields
                     model_class = getattr(model_class, part).related_from
+                    reverse_join = True
+                    join_lookup_field = previous_model_class.meta.related_names_mapping.get(part)
                     has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
 
                 if queryset.using_schema is not None:
@@ -196,7 +208,26 @@ class BaseQuerySet(
 
                 # If there is multiple FKs to the same table
                 if not has_many_fk_same_table:
-                    select_from = sqlalchemy.sql.join(select_from, table)
+                    if queryset.using_schema is not None and join_lookup_field is not None:
+                        if reverse_join:
+                            left_column = getattr(
+                                previous_table.c, previous_model_class.pkname, None
+                            )
+                            right_column = getattr(table.c, join_lookup_field, None)
+                        else:
+                            left_column = getattr(previous_table.c, join_lookup_field, None)
+                            right_column = getattr(table.c, model_class.pkname, None)
+
+                        if left_column is not None and right_column is not None:
+                            select_from = sqlalchemy.sql.join(
+                                select_from,
+                                table,
+                                left_column == right_column,
+                            )
+                        else:
+                            select_from = sqlalchemy.sql.join(select_from, table)
+                    else:
+                        select_from = sqlalchemy.sql.join(select_from, table)
                 else:
                     lookup_field = None
 
@@ -353,6 +384,7 @@ class BaseQuerySet(
             self.table,
             kwargs,
             escape_characters=tuple(self.ESCAPE_CHARACTERS),
+            using_schema=self.using_schema,
         )
         for related_path in implied_select_related:
             if related_path not in select_related:
@@ -402,7 +434,7 @@ class BaseQuerySet(
             if not value.has_column():
                 continue
             field_validator = value.validator
-            if value.primary_key and key in kwargs and field_validator.read_only:
+            if key in kwargs and field_validator.read_only:
                 field_validator = copy.copy(field_validator)
                 field_validator.read_only = False
             schema_fields[key] = field_validator
@@ -414,6 +446,31 @@ class BaseQuerySet(
             if value.validator.read_only and value.validator.has_default():
                 kwargs[key] = value.validator.get_default_value()
         return kwargs
+
+    def _normalize_many_to_many_values(
+        self,
+        field: saffier_fields.ManyToManyField,
+        value: Any,
+    ) -> list[Any]:
+        if value is None:
+            return []
+
+        values: Sequence[Any]
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            values = value
+        else:
+            values = [value]
+
+        target = field.target
+        normalized = []
+        for item in values:
+            if item is None:
+                continue
+            if isinstance(item, target):
+                normalized.append(item)
+            else:
+                normalized.append(target(pk=item))
+        return normalized
 
     def _prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
@@ -440,12 +497,11 @@ class BaseQuerySet(
 
         # Making sure the registry schema takes precendent with
         # Any provided using
+        effective_schema = self.using_schema
         if not self.model_class.meta.registry.db_schema:
             schema = get_schema()
-            if self.using_schema is None and schema is not None:
-                self.using_schema = schema
-            if self.using_schema is not None or getattr(self.model_class, "_table", None) is None:
-                queryset.model_class.table = self.model_class.build(self.using_schema)
+            if effective_schema is None and schema is not None:
+                effective_schema = schema
 
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
@@ -462,10 +518,15 @@ class BaseQuerySet(
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
-        queryset.table = self.table
+        if effective_schema is not None:
+            queryset.table = self.model_class.table_schema(effective_schema)
+        elif getattr(self.model_class, "_table", None) is None:
+            queryset.table = self.model_class.table
+        else:
+            queryset.table = self.table
         queryset.extra = self.extra
         queryset._exclude_secrets = self._exclude_secrets
-        queryset.using_schema = self.using_schema
+        queryset.using_schema = effective_schema
         queryset._for_update = copy.copy(self._for_update)
         queryset._batch_size = self._batch_size
         queryset._extra_select = copy.copy(self._extra_select)
@@ -525,7 +586,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 if related_path not in queryset._select_related:
                     queryset._select_related.append(related_path)
 
-        if exclude:
+        if exclude and isinstance(clause, Q):
             clause = sqlalchemy.not_(clause)
 
         if or_:
@@ -1023,10 +1084,34 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         queryset: QuerySet = self._clone()
+        many_to_many_values: dict[str, list[Any]] = {}
+        for field_name, field in queryset.model_class.fields.items():
+            if not isinstance(field, saffier_fields.ManyToManyField):
+                continue
+            if field_name not in kwargs:
+                continue
+            many_to_many_values[field_name] = queryset._normalize_many_to_many_values(
+                field,
+                kwargs.pop(field_name),
+            )
+
         kwargs = queryset._validate_kwargs(**kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)
+
+        for field_name, related_values in many_to_many_values.items():
+            relation = getattr(instance, field_name)
+            for related_value in related_values:
+                if getattr(related_value, "pk", None) is None:
+                    raise QuerySetError(
+                        detail=(
+                            f"Cannot assign unsaved related object to '{field_name}' while creating "
+                            f"'{queryset.model_class.__name__}'."
+                        )
+                    )
+                await relation.add(related_value)
+
         return instance
 
     async def bulk_create(self, objs: list[dict]) -> None:

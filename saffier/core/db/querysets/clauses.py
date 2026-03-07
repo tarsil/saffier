@@ -15,6 +15,7 @@ def build_lookup_clauses(
     kwargs: dict[str, Any],
     *,
     escape_characters: tuple[str, ...] = DEFAULT_ESCAPE_CHARACTERS,
+    using_schema: str | None = None,
 ) -> tuple[list[Any], list[str]]:
     """
     Build SQLAlchemy filter clauses from Saffier lookup kwargs.
@@ -52,11 +53,19 @@ def build_lookup_clauses(
 
                 for part in related_parts:
                     try:
-                        related_model = related_model.fields[part].target
-                    except KeyError:
+                        related_field = related_model.fields[part]
+                        related_model = related_field.target
+                    except (KeyError, AttributeError):
                         related_model = getattr(related_model, part).related_from
 
-            column = related_model.table.columns[field_name]
+            if field_name == "pk":
+                field_name = related_model.pkname
+            related_table = (
+                related_model.table_schema(using_schema)
+                if using_schema is not None
+                else related_model.table
+            )
+            column = related_table.columns[field_name]
         else:
             op = "exact"
             try:
@@ -64,7 +73,12 @@ def build_lookup_clauses(
             except KeyError as error:
                 try:
                     related_model = getattr(model_class, key).related_to
-                    column = related_model.table.columns[settings.default_related_lookup_field]
+                    related_table = (
+                        related_model.table_schema(using_schema)
+                        if using_schema is not None
+                        else related_model.table
+                    )
+                    column = related_table.columns[settings.default_related_lookup_field]
                 except AttributeError:
                     raise KeyError(str(error)) from error
 
@@ -154,6 +168,7 @@ class Q:
                 queryset.table,
                 self.kwargs,
                 escape_characters=escape_characters,
+                using_schema=getattr(queryset, "using_schema", None),
             )
             clauses.extend(kw_clauses)
             for path in related:
