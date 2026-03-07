@@ -151,18 +151,28 @@ class Registry:
         from saffier.core.db.fields.base import ManyToManyField
 
         for owner_model in self.models.values():
-            for field in owner_model.fields.values():
+            for field_name, field in owner_model.fields.items():
                 if not isinstance(field, ManyToManyField):
                     continue
                 through_model = getattr(field, "through", None)
                 if through_model is not model_class:
                     continue
                 target_name = self._get_relation_target_name(field.to) or field.target.__name__
-                expected_name = f"{owner_model.__name__}{target_name}"
-                expected_table = f"{owner_model.__name__.lower()}s_{target_name}s".lower()
+                expected_old_name = f"{owner_model.__name__}{target_name}"
+                expected_old_table = f"{owner_model.__name__.lower()}s_{target_name}s".lower()
+
+                expected_new_name = f"{owner_model.__name__}{field_name.capitalize()}Through"
+                expected_new_table = expected_new_name.lower()
+                if owner_model.meta.table_prefix:
+                    expected_old_table = f"{owner_model.meta.table_prefix}_{expected_old_table}"
+                    expected_new_table = f"{owner_model.meta.table_prefix}_{expected_new_table}"
+
                 return (
-                    model_class.__name__ == expected_name
-                    and getattr(model_class.meta, "tablename", None) == expected_table
+                    model_class.__name__ == expected_old_name
+                    and getattr(model_class.meta, "tablename", None) == expected_old_table
+                ) or (
+                    model_class.__name__ == expected_new_name
+                    and getattr(model_class.meta, "tablename", None) == expected_new_table
                 )
         return False
 

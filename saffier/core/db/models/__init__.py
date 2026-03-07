@@ -1,4 +1,5 @@
 from .managers import Manager, RedirectManager
+from .mixins.sqlalchemy import SQLAlchemyModelMixin
 from .model import Model, ReflectModel, StrictModel
 from .model_reference import ModelRef
 
@@ -8,5 +9,6 @@ __all__ = [
     "ModelRef",
     "RedirectManager",
     "ReflectModel",
+    "SQLAlchemyModelMixin",
     "StrictModel",
 ]

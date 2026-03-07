@@ -23,6 +23,9 @@ help you manage those stubborn tests that should land on a `test_` database.
 from saffier.testclient import DatabaseTestClient
 ```
 
+`SaffierTestClient` remains available as a compatibility alias, but
+`DatabaseTestClient` is the canonical import path.
+
 ### Parameters
 
 * **url** - The database url for your database. This can be in a string format or in a

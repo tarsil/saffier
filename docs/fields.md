@@ -530,11 +530,28 @@ class MyModel(saffier.Model):
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Saffier generates the model by default
 if none is provided.
+* **through_tablename** - Controls the table name used for the auto-generated through model.
+  Pass `saffier.OLD_M2M_NAMING` to keep the legacy naming scheme,
+  `saffier.NEW_M2M_NAMING` for the Edgy-style field-based naming scheme,
+  or a non-empty string. String values support `str.format(field=...)`.
 
 !!! Note
     Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.
     Auto-generated through models always include it, and custom through models must also expose
     `id` as the primary key.
+
+!!! Warning
+    For backward compatibility, Saffier keeps the legacy through-table naming when
+    `through_tablename` is omitted. Use `saffier.NEW_M2M_NAMING` or an explicit
+    table name for Edgy-compatible naming and migration-safe new relationships.
+    `saffier.OLD_M2M_NAMING` is not suitable when the same model points to the
+    same target model more than once, because those relations would share the
+    legacy through-table name.
+
+!!! Tip
+    String values for `through_tablename` are formatted with `field=self` before
+    being lowercased. This lets you derive stable names from the owner model and
+    field name when you need custom naming.
 
 #### IPAddressField
 

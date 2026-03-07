@@ -51,8 +51,10 @@ That gives you access to:
 * `monkay_instance.settings`
 * `monkay_instance.instance`
 
-In Saffier, `monkay_instance.instance` is the currently active application context set by
-`Migrate(...)` or `SaffierExtra(...)`.
+In Saffier, `monkay_instance.instance` is the currently active application
+context set by `Instance(...)` and commonly activated through
+`monkay.set_instance(...)`. Compatibility wrappers such as `Migrate(...)` and
+`SaffierExtra(...)` still end up driving the same runtime object.
 
 Example:
 
@@ -72,14 +74,14 @@ class CaptureRegistryInfo:
 
 Preloads run before extensions are registered.
 
-That matters because preload imports are the normal place where your project creates the app and
-calls `Migrate(...)`.
+That matters because preload imports are the normal place where your project
+creates the app and activates the current instance.
 
 Typical order:
 
 1. `evaluate_settings_once_ready()` starts
 2. preload module imports `myproject.main`
-3. `myproject.main` wires `Migrate(app=..., registry=...)`
+3. `myproject.main` wires `monkay.set_instance(Instance(app=..., registry=...))`
 4. Saffier has an active Monkay instance
 5. settings extensions are registered and applied to that instance
 

@@ -87,6 +87,13 @@ class MetaInfo:
         self.signals: Broadcaster | None = getattr(meta, "signals", {})  # type: ignore
 
 
+def _is_sqlalchemy_compatibility_enabled(model_class: type) -> bool:
+    for base in type.__getattribute__(model_class, "__mro__"):
+        if base.__dict__.get("__saffier_sqlalchemy_compatibility__", False):
+            return True
+    return False
+
+
 def _check_model_inherited_registry(bases: tuple[type, ...]) -> Registry:
     """
     When a registry is missing from the Meta class, it should look up for the bases
@@ -657,6 +664,24 @@ class BaseModelMeta(type):
             if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build(db_schema)
         return cls._table
+
+    def __getattr__(cls, name: str) -> Any:
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+
+        meta = cls.__dict__.get("meta")
+        if (
+            meta is not None
+            and meta.model is cls
+            and not meta.abstract
+            and _is_sqlalchemy_compatibility_enabled(cls)
+        ):
+            resolver = type.__getattribute__(cls, "_resolve_sqlalchemy_compatible_attribute")
+            try:
+                return resolver(name)
+            except AttributeError:
+                pass
+        raise AttributeError(name)
 
     @table.setter
     def table(self, value: sqlalchemy.Table) -> None:

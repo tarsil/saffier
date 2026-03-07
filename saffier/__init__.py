@@ -21,7 +21,17 @@ from .cli import Migrate
 from .core.connection.database import Database, DatabaseURL
 from .core.connection.registry import Registry
 from .core.db import fields
-from .core.db.constants import CASCADE, RESTRICT, SET_NULL
+from .core.db.constants import (
+    CASCADE,
+    DO_NOTHING,
+    NEW_M2M_NAMING,
+    OLD_M2M_NAMING,
+    PROTECT,
+    RESTRICT,
+    SET_DEFAULT,
+    SET_NULL,
+    ConditionalRedirect,
+)
 from .core.db.datastructures import Index, UniqueConstraint
 from .core.db.fields import (
     BigIntegerField,
@@ -59,7 +69,7 @@ from .core.db.fields import (
     URLField,
     UUIDField,
 )
-from .core.db.models import Model, ModelRef, ReflectModel, StrictModel
+from .core.db.models import Model, ModelRef, ReflectModel, SQLAlchemyModelMixin, StrictModel
 from .core.db.models.managers import BaseManager, Manager, RedirectManager
 from .core.db.querysets import Q, QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
@@ -112,6 +122,7 @@ __all__ = [
     "BinaryField",
     "BooleanField",
     "CASCADE",
+    "ConditionalRedirect",
     "CharChoiceField",
     "CharField",
     "ChoiceField",
@@ -123,6 +134,7 @@ __all__ = [
     "DateTimeField",
     "DatabaseNotConnectedWarning",
     "DecimalField",
+    "DO_NOTHING",
     "DurationField",
     "ObjectNotFound",
     "EmailField",
@@ -151,6 +163,8 @@ __all__ = [
     "Model",
     "ModelRef",
     "MultipleObjectsReturned",
+    "NEW_M2M_NAMING",
+    "OLD_M2M_NAMING",
     "OneToOne",
     "OneToOneField",
     "PasswordField",
@@ -159,14 +173,17 @@ __all__ = [
     "RefForeignKey",
     "SmallIntegerField",
     "Prefetch",
+    "PROTECT",
     "QuerySet",
     "RESTRICT",
     "ReflectModel",
     "Registry",
+    "SET_DEFAULT",
     "SaffierExtra",
     "SaffierSettings",
     "SET_NULL",
     "Signal",
+    "SQLAlchemyModelMixin",
     "StrictModel",
     "TextField",
     "TimeField",

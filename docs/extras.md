@@ -7,27 +7,30 @@ If you are in this section, you surely read about the [auto discovery](./migrati
 and how it relates with the way Saffier handles and manages migrations for you.
 
 But, what if you simply would like to use the [shell](./shell.md) or any related command offered
-by Saffier that doesn't necessarily requires migration management?
+by Saffier that does not require migration management?
 
-The Migrate object is the way of Saffier knowing what to do and how to manage your models but there
-are cases where that doesn't happen and it is not needed, for example,
-**a project using [reflect models](./reflection.md)**.
+The current runtime entry point is `saffier.Instance(...)` plus
+`saffier.monkay.set_instance(...)`. The deprecated `Migrate(...)` wrapper still
+exists for compatibility, but it is no longer the preferred bootstrap. There
+are also cases where migration management is not needed at all, for example a
+project using [reflect models](./reflection.md).
 
-A project using reflect models, means that somehow migrations are managed externally and not by
-Saffier and Saffier only needs to reflect those tables back into your code, so, do you really need
-the **Migrate** object here? **Short answer is no**.
+A project using reflect models means migrations are managed externally and
+Saffier only needs to reflect those tables back into your code, so the answer is
+still no.
 
-So how can you still use those features without depending on the Migrate object? Enters
-[SaffierExtra](#saffierextra).
+So how can you still use those features without coupling your setup to the
+compatibility wrapper? Use [SaffierExtra](#saffierextra).
 
 ## SaffierExtra
 
-This is the object you want to use when **you don't need Saffier to manage the migrations for you**
-and yet still being able to use Saffier tools like the [shell](./shell.md).
+This is the object you want to use when you do not need Saffier to manage
+migrations and still want Saffier tooling such as the [shell](./shell.md).
 
 ### How does it work
 
-Well, its actually very similar to Migrate object in terms of setup.
+It follows the same active-instance runtime direction as the rest of the
+current Saffier bootstrap.
 
 Let us use [Ravyn](https://ravyn.dymmond.com) again as an example like we did for the
 [tips and tricks](./tips-and-tricks.md).

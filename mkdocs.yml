@@ -83,6 +83,7 @@ nav:
       - Pagination: "pagination.md"
       - Queries:
           - Queries: "queries/queries.md"
+          - SQLAlchemy Compatibility: "queries/sqlalchemy-compatibility.md"
           - Q Expressions: "queries/q.md"
           - Secrets: "queries/secrets.md"
           - Related Name: "queries/related-name.md"

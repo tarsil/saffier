@@ -9,7 +9,7 @@ from sqlalchemy.ext.mutable import MutableList
 
 import saffier
 from saffier.contrib.sqlalchemy.fields import IPAddress
-from saffier.core.db.constants import CASCADE, RESTRICT, SET_NULL
+from saffier.core.db.constants import CASCADE, NEW_M2M_NAMING, OLD_M2M_NAMING, RESTRICT, SET_NULL
 from saffier.core.db.fields._internal import (
     URL,
     UUID,
@@ -30,7 +30,7 @@ from saffier.core.db.fields._internal import (
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
 from saffier.core.terminal import Print
-from saffier.exceptions import ImproperlyConfigured, ModelReferenceError
+from saffier.exceptions import FieldDefinitionError, ImproperlyConfigured, ModelReferenceError
 
 if typing.TYPE_CHECKING:
     from saffier import Model
@@ -534,8 +534,20 @@ class ManyToManyField(Field):
         self,
         to: type["Model"] | str,
         through: type["Model"] | None = None,
+        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] | None = None,
         **kwargs: typing.Any,
     ):
+        if through_tablename is not None and (
+            not isinstance(through_tablename, str)
+            and through_tablename is not OLD_M2M_NAMING
+            and through_tablename is not NEW_M2M_NAMING
+        ):
+            raise FieldDefinitionError(
+                '"through_tablename" must be OLD_M2M_NAMING, NEW_M2M_NAMING, or a non-empty string.'
+            )
+        if isinstance(through_tablename, str) and not through_tablename.strip():
+            raise FieldDefinitionError('"through_tablename" cannot be an empty string.')
+
         if "null" in kwargs:
             terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
@@ -543,6 +555,7 @@ class ManyToManyField(Field):
         super().__init__(null=True, **kwargs)
         self.to = to
         self.through = through
+        self.through_tablename = through_tablename
         self.related_name = related_name
 
         if self.related_name:
@@ -647,8 +660,15 @@ class ManyToManyField(Field):
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__
-        class_name = f"{owner_name}{to_name}"
-        tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+        class_name = f"{owner_name}{self.name.capitalize()}Through"
+        if self.through_tablename is NEW_M2M_NAMING:
+            tablename = class_name.lower()
+        elif isinstance(self.through_tablename, str) and self.through_tablename:
+            tablename = self.through_tablename.format(field=self).lower()
+        else:
+            tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+        if self.owner.meta.table_prefix:
+            tablename = f"{self.owner.meta.table_prefix}_{tablename}"
 
         new_meta_namespace = {
             "tablename": tablename,
@@ -669,7 +689,7 @@ class ManyToManyField(Field):
         to_related_name = (
             f"{self.related_name}"
             if self.related_name
-            else f"{to_name.lower()}_{class_name.lower()}s_set"
+            else f"{to_name.lower()}_{owner_name.lower()}{to_name.lower()}s_set"
         )
 
         through_model = type(

@@ -62,3 +62,8 @@ class DatabaseTestClient(_DatabaseTestClient):
             test_prefix=test_prefix,
             **options,
         )
+
+
+SaffierTestClient = DatabaseTestClient
+
+__all__ = ["DatabaseTestClient", "SaffierTestClient"]

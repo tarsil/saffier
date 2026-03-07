@@ -19,8 +19,8 @@ but [--app and environment variables](./migrations/discovery.md##environment-var
 is equally valid and works in the same way.
 
 !!! Tip
-    See the [extras](./extras.md) section after getting familiar with the previous. There offers
-    a way of using the shell without going through the deprecated **Migrate** wrapper.
+    See [extras](./extras.md) for a shell-oriented bootstrap that does not rely
+    on the deprecated `Migrate(...)` compatibility wrapper.
 
 ## How does it work
 

@@ -122,6 +122,9 @@ users = await User.query.filter(id__in=[1, 2, 3])
 Since Saffier uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
 The filter accepts also those.
 
+If you need direct class-attribute access such as `User.id` instead of
+`User.columns.id`, see [SQLAlchemy compatibility mode](./sqlalchemy-compatibility.md).
+
 ##### Example
 
 ```python
