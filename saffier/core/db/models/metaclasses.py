@@ -410,9 +410,13 @@ class BaseModelMeta(type):
                 elif isinstance(value, saffier_fields.ManyToManyField):
                     many_to_many_fields.add(value)
                     continue
-                elif isinstance(value, saffier_fields.ForeignKey) and not isinstance(
-                    value,
-                    saffier_fields.ManyToManyField,  # type: ignore
+                elif (
+                    isinstance(value, saffier_fields.ForeignKey)
+                    and not getattr(value, "is_model_reference", False)
+                    and not isinstance(
+                        value,
+                        saffier_fields.ManyToManyField,  # type: ignore
+                    )
                 ):
                     foreign_key_fields[key] = value
                     continue
@@ -497,7 +501,13 @@ class BaseModelMeta(type):
             meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
         # Handle the registry of models
-        if getattr(meta, "registry", None) is None:
+        skip_registry_lookup = getattr(meta_class, "registry", None) is False
+        if skip_registry_lookup and not meta.abstract:
+            raise ImproperlyConfigured(
+                "Meta.registry = False can only be used on abstract models."
+            )
+
+        if getattr(meta, "registry", None) is None and not skip_registry_lookup:
             if hasattr(new_class, "__db_model__") and new_class.__db_model__:
                 meta.registry = _check_model_inherited_registry(bases)
             else:
@@ -531,6 +541,15 @@ class BaseModelMeta(type):
                     raise ValueError(
                         "Meta.constraints must be a list of sqlalchemy.Constraint types."
                     )
+
+        if skip_registry_lookup:
+            new_class.__db_model__ = True
+            new_class.fields = meta.fields
+            meta.model = new_class
+            meta.manager.model_class = new_class
+            for _, value in new_class.fields.items():
+                value.owner = new_class
+            return new_class
 
         registry = meta.registry
         new_class.database = registry.database  # type: ignore[union-attr]

@@ -460,8 +460,10 @@ from `saffier`.
 
 #### RefForeignKey
 
-`RefForeignKey` is a `ForeignKey` variant that lets you attach explicit reference metadata
-through `ref_field` while keeping regular FK behavior.
+`RefForeignKey` supports two modes in Saffier.
+
+If you pass a real Saffier model, it behaves like a regular `ForeignKey` and keeps the extra
+`ref_field` metadata for tooling or custom conventions.
 
 ```python
 import saffier
@@ -474,6 +476,30 @@ class Team(saffier.Model):
 class Member(saffier.Model):
     team = saffier.RefForeignKey(Team, ref_field="slug", on_delete=saffier.CASCADE)
 ```
+
+If you pass a `ModelRef` subclass instead, `RefForeignKey` becomes a virtual nested-insert field.
+This is the Saffier-native pure Python adaptation of Edgy's reference workflow.
+
+```python
+class PostRef(saffier.ModelRef):
+    __related_name__ = "posts_set"
+    comment: str
+
+
+class User(saffier.StrictModel):
+    name = saffier.CharField(max_length=100, null=True)
+    posts = saffier.RefForeignKey(PostRef, null=True)
+```
+
+```python
+await User.query.create(
+    PostRef(comment="created from a positional ModelRef"),
+    name="Alice",
+    posts=[],
+)
+```
+
+See [Reference ForeignKey](./reference-foreignkey.md) for the full workflow.
 
 #### ManyToMany
 

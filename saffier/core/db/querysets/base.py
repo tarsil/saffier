@@ -428,6 +428,7 @@ class BaseQuerySet(
         )
 
     def _validate_kwargs(self, **kwargs: Any) -> Any:
+        original_kwargs = dict(kwargs)
         fields = self.model_class.fields
         schema_fields = {}
         for key, value in fields.items():
@@ -440,6 +441,10 @@ class BaseQuerySet(
             schema_fields[key] = field_validator
         validator = Schema(fields=schema_fields)
         kwargs = validator.check(kwargs)
+        for key, value in original_kwargs.items():
+            field = fields.get(key)
+            if field is not None and not field.has_column():
+                kwargs[key] = value
         for key, value in fields.items():
             if not value.has_column():
                 continue
@@ -1079,7 +1084,33 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return rows[0]
         return None
 
-    async def create(self, **kwargs: Any) -> SaffierModel:
+    def _filter_lookup_kwargs(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in payload.items()
+            if key in self.model_class.fields and self.model_class.fields[key].has_column()
+        }
+
+    def _extract_model_reference_kwargs(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in payload.items()
+            if key in self.model_class.fields
+            and getattr(self.model_class.fields[key], "is_model_reference", False)
+        }
+
+    async def _persist_model_reference_kwargs(
+        self,
+        instance: SaffierModel,
+        payload: dict[str, Any],
+    ) -> None:
+        if not payload:
+            return
+        for key, value in payload.items():
+            setattr(instance, key, value)
+        await instance._persist_model_references(set(payload))
+
+    async def create(self, *model_refs: Any, **kwargs: Any) -> SaffierModel:
         """
         Creates a record in a specific table.
         """
@@ -1096,6 +1127,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             )
 
         kwargs = queryset._validate_kwargs(**kwargs)
+        kwargs = queryset.model_class.merge_model_refs(model_refs, kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)
@@ -1275,18 +1307,29 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await self.model_class.signals.post_update.send(sender=self.__class__, instance=self)
 
     async def get_or_create(
-        self, defaults: dict[str, Any], **kwargs: Any
+        self,
+        *model_refs: Any,
+        defaults: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> tuple[SaffierModel, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
         queryset: QuerySet = self._clone()
+        defaults = defaults or {}
+        lookup_kwargs = queryset._filter_lookup_kwargs(kwargs)
+        ref_payload = dict(kwargs)
+        ref_payload.update(defaults)
+        ref_kwargs = queryset._extract_model_reference_kwargs(
+            queryset.model_class.merge_model_refs(model_refs, ref_payload)
+        )
         try:
-            instance = await queryset.get(**kwargs)
+            instance = await queryset.get(**lookup_kwargs)
+            await queryset._persist_model_reference_kwargs(instance, ref_kwargs)
             return instance, False
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await queryset.create(**kwargs)
+            instance = await queryset.create(*model_refs, **kwargs)
             return instance, True
 
     async def bulk_get_or_create(
@@ -1334,19 +1377,30 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     bulk_select_or_insert = bulk_get_or_create
 
     async def update_or_create(
-        self, defaults: dict[str, Any], **kwargs: Any
+        self,
+        *model_refs: Any,
+        defaults: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> tuple[SaffierModel, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """
         queryset: QuerySet = self._clone()
+        defaults = defaults or {}
+        lookup_kwargs = queryset._filter_lookup_kwargs(kwargs)
+        ref_payload = dict(kwargs)
+        ref_payload.update(defaults)
+        ref_kwargs = queryset._extract_model_reference_kwargs(
+            queryset.model_class.merge_model_refs(model_refs, ref_payload)
+        )
         try:
-            instance = await queryset.get(**kwargs)
+            instance = await queryset.get(**lookup_kwargs)
             await instance.update(**defaults)
+            await queryset._persist_model_reference_kwargs(instance, ref_kwargs)
             return instance, False
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await queryset.create(**kwargs)
+            instance = await queryset.create(*model_refs, **kwargs)
             return instance, True
 
     async def contains(self, instance: SaffierModel) -> bool:

@@ -18,7 +18,7 @@ from saffier.conf.global_settings import SaffierSettings
 from . import files, marshalls
 from ._instance import Instance
 from .cli import Migrate
-from .core.connection.database import Database
+from .core.connection.database import Database, DatabaseURL
 from .core.connection.registry import Registry
 from .core.db import fields
 from .core.db.constants import CASCADE, RESTRICT, SET_NULL
@@ -59,7 +59,7 @@ from .core.db.fields import (
     URLField,
     UUIDField,
 )
-from .core.db.models import Model, ReflectModel
+from .core.db.models import Model, ModelRef, ReflectModel, StrictModel
 from .core.db.models.managers import BaseManager, Manager, RedirectManager
 from .core.db.querysets import Q, QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
@@ -118,6 +118,7 @@ __all__ = [
     "CompositeField",
     "ComputedField",
     "Database",
+    "DatabaseURL",
     "DateField",
     "DateTimeField",
     "DatabaseNotConnectedWarning",
@@ -148,6 +149,7 @@ __all__ = [
     "RedirectManager",
     "Migrate",
     "Model",
+    "ModelRef",
     "MultipleObjectsReturned",
     "OneToOne",
     "OneToOneField",
@@ -165,6 +167,7 @@ __all__ = [
     "SaffierSettings",
     "SET_NULL",
     "Signal",
+    "StrictModel",
     "TextField",
     "TimeField",
     "UniqueConstraint",

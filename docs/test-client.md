@@ -26,10 +26,10 @@ from saffier.testclient import DatabaseTestClient
 ### Parameters
 
 * **url** - The database url for your database. This can be in a string format or in a
-`databases.DatabaseURL`.
+`saffier.DatabaseURL`.
 
     ```python
-    from databases import DatabaseURL
+    from saffier import DatabaseURL
     ```
 
 * **force_rollback** - This will ensure that all database connections are run within a transaction

@@ -81,7 +81,7 @@ class QuerySetProtocol(Protocol):
 
     async def last(self, **kwargs: Any) -> SaffierModel | None: ...
 
-    async def create(self, **kwargs: Any) -> SaffierModel: ...
+    async def create(self, *model_refs: Any, **kwargs: Any) -> SaffierModel: ...
 
     async def bulk_create(self, objs: Sequence[list[dict[Any, Any]]]) -> None: ...
 
@@ -112,7 +112,8 @@ class QuerySetProtocol(Protocol):
 
     async def get_or_create(
         self,
-        _defaults: dict[str, Any] | None = None,
+        *model_refs: Any,
+        defaults: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> tuple[SaffierModel, bool]: ...
 
@@ -123,7 +124,7 @@ class QuerySetProtocol(Protocol):
     ) -> list[SaffierModel]: ...
 
     async def update_or_create(
-        self, defaults: Any, **kwargs: Any
+        self, *model_refs: Any, defaults: Any = None, **kwargs: Any
     ) -> tuple[SaffierModel, bool]: ...
 
     async def contains(self, instance: SaffierModel) -> bool: ...

@@ -37,13 +37,66 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     __raw_query__: ClassVar[str | None] = None
     __proxy_model__: ClassVar[type["Model"] | None] = None
 
-    def __init__(self, **kwargs: Any) -> None:
-        self.setup_model_fields_from_kwargs(kwargs)
+    def __init__(self, *model_refs: Any, **kwargs: Any) -> None:
+        self.setup_model_fields_from_kwargs(model_refs, kwargs)
 
-    def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
+    @staticmethod
+    def _is_model_ref_instance(value: Any) -> bool:
+        return (
+            hasattr(value, "model_dump")
+            and hasattr(value.__class__, "__model_ref_fields__")
+            and hasattr(value.__class__, "__related_name__")
+        )
+
+    @classmethod
+    def resolve_model_ref_field_name(cls, ref_type: type[Any]) -> str:
+        for field_name, field in cls.fields.items():
+            model_ref = getattr(field, "model_ref", None)
+            if model_ref is not None and issubclass(ref_type, model_ref):
+                return field_name
+        raise saffier.ModelReferenceError(
+            detail=(
+                f"No RefForeignKey on '{cls.__name__}' accepts model references of type "
+                f"'{ref_type.__name__}'."
+            )
+        )
+
+    @classmethod
+    def merge_model_refs(
+        cls,
+        model_refs: Sequence[Any],
+        kwargs: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = dict(kwargs or {})
+        if not model_refs:
+            return payload
+
+        for model_ref in model_refs:
+            if not cls._is_model_ref_instance(model_ref):
+                raise TypeError("Positional arguments are reserved for ModelRef instances.")
+
+            field_name = cls.resolve_model_ref_field_name(model_ref.__class__)
+            existing = payload.get(field_name)
+            if existing is None:
+                payload[field_name] = [model_ref]
+            elif isinstance(existing, Sequence) and not isinstance(
+                existing, (str, bytes, bytearray)
+            ):
+                payload[field_name] = [*existing, model_ref]
+            else:
+                payload[field_name] = [existing, model_ref]
+        return payload
+
+    def setup_model_fields_from_kwargs(
+        self,
+        model_refs: Sequence[Any],
+        kwargs: dict[str, Any],
+    ) -> Any:
         """
         Loops and setup the kwargs of the model
         """
+        kwargs = self.__class__.merge_model_refs(model_refs, kwargs)
+
         if "pk" in kwargs:
             kwargs[self.pkname] = kwargs.pop("pk")
 
@@ -55,6 +108,16 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             setattr(self, key, value)
             kwargs[key] = value
         return kwargs
+
+    async def _persist_model_references(self, field_names: set[str] | None = None) -> None:
+        for field_name, field in self.fields.items():
+            if not getattr(field, "is_model_reference", False):
+                continue
+            if field_names is not None and field_name not in field_names:
+                continue
+            if field_name not in self.__dict__:
+                continue
+            await field.persist_references(self, self.__dict__[field_name])
 
     @property
     def pk(self) -> Any:

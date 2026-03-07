@@ -34,6 +34,15 @@ class RelatedField:
     def queryset(self) -> "QuerySet":
         return cast("QuerySet", self.manager.get_queryset())
 
+    def scoped_queryset(self) -> "QuerySet":
+        field = self.get_foreign_key_field_name()
+        queryset = cast("QuerySet", self.queryset.filter(**{field: self.instance.pk}))  # type: ignore[arg-type]
+
+        related = self.m2m_related()
+        if related:
+            queryset.m2m_related = related[0]
+        return queryset
+
     def m2m_related(self) -> Any:
         """
         Guarantees the the m2m filter is done by the owner of the call
@@ -62,8 +71,12 @@ class RelatedField:
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
-        try:
+        if item in {"create", "get_or_create", "update_or_create"}:
             attr = getattr(self.queryset, item)
+            return self.wrap_args(attr)
+
+        try:
+            return getattr(self.scoped_queryset(), item)
         except AttributeError:
             attr = getattr(self.related_from, item)
 
@@ -94,10 +107,6 @@ class RelatedField:
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             field = self.get_foreign_key_field_name()
             kwargs[field] = self.instance.pk  # type: ignore
-
-            related = self.m2m_related()
-            if related:
-                self.queryset.m2m_related = related[0]
             return func(*args, **kwargs)
 
         return wrapped

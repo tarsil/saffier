@@ -202,6 +202,7 @@ class Model(ModelRow, DeclarativeMixin):
         ):
             await self.load()
 
+        await self._persist_model_references()
         await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
 
@@ -229,6 +230,38 @@ class Model(ModelRow, DeclarativeMixin):
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self.pkname}={self.pk})"
+
+
+class StrictModel(Model):
+    """
+    Model variant that validates scalar field assignments and forbids ad-hoc public attributes.
+    """
+
+    class Meta:
+        abstract = True
+        registry = False
+
+    def __setattr__(self, key: Any, value: Any) -> Any:
+        if key in getattr(self, "fields", {}):
+            field = self.fields[key]
+            is_relationship = isinstance(
+                field,
+                (saffier.ForeignKey, saffier.OneToOneField, saffier.ManyToManyField),
+            )
+            if (
+                not field.is_virtual
+                and not is_relationship
+                and not getattr(field, "is_computed", False)
+            ):
+                value = field.validator.check(value)
+            return super().__setattr__(key, value)
+
+        if key.startswith("_") or key in self.__dict__ or hasattr(type(self), key):
+            return super().__setattr__(key, value)
+
+        raise AttributeError(
+            f"Unknown attribute '{key}' for strict model '{self.__class__.__name__}'."
+        )
 
 
 class ReflectModel(Model, SaffierBaseReflectModel):

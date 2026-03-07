@@ -30,7 +30,7 @@ from saffier.core.db.fields._internal import (
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
 from saffier.core.terminal import Print
-from saffier.exceptions import ImproperlyConfigured
+from saffier.exceptions import ImproperlyConfigured, ModelReferenceError
 
 if typing.TYPE_CHECKING:
     from saffier import Model
@@ -710,7 +710,100 @@ class RefForeignKey(ForeignKey):
         **kwargs: typing.Any,
     ) -> None:
         self.ref_field = ref_field
+        self.model_ref = None
+        if (
+            isinstance(to, type)
+            and hasattr(to, "__model_ref_fields__")
+            and hasattr(to, "__related_name__")
+        ):
+            if not getattr(to, "__related_name__", None):
+                raise ModelReferenceError(
+                    detail="'__related_name__' must be declared when subclassing ModelRef."
+                )
+            self.model_ref = to
+            self.is_virtual = True
         super().__init__(to=to, **kwargs)
+
+    @property
+    def is_model_reference(self) -> bool:
+        return self.model_ref is not None
+
+    def has_column(self) -> bool:
+        return not self.is_model_reference and super().has_column()
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        if self.is_model_reference:
+            return Any(**kwargs)
+        return super().get_validator(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        if self.is_model_reference:
+            raise RuntimeError(f"Virtual field '{name}' does not map to a database column.")
+        return super().get_column(name)
+
+    def expand_relationship(self, value: typing.Any) -> typing.Any:
+        if self.is_model_reference:
+            return value
+        return super().expand_relationship(value)
+
+    def _normalize_model_ref(self, value: typing.Any) -> typing.Any:
+        if value is None:
+            return None
+        if isinstance(value, self.model_ref):
+            return value
+        if isinstance(value, dict):
+            return self.model_ref(**value)
+        raise ModelReferenceError(
+            detail=(
+                f"RefForeignKey '{self.name}' expects '{self.model_ref.__name__}' instances "
+                "or dictionaries."
+            )
+        )
+
+    def set_value(self, instance: typing.Any, field_name: str, value: typing.Any) -> None:
+        if not self.is_model_reference:
+            instance.__dict__[field_name] = value
+            return
+
+        if value is None:
+            instance.__dict__[field_name] = None
+            return
+
+        values: typing.Sequence[typing.Any]
+        if isinstance(value, typing.Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            values = value
+        else:
+            values = [value]
+
+        instance.__dict__[field_name] = [
+            model_ref
+            for item in values
+            if (model_ref := self._normalize_model_ref(item)) is not None
+        ]
+
+    def get_value(self, instance: typing.Any, field_name: str) -> list[typing.Any]:
+        value = instance.__dict__.get(field_name)
+        if value is None:
+            return []
+        return list(value)
+
+    async def persist_references(self, instance: typing.Any, value: typing.Any) -> None:
+        if not self.is_model_reference or not value:
+            return
+
+        related_name = self.model_ref.__related_name__
+        relation = getattr(instance, related_name)
+        references = value
+        if not isinstance(references, typing.Sequence) or isinstance(
+            references, (str, bytes, bytearray)
+        ):
+            references = [references]
+
+        for reference in references:
+            model_ref = self._normalize_model_ref(reference)
+            if model_ref is None:
+                continue
+            await relation.create(**model_ref.model_dump())
 
 
 class OneToOneField(ForeignKey):

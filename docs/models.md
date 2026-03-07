@@ -36,6 +36,29 @@ class should be declared.
 Although this looks very simple, in fact **Saffier** is doing a lot of work for you behind the
 scenes.
 
+## StrictModel
+
+When you want Saffier to stay Python-native but behave more defensively at runtime, inherit from
+`saffier.StrictModel`.
+
+`StrictModel` keeps the same ORM surface as `Model`, but it adds two rules:
+
+* scalar field assignments are validated immediately;
+* undeclared public attributes are rejected.
+
+```python
+class Product(saffier.StrictModel):
+    id = saffier.IntegerField(primary_key=True, autoincrement=True)
+    name = saffier.CharField(max_length=100)
+    rating = saffier.IntegerField(minimum=1, maximum=5, default=1)
+
+    class Meta:
+        registry = models
+```
+
+Use `Model` when you want the looser Saffier behavior. Use `StrictModel` when you want Edgy-like
+runtime discipline without introducing Pydantic.
+
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 
