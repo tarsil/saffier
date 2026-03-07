@@ -72,6 +72,8 @@ class BaseQuerySet(
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
+        self._cached_select_related_expression = None
+        self._source_queryset = self
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets or False
@@ -319,15 +321,33 @@ class BaseQuerySet(
             only_columns = []
             for field in queryset._only:
                 if isinstance(field, str):
-                    only_columns.append(select_from.columns[field])
+                    if "__" in field:
+                        prefix, column_name = field.rsplit("__", 1)
+                    else:
+                        prefix, column_name = "", field
+                    table = tables_and_models.get(prefix, (None, None))[0]
+                    if table is not None:
+                        column = getattr(table.c, column_name, None)
+                        if column is not None:
+                            only_columns.append(column)
                 else:
                     only_columns.append(field)
             expression = expression.with_only_columns(*only_columns)
 
         if queryset._defer:
-            columns = [
-                column for column in select_from.columns if column.name not in queryset._defer
-            ]
+            deferred_columns = set()
+            for field in queryset._defer:
+                if "__" in field:
+                    prefix, column_name = field.rsplit("__", 1)
+                else:
+                    prefix, column_name = "", field
+                table = tables_and_models.get(prefix, (None, None))[0]
+                if table is None:
+                    continue
+                column = getattr(table.c, column_name, None)
+                if column is not None:
+                    deferred_columns.add(column)
+            columns = [column for column in select_from.columns if column not in deferred_columns]
             expression = expression.with_only_columns(*columns)
 
         if queryset._exclude_secrets:
@@ -376,6 +396,9 @@ class BaseQuerySet(
             expression = expression.with_for_update(**for_update)
 
         queryset._expression = expression  # type: ignore
+        if queryset._select_related:
+            queryset._cached_select_related_expression = expression
+            queryset._source_queryset._cached_select_related_expression = expression
         return expression, tables_and_models
 
     def _build_select(self) -> Any:
@@ -534,6 +557,8 @@ class BaseQuerySet(
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = self._expression
         queryset._cache = self._cache
+        queryset._cached_select_related_expression = self._cached_select_related_expression
+        queryset._source_queryset = getattr(self, "_source_queryset", self)
         queryset._m2m_related = self._m2m_related
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
@@ -990,6 +1015,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = expression.limit(2)
         queryset._set_query_expression(expression)
         rows = await queryset.database.fetch_all(expression)
+        if queryset._select_related:
+            self._cached_select_related_expression = expression
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
 
@@ -1025,6 +1052,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         expression, tables_and_models = queryset._build_select_with_tables()
         queryset._set_query_expression(expression)
+        self._set_query_expression(expression)
+        if queryset._select_related:
+            self._cached_select_related_expression = expression
 
         rows = await queryset.database.fetch_all(expression)
 
@@ -1076,6 +1106,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = expression.limit(2)
         rows = await queryset.database.fetch_all(expression)
         queryset._set_query_expression(expression)
+        if queryset._select_related:
+            self._cached_select_related_expression = expression
 
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
@@ -1109,10 +1141,32 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not queryset._order_by:
             queryset = queryset.order_by(queryset.pkname)
 
-        rows = await queryset.limit(1).all()
-        if rows:
-            return rows[0]
-        return None
+        queryset = queryset.limit(1)
+        expression, tables_and_models = queryset._build_select_with_tables()
+        queryset._set_query_expression(expression)
+        if queryset._select_related:
+            self._cached_select_related_expression = expression
+
+        rows = await queryset.database.fetch_all(expression)
+        if not rows:
+            return None
+
+        result = queryset.model_class.from_query_result(
+            rows[0],
+            select_related=queryset._select_related,
+            is_only_fields=bool(queryset._only),
+            only_fields=queryset._only,
+            is_defer_fields=bool(queryset._defer),
+            prefetch_related=queryset._prefetch_related,
+            using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
+            reference_select=queryset._reference_select,
+            tables_and_models=tables_and_models,
+        )
+        result = queryset._embed_parent_in_result(result)
+        if queryset.is_m2m:
+            return getattr(result, queryset.m2m_related)
+        return result
 
     async def last(self, **kwargs: Any) -> SaffierModel | None:
         """
@@ -1125,10 +1179,32 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not queryset._order_by:
             queryset = queryset.order_by(queryset.pkname)
 
-        rows = await queryset.reverse().limit(1).all()
-        if rows:
-            return rows[0]
-        return None
+        queryset = queryset.reverse().limit(1)
+        expression, tables_and_models = queryset._build_select_with_tables()
+        queryset._set_query_expression(expression)
+        if queryset._select_related:
+            self._cached_select_related_expression = expression
+
+        rows = await queryset.database.fetch_all(expression)
+        if not rows:
+            return None
+
+        result = queryset.model_class.from_query_result(
+            rows[0],
+            select_related=queryset._select_related,
+            is_only_fields=bool(queryset._only),
+            only_fields=queryset._only,
+            is_defer_fields=bool(queryset._defer),
+            prefetch_related=queryset._prefetch_related,
+            using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
+            reference_select=queryset._reference_select,
+            tables_and_models=tables_and_models,
+        )
+        result = queryset._embed_parent_in_result(result)
+        if queryset.is_m2m:
+            return getattr(result, queryset.m2m_related)
+        return result
 
     def _filter_lookup_kwargs(self, payload: dict[str, Any]) -> dict[str, Any]:
         return {

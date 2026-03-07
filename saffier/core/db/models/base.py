@@ -53,9 +53,13 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[str | None] = None
     __proxy_model__: ClassVar[type["Model"] | None] = None
+    __no_load_trigger_attrs__: ClassVar[set[str]] = set()
     __using_schema__: ClassVar[str | None] = None
 
     def __init__(self, *model_refs: Any, **kwargs: Any) -> None:
+        self.__dict__["__no_load_trigger_attrs__"] = set(
+            getattr(self.__class__, "__no_load_trigger_attrs__", set())
+        )
         self.setup_model_fields_from_kwargs(model_refs, kwargs)
 
     @staticmethod

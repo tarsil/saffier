@@ -339,6 +339,10 @@ class MyModel(saffier.Model):
 
 Virtual field whose value is resolved by getter/setter callbacks.
 
+Computed fields are excluded from `model_dump()` by default, matching Edgy's
+runtime serialization behavior. Set `exclude=False` when the computed value
+should be part of serialized model output.
+
 ```python
 import saffier
 
@@ -348,6 +352,7 @@ class Permission(saffier.Model):
     description = saffier.ComputedField(
         getter="get_description",
         setter="set_description",
+        exclude=False,
     )
 
     class Meta:

@@ -48,9 +48,7 @@ class ModelRow(SaffierBaseModel):
         root_model_class = root_model_class or cast("type[Model]", cls)
         model_table = cls.table_schema(using_schema) if using_schema is not None else cls.table
 
-        secret_fields = (
-            [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
-        )
+        secret_fields = cls.meta.secret_fields if exclude_secrets else set()
 
         # Instantiate any child instances first.
         for related in select_related:
@@ -106,6 +104,8 @@ class ModelRow(SaffierBaseModel):
             # and rebuild it with the new fields.
             if related not in secret_fields:
                 related_instance = model_related(**child_item)
+                if exclude_secrets:
+                    related_instance.__no_load_trigger_attrs__.update(model_related.meta.secret_fields)
                 if using_schema is not None:
                     related_instance.table = model_related.table_schema(using_schema)
                 item[related] = related_instance
@@ -119,14 +119,16 @@ class ModelRow(SaffierBaseModel):
             )
 
             for column, value in row._mapping.items():
-                if column in secret_fields:
+                column_name = str(getattr(column, "key", column))
+                if column_name in secret_fields:
                     continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column not in mapping_fields:
+                if column_name not in mapping_fields:
                     continue
-
-                if column not in item:
-                    item[column] = value
+                if column_name not in cls.fields:
+                    continue
+                if column_name not in item:
+                    item[column_name] = value
 
             # We need to generify the model fields to make sure we can populate the
             # model without mandatory fields
@@ -167,6 +169,8 @@ class ModelRow(SaffierBaseModel):
             if not exclude_secrets
             else cast("type[Model]", cls.proxy_model(**item))
         )
+        if exclude_secrets:
+            model.__no_load_trigger_attrs__.update(cls.meta.secret_fields)
 
         cls.__apply_reference_select(
             model=model,

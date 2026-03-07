@@ -72,6 +72,7 @@ class Field:
         self.name = kwargs.pop("name", "")
         self.inherit = kwargs.pop("inherit", True)
         self.no_copy = kwargs.pop("no_copy", False)
+        self.exclude = kwargs.pop("exclude", False)
         self.server_onupdate = kwargs.pop("server_onupdate", None)
         self.autoincrement = kwargs.pop("autoincrement", False)
         self.secret = kwargs.pop("secret", False)
@@ -1053,6 +1054,7 @@ class ExcludeField(Field):
     def __init__(self, **kwargs: typing.Any) -> None:
         kwargs.setdefault("null", True)
         kwargs.setdefault("read_only", True)
+        kwargs.setdefault("exclude", True)
         super().__init__(**kwargs)
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
@@ -1089,6 +1091,7 @@ class ComputedField(Field):
     ) -> None:
         kwargs.setdefault("null", True)
         kwargs.setdefault("read_only", setter is None)
+        kwargs.setdefault("exclude", True)
         super().__init__(**kwargs)
         self.getter = getter
         self.setter = setter

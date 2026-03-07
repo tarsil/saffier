@@ -55,31 +55,101 @@ class Model(ModelRow, DeclarativeMixin):
         seen = set() if _seen is None else _seen
         seen.add(id(self))
 
-        def serialize(value: typing.Any) -> typing.Any:
+        def is_included(
+            field_name: str,
+            include_rule: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None,
+        ) -> bool:
+            if include_rule is None:
+                return True
+            if isinstance(include_rule, dict):
+                return field_name in include_rule and include_rule[field_name] is not False
+            return field_name in include_rule
+
+        def is_excluded(
+            field_name: str,
+            exclude_rule: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None,
+        ) -> bool:
+            if exclude_rule is None:
+                return False
+            if isinstance(exclude_rule, dict):
+                return exclude_rule.get(field_name) is True
+            return field_name in exclude_rule
+
+        def nested_rule(
+            rule: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None,
+            field_name: str,
+        ) -> typing.Any:
+            if not isinstance(rule, dict):
+                return None
+            value = rule.get(field_name)
+            if value in (None, True, False):
+                return None
+            return value
+
+        def serialize(
+            value: typing.Any,
+            *,
+            sub_include: typing.Any = None,
+            sub_exclude: typing.Any = None,
+        ) -> typing.Any:
             if hasattr(value, "model_dump") and callable(value.model_dump):
                 if id(value) in seen:
                     return getattr(value, "pk", None)
                 try:
-                    return value.model_dump(exclude_none=exclude_none, _seen=seen)
+                    return value.model_dump(
+                        include=sub_include,
+                        exclude=sub_exclude,
+                        exclude_none=exclude_none,
+                        _seen=seen,
+                    )
                 except TypeError:
-                    return value.model_dump(exclude_none=exclude_none)
+                    kwargs: dict[str, typing.Any] = {"exclude_none": exclude_none}
+                    if sub_include is not None:
+                        kwargs["include"] = sub_include
+                    if sub_exclude is not None:
+                        kwargs["exclude"] = sub_exclude
+                    return value.model_dump(**kwargs)
 
             if isinstance(value, dict):
-                return {key: serialize(inner_value) for key, inner_value in value.items()}
+                return {
+                    key: serialize(inner_value)
+                    for key, inner_value in value.items()
+                }
 
             if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
                 return [serialize(item) for item in value]
 
             return value
 
-        row_dict = {k: serialize(v) for k, v in self.__dict__.items() if k in self.fields}
+        row_dict: dict[str, typing.Any] = {}
 
-        if include is not None:
-            row_dict = {k: v for k, v in row_dict.items() if k in include}
-        if exclude is not None:
-            row_dict = {k: v for k, v in row_dict.items() if k not in exclude}
-        if exclude_none:
-            row_dict = {k: v for k, v in row_dict.items() if v is not None}
+        for field_name, field in self.fields.items():
+            if isinstance(field, saffier.ManyToManyField):
+                continue
+            if getattr(field, "exclude", False):
+                continue
+            if not is_included(field_name, include) or is_excluded(field_name, exclude):
+                continue
+
+            if field_name in self.__dict__:
+                value = self.__dict__[field_name]
+            elif getattr(field, "is_computed", False):
+                try:
+                    value = getattr(self, field_name)
+                except AttributeError:
+                    continue
+            else:
+                continue
+
+            value = serialize(
+                value,
+                sub_include=nested_rule(include, field_name),
+                sub_exclude=nested_rule(exclude, field_name),
+            )
+            if exclude_none and value is None:
+                continue
+            row_dict[field_name] = value
+
         return row_dict
 
     def model_dump_json(
@@ -260,6 +330,8 @@ class Model(ModelRow, DeclarativeMixin):
                     return getattr(self, settings.many_to_many_relation.format(key=name))
                 if hasattr(field, "get_value"):
                     return field.get_value(self, name)
+                raise AttributeError(name)
+            if name in getattr(self, "__no_load_trigger_attrs__", set()):
                 raise AttributeError(name)
             run_sync(self.load())
             return self.__dict__[name]

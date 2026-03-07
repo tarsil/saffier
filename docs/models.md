@@ -76,6 +76,19 @@ await user.load()
 This keeps schema selection on the pure-Python model side and avoids mutating the registry-wide
 default schema just to run a scoped query.
 
+## Model dumping
+
+`model_dump()` walks the declared Saffier fields instead of blindly serializing
+`__dict__`.
+
+This means:
+
+* field declarations with `exclude=True` are skipped during serialization;
+* many-to-many managers are not leaked into dumps;
+* computed fields only appear by default when you declare them with `exclude=False`;
+* secret-filtered querysets keep masked attributes out of `model_dump()` until you
+  explicitly reload them with `load()` or `load_recursive()`.
+
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 

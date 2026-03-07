@@ -76,6 +76,11 @@ the `secret` declared. This can be specially useful if you don't want to be both
 manipulate all of those details manually and simlpy still using the normal ORM queries without any
 hassle.
 
+When a queryset is running in `exclude_secrets()` mode, Saffier also blocks those
+secret attributes from being loaded implicitly through attribute access or computed
+field serialization. This keeps `model_dump()` aligned with the filtered query
+instead of lazily reintroducing secret data by accident.
+
 #### Other examples
 
 As mentioned before, you can mix the operations with the `exclude_secrets` which means you can do
@@ -108,6 +113,9 @@ await user.load_recursive()
 
 `load_recursive()` is useful when the secret query masked foreign-key relations and you want to
 reload the full related graph before dumping it again.
+
+For a single model instance, `await user.load()` is enough to restore the masked
+scalar fields before serializing again.
 
 Removing the flag has no issue since you can add it back at any given time but the best way it would
 be by simply not calling `exclude_secrets` at all since the flag `secret=True` is only used for that

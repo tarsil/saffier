@@ -53,6 +53,9 @@ class MetaInfo:
         "related_fields",
         "related_names_mapping",
         "signals",
+        "special_getter_fields",
+        "secret_fields",
+        "_needs_special_serialization",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -85,6 +88,31 @@ class MetaInfo:
         self.related_fields: dict[str, Any] = getattr(meta, "related_fields", {})
         self.related_names_mapping: dict[str, Any] = getattr(meta, "related_names_mapping", {})
         self.signals: Broadcaster | None = getattr(meta, "signals", {})  # type: ignore
+        self.special_getter_fields: set[str] = set(
+            getattr(meta, "special_getter_fields", set()) or []
+        )
+        self.secret_fields: set[str] = set(getattr(meta, "secret_fields", set()) or [])
+        self._needs_special_serialization: bool | None = getattr(
+            meta, "_needs_special_serialization", None
+        )
+
+    @property
+    def needs_special_serialization(self) -> bool:
+        if self._needs_special_serialization is None:
+            needs_special_serialization = any(
+                not self.fields[field_name].exclude for field_name in self.special_getter_fields
+            )
+            if not needs_special_serialization:
+                for field_name in self.foreign_key_fields:
+                    field = self.fields[field_name]
+                    if field.exclude:
+                        continue
+                    target = getattr(field, "target", None)
+                    if target is not None and target.meta.needs_special_serialization:
+                        needs_special_serialization = True
+                        break
+            self._needs_special_serialization = needs_special_serialization
+        return self._needs_special_serialization
 
 
 def _is_sqlalchemy_compatibility_enabled(model_class: type) -> bool:
@@ -219,7 +247,7 @@ def _set_related_name_for_foreign_keys(
             )
 
             target_models = [target_model]
-            proxy_target = getattr(target_model, "proxy_model", None)
+            proxy_target = target_model.__dict__.get("__proxy_model__")
             if proxy_target is not None and proxy_target not in target_models:
                 target_models.append(proxy_target)
             for candidate in target_models:
@@ -497,6 +525,15 @@ class BaseModelMeta(type):
         meta.many_to_many_fields = many_to_many_fields
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)
+        meta.special_getter_fields = {
+            field_name
+            for field_name, field in fields.items()
+            if getattr(field, "is_computed", False)
+        }
+        meta.secret_fields = {
+            field_name for field_name, field in fields.items() if getattr(field, "secret", False)
+        }
+        meta._needs_special_serialization = None
 
         if not fields:
             meta.abstract = True
