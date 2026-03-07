@@ -327,6 +327,10 @@ The migration system reads these settings directly:
 * `migration_directory`
 * `alembic_ctx_kwargs`
 * `preloads`
+* `allow_automigrations`
+* `multi_schema`
+* `ignore_schema_pattern`
+* `migrate_databases`
 
 Example:
 
@@ -348,6 +352,13 @@ This affects:
 * `saffier init`
 * generated migration `env.py` templates
 * runtime Alembic context setup
+* `saffier.get_migration_prepared_registry(...)`
+* registry-managed automigration flows
+
+`allow_automigrations` gates `Registry(..., automigrate_config=...)` so applications and test
+harnesses can opt into "migrate on first connect" without hard-coding that behavior. `multi_schema`,
+`ignore_schema_pattern`, and `migrate_databases` keep the generated migration environment aligned
+with the active registry metadata layout, including multi-database projects.
 
 ## Storage and Upload Settings
 
@@ -433,6 +444,10 @@ class Settings(SaffierSettings):
 * `extensions`
 * `migration_directory`
 * `alembic_ctx_kwargs`
+* `allow_automigrations`
+* `multi_schema`
+* `ignore_schema_pattern`
+* `migrate_databases`
 
 ### Files and Storage
 

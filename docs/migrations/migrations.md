@@ -89,6 +89,9 @@ Migration configuration can now be centralized in [Settings](../settings.md):
 * `migration_directory`: default folder used by `init` and migration commands
 * `alembic_ctx_kwargs`: extra Alembic context kwargs injected into generated `env.py`
 * `preloads`: early imports that help discovery and model registration
+* `allow_automigrations`: enable or disable registry-managed automatic upgrades on first connect
+* `multi_schema`, `ignore_schema_pattern`, and `migrate_databases`: keep generated migration
+  metadata aligned with the active registry layout
 
 Example:
 
@@ -105,6 +108,43 @@ class Settings(SaffierSettings):
         "include_schemas": True,
     }
 ```
+
+### Preparing registry metadata
+
+Migration commands now work from the active `Instance`, and the public helper
+`get_migration_prepared_registry()` uses the current settings to refresh the registry metadata
+before Alembic inspection.
+
+```python
+import copy
+
+import saffier
+
+
+prepared_registry = saffier.get_migration_prepared_registry()
+copied_registry = saffier.get_migration_prepared_registry(copy.copy(prepared_registry))
+```
+
+That copy step is useful when a migration workflow needs an isolated registry view. Saffier keeps
+per-database metadata mappings intact and rewires copied many-to-many through models to the copied
+registry instead of leaving them attached to the original one.
+
+### Automigration on connect
+
+Saffier also supports the current Edgy-style "migrate once on first connect" flow for managed
+runtimes:
+
+```python
+from saffier import Registry
+from myproject.configs.settings import Settings
+
+
+registry = Registry(database=database, automigrate_config=Settings)
+```
+
+When `allow_automigrations` is enabled in the active settings, the registry runs the standard
+`upgrade()` flow once before finishing its first async context-manager connect. If you do not want
+that behavior in a given environment, set `allow_automigrations = False`.
 
 ### How to use it
 
