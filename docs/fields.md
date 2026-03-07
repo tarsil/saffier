@@ -531,9 +531,10 @@ class MyModel(saffier.Model):
 * **through** - The model to be used for the relationship. Saffier generates the model by default
 if none is provided.
 * **through_tablename** - Controls the table name used for the auto-generated through model.
-  Pass `saffier.OLD_M2M_NAMING` to keep the legacy naming scheme,
-  `saffier.NEW_M2M_NAMING` for the Edgy-style field-based naming scheme,
-  or a non-empty string. String values support `str.format(field=...)`.
+  Saffier uses the field-based naming scheme by default, which is the same
+  behavior as `saffier.NEW_M2M_NAMING`. You can still pass
+  `saffier.NEW_M2M_NAMING` explicitly or provide a non-empty string.
+  String values support `str.format(field=...)`.
 
 !!! Note
     Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.
@@ -541,12 +542,9 @@ if none is provided.
     `id` as the primary key.
 
 !!! Warning
-    For backward compatibility, Saffier keeps the legacy through-table naming when
-    `through_tablename` is omitted. Use `saffier.NEW_M2M_NAMING` or an explicit
-    table name for Edgy-compatible naming and migration-safe new relationships.
-    `saffier.OLD_M2M_NAMING` is not suitable when the same model points to the
-    same target model more than once, because those relations would share the
-    legacy through-table name.
+    Saffier intentionally does not support Edgy's legacy `OLD_M2M_NAMING`
+    marker. Auto-generated through models always use the field-based naming
+    path unless you provide an explicit table name yourself.
 
 !!! Tip
     String values for `through_tablename` are formatted with `field=self` before

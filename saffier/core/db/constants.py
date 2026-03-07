@@ -8,7 +8,7 @@ PROTECT = "PROTECT"
 
 class OLD_M2M_NAMING:
     """
-    Marker for the legacy through-table naming convention.
+    Compatibility marker kept only so Saffier can raise a clear error.
     """
 
 
@@ -31,7 +31,6 @@ __all__ = [
     "SET_NULL",
     "SET_DEFAULT",
     "PROTECT",
-    "OLD_M2M_NAMING",
     "NEW_M2M_NAMING",
     "ConditionalRedirect",
 ]

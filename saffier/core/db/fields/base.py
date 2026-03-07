@@ -534,16 +534,19 @@ class ManyToManyField(Field):
         self,
         to: type["Model"] | str,
         through: type["Model"] | None = None,
-        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] | None = None,
+        through_tablename: str | type[NEW_M2M_NAMING] | None = NEW_M2M_NAMING,
         **kwargs: typing.Any,
     ):
+        if through_tablename is OLD_M2M_NAMING:
+            raise FieldDefinitionError(
+                '"through_tablename" no longer supports OLD_M2M_NAMING in Saffier. '
+                "Use NEW_M2M_NAMING or a non-empty string."
+            )
         if through_tablename is not None and (
-            not isinstance(through_tablename, str)
-            and through_tablename is not OLD_M2M_NAMING
-            and through_tablename is not NEW_M2M_NAMING
+            not isinstance(through_tablename, str) and through_tablename is not NEW_M2M_NAMING
         ):
             raise FieldDefinitionError(
-                '"through_tablename" must be OLD_M2M_NAMING, NEW_M2M_NAMING, or a non-empty string.'
+                '"through_tablename" must be NEW_M2M_NAMING or a non-empty string.'
             )
         if isinstance(through_tablename, str) and not through_tablename.strip():
             raise FieldDefinitionError('"through_tablename" cannot be an empty string.')
@@ -661,12 +664,10 @@ class ManyToManyField(Field):
         owner_name = self.owner.__name__
         to_name = self.to.__name__
         class_name = f"{owner_name}{self.name.capitalize()}Through"
-        if self.through_tablename is NEW_M2M_NAMING:
+        if self.through_tablename is None or self.through_tablename is NEW_M2M_NAMING:
             tablename = class_name.lower()
-        elif isinstance(self.through_tablename, str) and self.through_tablename:
-            tablename = self.through_tablename.format(field=self).lower()
         else:
-            tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+            tablename = self.through_tablename.format(field=self).lower()
         if self.owner.meta.table_prefix:
             tablename = f"{self.owner.meta.table_prefix}_{tablename}"
 

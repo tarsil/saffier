@@ -1,6 +1,7 @@
 import pytest
 
 import saffier
+from saffier.core.db.constants import OLD_M2M_NAMING
 
 database = saffier.Database("sqlite+aiosqlite:///m2m_naming.db")
 models = saffier.Registry(database=database)
@@ -23,20 +24,7 @@ class Album(BasePrefixed):
 
 
 class User(BasePrefixed):
-    albums = saffier.ManyToMany(
-        Album,
-        through_tablename=saffier.NEW_M2M_NAMING,
-    )
-
-    class Meta:
-        registry = models
-
-
-class LegacyAlbum(BasePrefixed):
-    legacy_users = saffier.ManyToMany(
-        User,
-        through_tablename=saffier.OLD_M2M_NAMING,
-    )
+    albums = saffier.ManyToMany(Album)
 
     class Meta:
         registry = models
@@ -63,13 +51,14 @@ class Project(BasePrefixed):
         registry = models
 
 
-def test_explicit_new_m2m_naming_uses_field_based_through_table() -> None:
+def test_default_m2m_naming_uses_field_based_through_table() -> None:
     assert User.meta.fields["albums"].through.meta.tablename == "m2m_useralbumsthrough"
 
 
-def test_explicit_old_m2m_naming_uses_legacy_through_table() -> None:
+def test_explicit_new_m2m_naming_uses_field_based_through_table() -> None:
     assert (
-        LegacyAlbum.meta.fields["legacy_users"].through.meta.tablename == "m2m_legacyalbums_users"
+        Project.meta.fields["primarytags"].through.meta.tablename
+        == "m2m_projectprimarytagsthrough"
     )
 
 
@@ -105,6 +94,26 @@ def test_string_through_tablename_supports_field_formatting() -> None:
             registry = test_registry
 
     assert Member.meta.fields["teams"].through.meta.tablename == "custom_member_teams"
+
+
+def test_old_m2m_naming_is_rejected() -> None:
+    test_registry = saffier.Registry(
+        database=saffier.Database("sqlite+aiosqlite:///m2m_naming_old.db")
+    )
+
+    with pytest.raises(saffier.FieldDefinitionError, match="OLD_M2M_NAMING"):
+
+        class Team(saffier.StrictModel):
+            name = saffier.CharField(max_length=100)
+
+            class Meta:
+                registry = test_registry
+
+        class Member(saffier.StrictModel):
+            teams = saffier.ManyToMany(Team, through_tablename=OLD_M2M_NAMING)
+
+            class Meta:
+                registry = test_registry
 
 
 def test_invalid_through_tablename_is_rejected() -> None:
