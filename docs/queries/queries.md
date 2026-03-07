@@ -195,13 +195,30 @@ async for user in User.query.order_by("id").batch_size(100):
 
 ### Extra and reference selects
 
-You can extend the selected columns with SQLAlchemy expressions:
+`extra_select()` adds SQLAlchemy expressions to the `SELECT` list.
+`reference_select()` maps already-selected values back onto model attributes, including nested
+related objects.
 
 ```python
 import sqlalchemy
 
 queryset = User.query.extra_select(sqlalchemy.literal(1).label("marker"))
-queryset = queryset.reference_select({"score": sqlalchemy.literal(100)})
+queryset = queryset.reference_select({"score": "marker"})
+```
+
+Reference paths can target related models:
+
+```python
+queryset = Profile.query.select_related("user").reference_select(
+    {"user": {"profile_name": "name"}, "user_name": "user__name"}
+)
+```
+
+If you need the raw SQLAlchemy statement for subqueries or aggregates, use `as_select()`:
+
+```python
+user_select = await User.query.filter(is_active=True).as_select()
+total = sqlalchemy.func.count().select().select_from(user_select.subquery())
 ```
 
 ### Order by

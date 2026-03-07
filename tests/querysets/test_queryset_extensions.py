@@ -59,7 +59,14 @@ def test_reference_select_tracks_named_expression():
     expression = queryset._build_select()
 
     assert "marker" in queryset._reference_select
-    assert "marker" in str(expression)
+    assert "marker" not in str(expression)
+
+
+@pytest.mark.anyio
+async def test_as_select_returns_select_expression():
+    expression = await User.query.filter(name="Alice").as_select()
+
+    assert isinstance(expression, sqlalchemy.sql.Select)
 
 
 def test_select_for_update_builds_locking_clause():

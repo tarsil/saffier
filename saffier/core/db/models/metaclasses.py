@@ -215,6 +215,7 @@ def _set_related_name_for_foreign_keys(
                 related_name=default_related_name,
                 related_to=target_model,
                 related_from=model_class,
+                embed_parent=getattr(foreign_key, "embed_parent", None),
             )
 
             target_models = [target_model]
@@ -469,6 +470,7 @@ class BaseModelMeta(type):
 
                 if isinstance(value, saffier_fields.OneToOneField):
                     one_to_one_fields.add(value)
+                    foreign_key_fields[key] = value
                     continue
                 elif isinstance(value, saffier_fields.ManyToManyField):
                     many_to_many_fields.add(value)

@@ -55,6 +55,7 @@ class BaseQuerySet(
         batch_size: int | None = None,
         extra_select: Any = None,
         reference_select: Any = None,
+        embed_parent: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("type[Model]", model_class)
@@ -79,6 +80,8 @@ class BaseQuerySet(
         self._batch_size = batch_size
         self._extra_select = [] if extra_select is None else extra_select
         self._reference_select = {} if reference_select is None else reference_select
+        self.embed_parent = embed_parent
+        self.embed_parent_filters = None
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
@@ -168,6 +171,7 @@ class BaseQuerySet(
 
         tables = [queryset.table]
         select_from = queryset.table
+        tables_and_models: dict[str, tuple[Any, Any]] = {"": (queryset.table, queryset.model_class)}
 
         select_related = list(dict.fromkeys(queryset._select_related))
         # When a deeper path exists (e.g. `members__users`), joining its prefix
@@ -182,12 +186,14 @@ class BaseQuerySet(
         for item in select_related:
             # For m2m relationships
             model_class = queryset.model_class
+            current_table = queryset.table
+            prefix = ""
 
             for part in item.split("__"):
                 has_many_fk_same_table = False
                 keys: list[tuple[str, str, str]] = []
                 previous_model_class = model_class
-                previous_table = tables[-1]
+                previous_table = current_table
                 join_lookup_field: str | None = None
                 reverse_join = False
                 try:
@@ -245,9 +251,9 @@ class BaseQuerySet(
                     if lookup_field is None:
                         select_from = sqlalchemy.sql.join(select_from, table)
                     else:
-                        left_column = getattr(select_from.c, queryset.pkname, None)
+                        left_column = getattr(previous_table.c, previous_model_class.pkname, None)
                         if left_column is None:
-                            primary_keys = list(select_from.primary_key)
+                            primary_keys = list(previous_table.primary_key)
                             left_column = primary_keys[0] if primary_keys else None
 
                         if left_column is None:
@@ -264,8 +270,11 @@ class BaseQuerySet(
                             left_column == getattr(table.c, lookup_field),
                         )
 
+                prefix = part if not prefix else f"{prefix}__{part}"
+                tables_and_models[prefix] = (table, model_class)
+                current_table = table
                 tables.append(table)
-        return tables, select_from
+        return tables, select_from, tables_and_models
 
     def _validate_only_and_defer(self) -> None:
         if self._only and self._defer:
@@ -295,22 +304,15 @@ class BaseQuerySet(
         columns = list(set(columns))
         return columns
 
-    def _build_select(self) -> Any:
+    def _build_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]:
         """
         Builds the query select based on the given parameters and filters.
         """
         queryset: QuerySet = self._clone()
 
         queryset._validate_only_and_defer()
-        tables, select_from = queryset._build_tables_select_from_relationship()
-        reference_select = []
-        for key, value in queryset._reference_select.items():
-            if hasattr(value, "label"):
-                reference_select.append(value.label(key))
-            else:
-                reference_select.append(value)
-
-        expression = sqlalchemy.sql.select(*tables, *queryset._extra_select, *reference_select)
+        tables, select_from, tables_and_models = queryset._build_tables_select_from_relationship()
+        expression = sqlalchemy.sql.select(*tables, *queryset._extra_select)
         expression = expression.select_from(select_from)
 
         if queryset._only:
@@ -374,7 +376,10 @@ class BaseQuerySet(
             expression = expression.with_for_update(**for_update)
 
         queryset._expression = expression  # type: ignore
-        return expression
+        return expression, tables_and_models
+
+    def _build_select(self) -> Any:
+        return self._build_select_with_tables()[0]
 
     def _filter_query(self, exclude: bool = False, or_: bool = False, **kwargs: Any) -> "QuerySet":
         clauses: list[Any] = []
@@ -433,6 +438,7 @@ class BaseQuerySet(
                 batch_size=self._batch_size,
                 extra_select=self._extra_select,
                 reference_select=self._reference_select,
+                embed_parent=self.embed_parent,
             ),
         )
 
@@ -545,6 +551,8 @@ class BaseQuerySet(
         queryset._batch_size = self._batch_size
         queryset._extra_select = copy.copy(self._extra_select)
         queryset._reference_select = copy.copy(self._reference_select)
+        queryset.embed_parent = self.embed_parent
+        queryset.embed_parent_filters = self.embed_parent_filters
 
         return queryset
 
@@ -978,20 +986,30 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Fetch one object matching the parameters or returns None.
         """
         queryset: QuerySet = self.filter(**kwargs)
-        expression = queryset._build_select().limit(2)
+        expression, tables_and_models = queryset._build_select_with_tables()
+        expression = expression.limit(2)
         queryset._set_query_expression(expression)
         rows = await queryset.database.fetch_all(expression)
+        is_only_fields = bool(queryset._only)
+        is_defer_fields = bool(queryset._defer)
 
         if not rows:
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return queryset.model_class.from_query_result(
+        result = queryset.model_class.from_query_result(
             rows[0],
             select_related=queryset._select_related,
+            is_only_fields=is_only_fields,
+            only_fields=queryset._only,
+            is_defer_fields=is_defer_fields,
+            prefetch_related=queryset._prefetch_related,
             using_schema=queryset.using_schema,
             exclude_secrets=queryset._exclude_secrets,
+            reference_select=queryset._reference_select,
+            tables_and_models=tables_and_models,
         )
+        return queryset._embed_parent_in_result(result)
 
     async def _all(self, **kwargs: Any) -> list[SaffierModel]:
         """
@@ -1005,7 +1023,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if kwargs:
             return await queryset.filter(**kwargs).all()
 
-        expression = queryset._build_select()
+        expression, tables_and_models = queryset._build_select_with_tables()
         queryset._set_query_expression(expression)
 
         rows = await queryset.database.fetch_all(expression)
@@ -1026,12 +1044,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 is_defer_fields=is_defer_fields,
                 using_schema=queryset.using_schema,
                 exclude_secrets=queryset._exclude_secrets,
+                reference_select=queryset._reference_select,
+                tables_and_models=tables_and_models,
             )
             for row in rows
         ]
 
         if not queryset.is_m2m:
-            return results
+            return [queryset._embed_parent_in_result(result) for result in results]
 
         return [getattr(result, queryset.m2m_related) for result in results]
 
@@ -1052,7 +1072,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if kwargs:
             return await queryset.filter(**kwargs).get()
 
-        expression = queryset._build_select().limit(2)
+        expression, tables_and_models = queryset._build_select_with_tables()
+        expression = expression.limit(2)
         rows = await queryset.database.fetch_all(expression)
         queryset._set_query_expression(expression)
 
@@ -1063,7 +1084,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return queryset.model_class.from_query_result(
+        result = queryset.model_class.from_query_result(
             rows[0],
             select_related=queryset._select_related,
             is_only_fields=is_only_fields,
@@ -1072,7 +1093,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             prefetch_related=queryset._prefetch_related,
             using_schema=queryset.using_schema,
             exclude_secrets=queryset._exclude_secrets,
+            reference_select=queryset._reference_select,
+            tables_and_models=tables_and_models,
         )
+        return queryset._embed_parent_in_result(result)
 
     async def first(self, **kwargs: Any) -> SaffierModel | None:
         """
@@ -1525,6 +1549,34 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
+    def _embed_parent_in_result(self, result: SaffierModel) -> SaffierModel:
+        """
+        Returns the embedded parent target when the queryset was created from a relation.
+        """
+        if not self.embed_parent:
+            return result
+
+        new_result: Any = result
+        for part in self.embed_parent[0].split("__"):
+            new_result = getattr(new_result, part)
+
+        if self.embed_parent[1]:
+            setattr(new_result, self.embed_parent[1], result)
+        return cast("SaffierModel", new_result)
+
+    async def as_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]:
+        """
+        Returns the SQLAlchemy select expression together with the table mapping.
+        """
+        queryset: QuerySet = self._clone()
+        return queryset._build_select_with_tables()
+
+    async def as_select(self) -> Any:
+        """
+        Returns the SQLAlchemy select expression for the queryset.
+        """
+        return (await self.as_select_with_tables())[0]
+
     async def _execute(self) -> Any:
         queryset: QuerySet = self._clone()
         records = await queryset._all(**queryset.extra)
@@ -1539,7 +1591,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if queryset.extra:
             queryset = queryset.filter(**queryset.extra)
 
-        expression = queryset._build_select()
+        expression, tables_and_models = queryset._build_select_with_tables()
         queryset._set_query_expression(expression)
 
         is_only_fields = bool(queryset._only)
@@ -1556,10 +1608,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 is_defer_fields=is_defer_fields,
                 using_schema=queryset.using_schema,
                 exclude_secrets=queryset._exclude_secrets,
+                reference_select=queryset._reference_select,
+                tables_and_models=tables_and_models,
             )
 
             if not queryset.is_m2m:
-                yield result
+                yield queryset._embed_parent_in_result(result)
             else:
                 yield getattr(result, queryset.m2m_related)
 
@@ -1601,7 +1655,7 @@ class CombinedQuerySet(QuerySet):
         queryset._op = self._op
         return queryset
 
-    def _build_select(self) -> Any:
+    def _build_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]:
         queryset = self._clone()
 
         if queryset.filter_clauses or queryset.or_clauses:
@@ -1645,6 +1699,7 @@ class CombinedQuerySet(QuerySet):
 
         subquery = combined_expression.subquery("saffier_combined")
         expression = sqlalchemy.select(subquery)
+        tables_and_models = {"": (subquery, queryset.model_class)}
 
         if queryset._order_by:
             ordering = []
@@ -1688,4 +1743,7 @@ class CombinedQuerySet(QuerySet):
             expression = expression.offset(queryset._offset)
 
         queryset._expression = expression  # type: ignore
-        return expression
+        return expression, tables_and_models
+
+    def _build_select(self) -> Any:
+        return self._build_select_with_tables()[0]

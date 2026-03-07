@@ -19,11 +19,13 @@ class RelatedField:
         related_to: type["Model"] | type["ReflectModel"],
         related_from: type["Model"] | type["ReflectModel"] | None = None,
         instance: type["Model"] | type["ReflectModel"] | None = None,
+        embed_parent: tuple[str, str] | None = None,
     ) -> None:
         self.related_name = related_name
         self.related_to = related_to
         self.related_from = related_from
         self.instance = instance
+        self.embed_parent = embed_parent
 
     @functools.cached_property
     def manager(self) -> "Manager":
@@ -37,6 +39,12 @@ class RelatedField:
     def scoped_queryset(self) -> "QuerySet":
         field = self.get_foreign_key_field_name()
         queryset = cast("QuerySet", self.queryset.filter(**{field: self.instance.pk}))  # type: ignore[arg-type]
+        queryset.embed_parent = self.embed_parent
+
+        if self.embed_parent:
+            embed_parent_field = self.embed_parent[0].split("__", 1)[0]
+            if embed_parent_field not in queryset._select_related:
+                queryset._select_related.append(embed_parent_field)
 
         related = self.m2m_related()
         if related:
@@ -64,6 +72,7 @@ class RelatedField:
             related_to=self.related_to,
             instance=instance,
             related_from=self.related_from,
+            embed_parent=self.embed_parent,
         )
 
     def __getattr__(self, item: Any) -> Any:

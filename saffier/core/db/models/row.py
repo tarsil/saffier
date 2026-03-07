@@ -23,6 +23,9 @@ class ModelRow(SaffierBaseModel):
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
         using_schema: str | None = None,
+        reference_select: dict[str, Any] | None = None,
+        tables_and_models: dict[str, tuple[Any, Any]] | None = None,
+        root_model_class: type["Model"] | None = None,
     ) -> type["Model"] | None:
         """
         Class method to convert a SQLAlchemy Row result into a SaffierModel row type.
@@ -41,6 +44,8 @@ class ModelRow(SaffierBaseModel):
         item: dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
+        reference_select = reference_select or {}
+        root_model_class = root_model_class or cast("type[Model]", cls)
         model_table = cls.table_schema(using_schema) if using_schema is not None else cls.table
 
         secret_fields = (
@@ -61,6 +66,8 @@ class ModelRow(SaffierBaseModel):
                     select_related=[remainder],
                     using_schema=using_schema,
                     exclude_secrets=exclude_secrets,
+                    tables_and_models=tables_and_models,
+                    root_model_class=root_model_class,
                 )
             else:
                 try:
@@ -68,7 +75,11 @@ class ModelRow(SaffierBaseModel):
                 except (KeyError, AttributeError):
                     model_cls = getattr(cls, related).related_from
                 item[related] = model_cls.from_query_result(
-                    row, using_schema=using_schema, exclude_secrets=exclude_secrets
+                    row,
+                    using_schema=using_schema,
+                    exclude_secrets=exclude_secrets,
+                    tables_and_models=tables_and_models,
+                    root_model_class=root_model_class,
                 )
 
         # Populate the related names
@@ -121,6 +132,15 @@ class ModelRow(SaffierBaseModel):
             # model without mandatory fields
             model = cast("type[Model]", cls.proxy_model(**item))
 
+            cls.__apply_reference_select(
+                model=model,
+                row=row,
+                references=reference_select,
+                tables_and_models=tables_and_models,
+                root_model_class=root_model_class,
+                using_schema=using_schema,
+            )
+
             # Apply the schema to the model
             model = cls.__apply_schema(model, using_schema)
 
@@ -148,6 +168,15 @@ class ModelRow(SaffierBaseModel):
             else cast("type[Model]", cls.proxy_model(**item))
         )
 
+        cls.__apply_reference_select(
+            model=model,
+            row=row,
+            references=reference_select,
+            tables_and_models=tables_and_models,
+            root_model_class=root_model_class,
+            using_schema=using_schema,
+        )
+
         # Apply the schema to the model
         model = cls.__apply_schema(model, using_schema)
 
@@ -159,6 +188,109 @@ class ModelRow(SaffierBaseModel):
         if using_schema is not None:
             model.table = model.build(using_schema)  # type: ignore
         return model
+
+    @classmethod
+    def __apply_reference_select(
+        cls,
+        model: type["Model"] | None,
+        row: Row,
+        references: dict[str, Any],
+        tables_and_models: dict[str, tuple[Any, Any]] | None,
+        root_model_class: type["Model"],
+        using_schema: str | None = None,
+    ) -> None:
+        if model is None:
+            return
+
+        for target, source in references.items():
+            if isinstance(source, dict):
+                child = getattr(model, target, None)
+                if child is not None:
+                    cls.__apply_reference_select(
+                        model=child,
+                        row=row,
+                        references=source,
+                        tables_and_models=tables_and_models,
+                        root_model_class=root_model_class,
+                        using_schema=using_schema,
+                    )
+                continue
+
+            if source is None:
+                continue
+
+            value = cls.__resolve_reference_source(
+                row=row,
+                source=source,
+                tables_and_models=tables_and_models,
+                root_model_class=root_model_class,
+                using_schema=using_schema,
+            )
+            setattr(model, target, value)
+
+    @classmethod
+    def __resolve_reference_source(
+        cls,
+        row: Row,
+        source: Any,
+        tables_and_models: dict[str, tuple[Any, Any]] | None,
+        root_model_class: type["Model"],
+        using_schema: str | None = None,
+    ) -> Any:
+        if source in row._mapping:
+            return row._mapping[source]
+
+        source_key = getattr(source, "key", None) or getattr(source, "name", None)
+        if source_key is not None and source_key in row._mapping:
+            return row._mapping[source_key]
+
+        if isinstance(source, str):
+            column = cls.__resolve_reference_column(
+                source=source,
+                tables_and_models=tables_and_models,
+                root_model_class=root_model_class,
+                using_schema=using_schema,
+            )
+            if column is not None:
+                if column in row._mapping:
+                    return row._mapping[column]
+                if column.key in row._mapping:
+                    return row._mapping[column.key]
+            if source in row._mapping:
+                return row._mapping[source]
+            if hasattr(row, source):
+                return getattr(row, source)
+
+        raise QuerySetError(
+            detail=f"Unable to resolve reference_select source '{source}' for {cls.__name__}."
+        )
+
+    @classmethod
+    def __resolve_reference_column(
+        cls,
+        source: str,
+        tables_and_models: dict[str, tuple[Any, Any]] | None,
+        root_model_class: type["Model"],
+        using_schema: str | None = None,
+    ) -> Any | None:
+        table = None
+        column_name = source
+
+        if "__" in source:
+            prefix, column_name = source.rsplit("__", 1)
+            if tables_and_models is not None:
+                table = tables_and_models.get(prefix, (None, None))[0]
+        elif tables_and_models is not None:
+            table = tables_and_models.get("", (None, None))[0]
+
+        if table is None:
+            table = (
+                root_model_class.table_schema(using_schema)
+                if using_schema is not None
+                else root_model_class.table
+            )
+
+        return getattr(table.c, column_name, None)
 
     @classmethod
     def __apply_schema(cls, model: type["Model"], schema: str | None = None) -> type["Model"]:

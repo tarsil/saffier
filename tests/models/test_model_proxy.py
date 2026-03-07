@@ -71,3 +71,12 @@ async def test_model_fields_are_different():
 
     assert user.proxy_model.fields["name"].annotation == Any
     assert User.proxy_model.fields["name"].annotation == Any
+
+
+async def test_get_real_class_returns_parent_for_proxy_models():
+    user: User = await User.query.create(name="Jane", language="EN", description="Jane")
+
+    assert User.get_real_class() is User
+    assert User.proxy_model.get_real_class() is User
+    assert user.get_real_class() is User
+    assert user.proxy_model.get_real_class() is User

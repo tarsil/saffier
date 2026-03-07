@@ -183,6 +183,12 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     def signals(self) -> "Broadcaster":
         return self.__class__.signals  # type: ignore
 
+    @classmethod
+    def get_real_class(cls) -> type["Model"]:
+        if getattr(cls, "is_proxy_model", False):
+            return cast("type[Model]", getattr(cls, "parent"))
+        return cast("type[Model]", cls)
+
     @functools.cached_property
     def identifying_db_fields(self) -> Sequence[str]:
         """
@@ -595,11 +601,10 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
         """
-        related_names = self.meta.related_names
         return {
             k: v
             for k, v in self.__dict__.items()
-            if k not in related_names and k in self.fields and self.fields[k].has_column()
+            if k in self.fields and self.fields[k].has_column()
         }
 
     def __setattr__(self, key: Any, value: Any) -> Any:

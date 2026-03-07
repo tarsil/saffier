@@ -456,6 +456,7 @@ class ForeignKey(Field):
         on_delete: str = RESTRICT,
         on_update: str = CASCADE,
         related_name: str | None = None,
+        embed_parent: tuple[str, str] | None = None,
         no_constraint: bool = False,
         **kwargs: Any,
     ):
@@ -481,7 +482,13 @@ class ForeignKey(Field):
         self.on_delete = on_delete
         self.on_update = on_update or CASCADE
         self.related_name = related_name
+        self.embed_parent = embed_parent
         self.no_constraint = no_constraint
+
+        if embed_parent and "__" in embed_parent[1]:
+            raise FieldDefinitionError(
+                '"embed_parent" second argument (for embedding parent) cannot contain "__".'
+            )
 
     @property
     def target(self) -> typing.Any:

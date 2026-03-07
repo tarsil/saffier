@@ -41,6 +41,10 @@ class QuerySetProtocol(Protocol):
 
     def reference_select(self, references: dict[str, Any]) -> "QuerySet": ...
 
+    async def as_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]: ...
+
+    async def as_select(self) -> Any: ...
+
     def paginator(
         self,
         page_size: int,
