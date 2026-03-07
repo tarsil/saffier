@@ -162,6 +162,79 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     def signals(self) -> "Broadcaster":
         return self.__class__.signals  # type: ignore
 
+    @functools.cached_property
+    def identifying_db_fields(self) -> Sequence[str]:
+        """
+        Returns the database columns that uniquely identify the current instance.
+
+        Saffier currently uses the model primary key columns for this.
+        """
+        pkcolumns = getattr(self.__class__, "pkcolumns", ())
+        return tuple(pkcolumns) or (self.pkname,)
+
+    @property
+    def can_load(self) -> bool:
+        """
+        Indicates whether this instance has enough identifying data to be reloaded.
+        """
+        return bool(
+            self.meta.registry
+            and not self.meta.abstract
+            and all(
+                getattr(self, field_name, None) is not None
+                for field_name in self.identifying_db_fields
+            )
+        )
+
+    def create_model_key(self) -> tuple[Any, ...]:
+        """
+        Creates a stable key for recursion guards while walking model graphs.
+        """
+        return (
+            self.__class__,
+            *(getattr(self, field_name, None) for field_name in self.identifying_db_fields),
+        )
+
+    def _has_loaded_db_fields(self) -> bool:
+        return all(
+            field_name in self.__dict__
+            for field_name, field in self.fields.items()
+            if field.has_column()
+        )
+
+    async def load_recursive(
+        self,
+        only_needed: bool = False,
+        only_needed_nest: bool = False,
+        _seen: set[tuple[Any, ...]] | None = None,
+    ) -> None:
+        """
+        Recursively loads this instance and its foreign-key relations.
+        """
+        model_key = self.create_model_key()
+        if _seen is None:
+            _seen = {model_key}
+        elif model_key in _seen:
+            return
+        else:
+            _seen.add(model_key)
+
+        was_loaded = self._has_loaded_db_fields()
+        if self.can_load:
+            await self.load(only_needed=only_needed)
+
+        if only_needed_nest and was_loaded:
+            return
+
+        for field_name in self.meta.foreign_key_fields:
+            value = getattr(self, field_name, None)
+            if value is not None and hasattr(value, "load_recursive"):
+                await value.load_recursive(
+                    only_needed=only_needed,
+                    only_needed_nest=True,
+                    _seen=_seen,
+                )
+
     def get_instance_name(self) -> str:
         """
         Returns the name of the class in lowercase.

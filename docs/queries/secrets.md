@@ -85,6 +85,7 @@ things like this.
 users = await User.query.filter(id=1).exclude_secrets()
 users = await User.query.filter(id=1).exclude_secrets().get() # returns only 1 object
 users = await User.query.exclude_secrets().only("email")
+users = await User.query.exclude_secrets().exclude_secrets(False).get(id=1)
 ```
 
 And the list goes on and on.
@@ -97,6 +98,16 @@ There are different ways of making this happen.
 
 One of the ways is by **not using the exclude_secrets** queryset and the other is by removing the
 flag `secret` from the field.
+
+If you already have a queryset chain that enables secret filtering, you can turn it back off with:
+
+```python
+user = await User.query.exclude_secrets().exclude_secrets(False).get(id=1)
+await user.load_recursive()
+```
+
+`load_recursive()` is useful when the secret query masked foreign-key relations and you want to
+reload the full related graph before dumping it again.
 
 Removing the flag has no issue since you can add it back at any given time but the best way it would
 be by simply not calling `exclude_secrets` at all since the flag `secret=True` is only used for that

@@ -675,6 +675,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def exclude_secrets(
         self,
+        enabled: bool = True,
         clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
@@ -682,7 +683,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Excludes any field that contains the `secret=True` declared from being leaked.
         """
         queryset: QuerySet = self._clone()
-        queryset._exclude_secrets = True
+        queryset._exclude_secrets = enabled
         queryset = queryset.filter(clause=clause, **kwargs)
         return queryset
 

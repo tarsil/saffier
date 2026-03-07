@@ -1,6 +1,8 @@
 import typing
+from collections.abc import Sequence
 from typing import Any, cast
 
+import orjson
 import sqlalchemy
 from sqlalchemy.engine.result import Row
 
@@ -45,11 +47,32 @@ class Model(ModelRow, DeclarativeMixin):
         include: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
         exclude: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
         exclude_none: bool = False,
+        _seen: set[int] | None = None,
     ) -> dict[str, typing.Any]:
         """
         Dumps the model in a dict format.
         """
-        row_dict = {k: v for k, v in self.__dict__.items() if k in self.fields}
+        seen = set() if _seen is None else _seen
+        seen.add(id(self))
+
+        def serialize(value: typing.Any) -> typing.Any:
+            if hasattr(value, "model_dump") and callable(value.model_dump):
+                if id(value) in seen:
+                    return getattr(value, "pk", None)
+                try:
+                    return value.model_dump(exclude_none=exclude_none, _seen=seen)
+                except TypeError:
+                    return value.model_dump(exclude_none=exclude_none)
+
+            if isinstance(value, dict):
+                return {key: serialize(inner_value) for key, inner_value in value.items()}
+
+            if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+                return [serialize(item) for item in value]
+
+            return value
+
+        row_dict = {k: serialize(v) for k, v in self.__dict__.items() if k in self.fields}
 
         if include is not None:
             row_dict = {k: v for k, v in row_dict.items() if k in include}
@@ -58,6 +81,20 @@ class Model(ModelRow, DeclarativeMixin):
         if exclude_none:
             row_dict = {k: v for k, v in row_dict.items() if v is not None}
         return row_dict
+
+    def model_dump_json(
+        self,
+        include: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
+        exclude: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
+        exclude_none: bool = False,
+    ) -> str:
+        """
+        Dumps the model into a JSON string.
+        """
+        return orjson.dumps(
+            self.model_dump(include=include, exclude=exclude, exclude_none=exclude_none),
+            option=orjson.OPT_NON_STR_KEYS,
+        ).decode("utf-8")
 
     async def update(self, **kwargs: typing.Any) -> typing.Any:
         """
@@ -104,7 +141,10 @@ class Model(ModelRow, DeclarativeMixin):
         )
         return row_count
 
-    async def load(self) -> None:
+    async def load(self, only_needed: bool = False) -> None:
+        if only_needed and self._has_loaded_db_fields():
+            return
+
         # Build the select expression.
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.select().where(pk_column == self.pk)
