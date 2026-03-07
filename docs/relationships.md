@@ -49,6 +49,29 @@ possible to achieve.
     you can leverage reverse queries with foreign keys withe the
     [related_name](./queries/related-name.md#related_name-attribute).
 
+### Reverse relation mutation helpers
+
+Reverse foreign-key relations expose the same mutation helpers as Edgy's current runtime:
+`add()`, `add_many()`, `create()`, `remove()`, and `remove_many()`.
+
+```python
+album = await Album.query.create(name="Malibu")
+track = await Track.query.create(title="The Bird", position=1)
+
+await album.tracks_set.add(track)
+await album.tracks_set.create(title="Heart don't stand a chance", position=2)
+await album.tracks_set.remove(track)
+```
+
+You can also stage reverse children during parent creation or save:
+
+```python
+track1 = await Track.query.create(title="The Bird", position=1)
+track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+
+album = await Album.query.create(name="Malibu", tracks_set=[track1, track2])
+```
+
 ### Load an instance without the foreign key relationship on it
 
 ```python
@@ -161,6 +184,28 @@ Let us create a `User` and a `Profile`.
 ```python
 user = await User.query.create(email="foo@bar.com")
 await Profile.query.create(user=user)
+```
+
+### Reverse one-to-one names
+
+When `related_name` is omitted on a one-to-one field, Saffier now follows Edgy's current behavior
+and generates the singular reverse name from the declaring model.
+
+```python
+class Profile(saffier.Model):
+    ...
+
+
+class Person(saffier.Model):
+    profile = saffier.OneToOneField(Profile, on_delete=saffier.CASCADE, null=True)
+```
+
+The reverse accessor on `Profile` is `profile.person`, not `profile.persons_set`.
+
+Because reverse one-to-one relations are unique, `remove()` can omit the child:
+
+```python
+await profile.person.remove()
 ```
 
 Now creating another `Profile` with the same user will fail and raise an exception.

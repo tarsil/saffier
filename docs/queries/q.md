@@ -45,6 +45,29 @@ query = Product.query.filter(Q(user__email__icontains="saffier"))
 products = await query
 ```
 
+The same lookup rules also work across forward and reverse many-to-many paths.
+
+```python
+from saffier import Q
+
+query = User.query.filter(
+    Q(products__name__icontains="soap") | Q(products__categories__name="food")
+).distinct("id")
+users = await query
+```
+
+Reverse foreign-key paths and embedded-parent relationship paths can be composed in the same way.
+
+```python
+from saffier import Q
+
+albums = await Album.query.filter(Q(tracks_set__title__icontains="bird")).distinct("id")
+
+tracks = await Track.query.filter(
+    Q(studio__album__company__name="Acme") | Q(album__name__icontains="live")
+)
+```
+
 ## Mixing Raw SQLAlchemy Clauses
 
 You can combine `Q` with SQLAlchemy column expressions.

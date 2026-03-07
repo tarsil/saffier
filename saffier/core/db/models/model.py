@@ -42,6 +42,25 @@ class Model(ModelRow, DeclarativeMixin):
 
         """
 
+    def __getattribute__(self, name: str) -> Any:
+        value = super().__getattribute__(name)
+        if value is not None or name.startswith("_"):
+            return value
+
+        try:
+            fields = object.__getattribute__(self, "fields")
+        except AttributeError:
+            return value
+
+        field = fields.get(name) if isinstance(fields, dict) else None
+        if (
+            field is not None
+            and getattr(field, "null", False)
+            and isinstance(field, (saffier.ForeignKey, saffier.OneToOneField))
+        ):
+            return field.target(pk=None)
+        return value
+
     def model_dump(
         self,
         include: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None = None,
@@ -195,19 +214,133 @@ class Model(ModelRow, DeclarativeMixin):
 
         return self
 
-    async def delete(self) -> int:
-        """Delete operation from the database"""
-        await self.signals.pre_delete.send(sender=self.__class__, instance=self)
+    async def _delete_forward_references(self, ignore_fields: set[str]) -> None:
+        has_forward_reference_cleanup = any(
+            getattr(field, "remove_referenced", False)
+            for field in self.meta.foreign_key_fields.values()
+        )
+        if has_forward_reference_cleanup and self.can_load and not self._has_loaded_db_fields():
+            await self.load(only_needed=True)
+
+        for field_name, field in self.meta.foreign_key_fields.items():
+            related_name = getattr(field, "related_name", None)
+            if (
+                field_name in ignore_fields
+                or related_name in ignore_fields
+                or not getattr(field, "remove_referenced", False)
+            ):
+                continue
+
+            value = self.__dict__.get(field_name)
+            if value is None:
+                continue
+
+            related = field.expand_relationship(value)
+            if related is None:
+                continue
+
+            remove_call: str | bool = related_name or True
+            raw_delete = getattr(related, "raw_delete", None)
+            if callable(raw_delete):
+                await raw_delete(
+                    skip_post_delete_hooks=False,
+                    remove_referenced_call=remove_call,
+                )
+            else:
+                await related.delete()
+
+    async def _delete_reverse_relations(self, ignore_fields: set[str]) -> None:
+        for related_name, related_field in self.meta.related_fields.items():
+            if related_name in ignore_fields:
+                continue
+            if getattr(self.__class__, related_name, None) is None:
+                continue
+
+            foreign_key_name = related_field.get_foreign_key_field_name()
+            foreign_key = related_field.related_from.fields.get(foreign_key_name)
+            if foreign_key is None:
+                continue
+
+            should_cascade = getattr(foreign_key, "force_cascade_deletion_relation", False) or (
+                getattr(foreign_key, "no_constraint", False)
+                and getattr(foreign_key, "on_delete", None) == saffier.CASCADE
+            )
+            if not should_cascade:
+                continue
+
+            queryset = getattr(self, related_name)
+            schema_name = getattr(self, "schema_name", None)
+            if schema_name is not None and hasattr(queryset, "using"):
+                queryset = queryset.using(schema=schema_name)
+            await queryset.raw_delete(
+                use_models=getattr(foreign_key, "use_model_based_deletion", False),
+                remove_referenced_call=related_name,
+            )
+
+    async def raw_delete(
+        self,
+        *,
+        skip_post_delete_hooks: bool = False,
+        remove_referenced_call: bool | str = False,
+    ) -> int:
+        del skip_post_delete_hooks
+        if getattr(self, "_db_deleted", False):
+            return 0
+
+        if self.__deletion_with_signals__ and remove_referenced_call:
+            await self.signals.pre_delete.send(
+                sender=self.__class__,
+                instance=self,
+                model_instance=self,
+            )
 
         pk_column = getattr(self.table.c, self.pkname)
         count_expression = sqlalchemy.func.count().select().select_from(self.table)
         count_expression = count_expression.where(pk_column == self.pk)
         row_count = cast("int", await self.database.fetch_val(count_expression) or 0)
 
-        expression = self.table.delete().where(pk_column == self.pk)
-        await self.database.execute(expression)
+        if row_count:
+            expression = self.table.delete().where(pk_column == self.pk)
+            await self.database.execute(expression)
+
+        self.__dict__["_db_deleted"] = bool(row_count)
+
+        ignore_fields: set[str] = set()
+        if isinstance(remove_referenced_call, str):
+            ignore_fields.add(remove_referenced_call)
+
+        if row_count:
+            await self._delete_forward_references(ignore_fields)
+            if not getattr(self, "__skip_generic_reverse_delete__", False):
+                await self._delete_reverse_relations(ignore_fields)
+
+        if self.__deletion_with_signals__ and remove_referenced_call:
+            await self.signals.post_delete.send(
+                sender=self.__class__,
+                instance=self,
+                model_instance=self,
+                row_count=row_count,
+            )
+        return row_count
+
+    async def delete(self, skip_post_delete_hooks: bool = False) -> int:
+        """Delete operation from the database"""
+        await self.signals.pre_delete.send(
+            sender=self.__class__,
+            instance=self,
+            model_instance=self,
+        )
+
+        row_count = await self.raw_delete(
+            skip_post_delete_hooks=skip_post_delete_hooks,
+            remove_referenced_call=False,
+        )
+
         await self.signals.post_delete.send(
-            sender=self.__class__, instance=self, row_count=row_count
+            sender=self.__class__,
+            instance=self,
+            model_instance=self,
+            row_count=row_count,
         )
         return row_count
 
@@ -313,6 +446,7 @@ class Model(ModelRow, DeclarativeMixin):
             await self.load()
 
         await self._persist_model_references()
+        await self._persist_related_fields()
         await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
 

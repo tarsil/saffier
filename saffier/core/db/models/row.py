@@ -1,10 +1,11 @@
-import asyncio
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 from sqlalchemy.engine.result import Row
 
+from saffier.core.db import fields as saffier_fields
 from saffier.core.db.models.base import SaffierBaseModel
+from saffier.core.utils.sync import run_sync
 from saffier.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -12,6 +13,21 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class ModelRow(SaffierBaseModel):
+    @classmethod
+    async def apply_prefetch_related(
+        cls,
+        row: Row,
+        model: type["Model"],
+        prefetch_related: Sequence["Prefetch"],
+    ) -> type["Model"]:
+        if not prefetch_related:
+            return model
+        return await cls.__handle_prefetch_related_async(
+            row=row,
+            model=model,
+            prefetch_related=prefetch_related,
+        )
+
     @classmethod
     def from_query_result(
         cls,
@@ -352,6 +368,19 @@ class ModelRow(SaffierBaseModel):
 
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)
+                if isinstance(cls.fields.get(first_part), saffier_fields.ManyToManyField) or hasattr(
+                    model, first_part
+                ):
+                    records = run_sync(
+                        cls.__collect_prefetch_records(
+                            model=model,
+                            related_name=related.related_name,
+                            queryset=original_prefetch.queryset,
+                        )
+                    )
+                    setattr(model, related.to_attr, records)
+                    continue
+
                 model_cls = cls.meta.related_fields[first_part].related_to
 
                 # Build the new nested Prefetch object
@@ -377,8 +406,18 @@ class ModelRow(SaffierBaseModel):
                 related.queryset.extra = extra
 
                 # Execute the queryset
-                records = asyncio.get_event_loop().run_until_complete(
-                    cls.__run_query(queryset=related.queryset)
+                records = run_sync(cls.__run_query(queryset=related.queryset))
+                setattr(model, related.to_attr, records)
+            elif isinstance(
+                cls.fields.get(related.related_name),
+                saffier_fields.ManyToManyField,
+            ) or hasattr(model, related.related_name):
+                records = run_sync(
+                    cls.__collect_prefetch_records(
+                        model=model,
+                        related_name=related.related_name,
+                        queryset=related.queryset,
+                    )
                 )
                 setattr(model, related.to_attr, records)
             else:
@@ -391,6 +430,85 @@ class ModelRow(SaffierBaseModel):
                     queryset=original_prefetch.queryset,
                 )
 
+                setattr(model, related.to_attr, records)
+        return model
+
+    @classmethod
+    async def __handle_prefetch_related_async(
+        cls,
+        row: Row,
+        model: type["Model"],
+        prefetch_related: Sequence["Prefetch"],
+        parent_cls: type["Model"] | None = None,
+        original_prefetch: Optional["Prefetch"] = None,
+        is_nested: bool = False,
+    ) -> type["Model"]:
+        if not parent_cls:
+            parent_cls = model
+
+        for related in prefetch_related:
+            if not original_prefetch:
+                original_prefetch = related
+
+            if original_prefetch and not is_nested:
+                original_prefetch = related
+
+            if hasattr(parent_cls, original_prefetch.to_attr):
+                raise QuerySetError(
+                    f"Conflicting attribute to_attr='{original_prefetch.related_name}' with '{original_prefetch.to_attr}' in {parent_cls.__class__.__name__}"
+                )
+
+            if "__" in related.related_name:
+                first_part, remainder = related.related_name.split("__", 1)
+                if isinstance(cls.fields.get(first_part), saffier_fields.ManyToManyField) or hasattr(
+                    model, first_part
+                ):
+                    records = await cls.__collect_prefetch_records(
+                        model=model,
+                        related_name=related.related_name,
+                        queryset=original_prefetch.queryset,
+                    )
+                    setattr(model, related.to_attr, records)
+                    continue
+
+                model_cls = cls.meta.related_fields[first_part].related_to
+                remainder_prefetch = related.__class__(
+                    related_name=remainder,
+                    to_attr=related.to_attr,
+                    queryset=related.queryset,
+                )
+                await model_cls.__handle_prefetch_related_async(
+                    row,
+                    model,
+                    prefetch_related=[remainder_prefetch],
+                    original_prefetch=original_prefetch,
+                    parent_cls=model,
+                    is_nested=True,
+                )
+            elif related.queryset is not None and not is_nested:
+                filter_by_pk = getattr(row, cls.pkname)
+                extra = {f"{related.related_name}__id": filter_by_pk}
+                related.queryset.extra = extra
+                records = await cls.__run_query(queryset=related.queryset)
+                setattr(model, related.to_attr, records)
+            elif isinstance(
+                cls.fields.get(related.related_name),
+                saffier_fields.ManyToManyField,
+            ) or hasattr(model, related.related_name):
+                records = await cls.__collect_prefetch_records(
+                    model=model,
+                    related_name=related.related_name,
+                    queryset=related.queryset,
+                )
+                setattr(model, related.to_attr, records)
+            else:
+                records = await cls.__process_nested_prefetch_related_async(
+                    row=row,
+                    prefetch_related=related,
+                    parent_cls=model,
+                    original_prefetch=original_prefetch,
+                    queryset=original_prefetch.queryset,
+                )
                 setattr(model, related.to_attr, records)
         return model
 
@@ -427,10 +545,78 @@ class ModelRow(SaffierBaseModel):
 
         extra = {f"{query}__id": filter_by_pk}
 
-        records = asyncio.get_event_loop().run_until_complete(
-            cls.__run_query(model_class, extra, queryset)
-        )
+        records = run_sync(cls.__run_query(model_class, extra, queryset))
         return records
+
+    @classmethod
+    async def __process_nested_prefetch_related_async(
+        cls,
+        row: Row,
+        prefetch_related: "Prefetch",
+        parent_cls: type["Model"],
+        original_prefetch: "Prefetch",
+        queryset: "QuerySet",
+    ) -> list[type["Model"]]:
+        query_split = original_prefetch.related_name.split("__")
+        query_split.reverse()
+        query_split.pop(query_split.index(prefetch_related.related_name))
+
+        model_class = getattr(cls, prefetch_related.related_name).related_from
+        foreign_key_name = model_class.meta.related_names_mapping[prefetch_related.related_name]
+        query_split.insert(0, foreign_key_name)
+
+        query = "__".join(query_split)
+        filter_by_pk = getattr(row, parent_cls.pkname)
+        extra = {f"{query}__id": filter_by_pk}
+
+        return await cls.__run_query(model_class, extra, queryset)
+
+    @classmethod
+    async def __collect_prefetch_records(
+        cls,
+        model: type["Model"],
+        related_name: str,
+        queryset: Optional["QuerySet"] = None,
+    ) -> list[type["Model"]]:
+        records = await cls.__traverse_prefetch_path(model, related_name.split("__"))
+        if queryset is None:
+            return records
+        if not records:
+            return []
+
+        filter_values = []
+        for record in records:
+            pk = getattr(record, "pk", None)
+            if pk is not None and pk not in filter_values:
+                filter_values.append(pk)
+
+        if not filter_values:
+            return []
+
+        cloned_queryset = queryset._clone() if hasattr(queryset, "_clone") else queryset
+        return await cloned_queryset.filter(pk__in=filter_values)
+
+    @classmethod
+    async def __traverse_prefetch_path(
+        cls,
+        model: type["Model"],
+        path_parts: Sequence[str],
+    ) -> list[type["Model"]]:
+        if not path_parts:
+            return [model]
+
+        attr = getattr(model, path_parts[0], None)
+        if attr is None:
+            return []
+
+        if hasattr(attr, "all"):
+            values = await attr.all()
+            results: list[type[Model]] = []
+            for value in values:
+                results.extend(await cls.__traverse_prefetch_path(value, path_parts[1:]))
+            return results
+
+        return await cls.__traverse_prefetch_path(attr, path_parts[1:])
 
     @classmethod
     async def __run_query(

@@ -5,8 +5,18 @@ from typing import Any
 import sqlalchemy
 
 from saffier.conf import settings
+from saffier.core.db.relationships.related import RelatedField
+from saffier.core.db.relationships.utils import crawl_relationship
 
 DEFAULT_ESCAPE_CHARACTERS = ("%", "_")
+
+
+def _normalize_lookup_path(key: str, embed_parent: tuple[str, str] | None) -> str:
+    if not embed_parent:
+        return key
+    if embed_parent[1] and key.startswith(embed_parent[1]):
+        return key.removeprefix(embed_parent[1]).removeprefix("__")
+    return f"{embed_parent[0]}__{key}"
 
 
 def build_lookup_clauses(
@@ -16,6 +26,7 @@ def build_lookup_clauses(
     *,
     escape_characters: tuple[str, ...] = DEFAULT_ESCAPE_CHARACTERS,
     using_schema: str | None = None,
+    embed_parent: tuple[str, str] | None = None,
 ) -> tuple[list[Any], list[str]]:
     """
     Build SQLAlchemy filter clauses from Saffier lookup kwargs.
@@ -32,40 +43,30 @@ def build_lookup_clauses(
     if "pk" in clean_kwargs:
         clean_kwargs[model_class.pkname] = clean_kwargs.pop("pk")
 
-    for key, value in clean_kwargs.items():
+    for raw_key, value in clean_kwargs.items():
+        key = _normalize_lookup_path(raw_key, embed_parent)
         if "__" in key:
-            parts = key.split("__")
-
-            if parts[-1] in settings.filter_operators:
-                op = parts[-1]
-                field_name = parts[-2]
-                related_parts = parts[:-2]
-            else:
-                op = "exact"
-                field_name = parts[-1]
-                related_parts = parts[:-1]
-
-            related_model = model_class
-            if related_parts:
-                related_path = "__".join(related_parts)
-                if related_path not in select_related:
-                    select_related.append(related_path)
-
-                for part in related_parts:
-                    try:
-                        related_field = related_model.fields[part]
-                        related_model = related_field.target
-                    except (KeyError, AttributeError):
-                        related_model = getattr(related_model, part).related_from
-
-            if field_name == "pk":
-                field_name = related_model.pkname
+            crawl_result = crawl_relationship(model_class, key)
+            op = crawl_result.operator or "exact"
+            related_model = crawl_result.model_class
+            field_name = (
+                related_model.pkname if crawl_result.field_name == "pk" else crawl_result.field_name
+            )
+            if crawl_result.forward_path and crawl_result.forward_path not in select_related:
+                select_related.append(crawl_result.forward_path)
             related_table = (
                 related_model.table_schema(using_schema)
                 if using_schema is not None
                 else related_model.table
             )
-            column = related_table.columns[field_name]
+            try:
+                column = related_table.columns[field_name]
+            except KeyError as error:
+                attr = getattr(related_model, field_name, None)
+                if isinstance(attr, RelatedField):
+                    column = related_table.columns[settings.default_related_lookup_field]
+                else:
+                    raise KeyError(str(error)) from error
         else:
             op = "exact"
             try:
@@ -172,6 +173,7 @@ class Q:
                 self.kwargs,
                 escape_characters=escape_characters,
                 using_schema=getattr(queryset, "using_schema", None),
+                embed_parent=getattr(queryset, "embed_parent_filters", None),
             )
             clauses.extend(kw_clauses)
             for path in related:

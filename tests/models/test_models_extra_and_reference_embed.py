@@ -85,3 +85,23 @@ async def test_embed_parent_all_returns_embedded_users():
     assert len(users) == 1
     assert issubclass(users[0].get_real_class(), User)
     assert users[0].normal_profile.profile.pk == super_profile.pk
+
+
+async def test_embed_parent_filter_uses_embedded_parent_path():
+    super_profile = await SuperProfile.query.order_by("id").first()
+    assert super_profile is not None
+
+    users = await super_profile.profile.filter(name="user-0")
+
+    assert len(users) == 1
+    assert users[0].name == "user-0"
+
+
+async def test_embed_parent_filter_supports_parent_prefix():
+    super_profile = await SuperProfile.query.order_by("id").first()
+    assert super_profile is not None
+
+    users = await super_profile.profile.filter(normal_profile__name="profile-0")
+
+    assert len(users) == 1
+    assert users[0].normal_profile.name == "profile-0"

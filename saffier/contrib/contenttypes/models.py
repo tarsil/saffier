@@ -9,6 +9,7 @@ from .metaclasses import ContentTypeMeta
 
 class ContentType(saffier.Model, metaclass=ContentTypeMeta):
     no_constraint: ClassVar[bool] = False
+    __skip_generic_reverse_delete__ = True
 
     class Meta:
         abstract = True
@@ -24,8 +25,18 @@ class ContentType(saffier.Model, metaclass=ContentTypeMeta):
             queryset = queryset.using(schema=self.schema_name)
         return cast("saffier.Model", await queryset.get())
 
-    async def delete(self) -> int:
-        row_count = await super().delete()
+    async def raw_delete(
+        self,
+        *,
+        skip_post_delete_hooks: bool = False,
+        remove_referenced_call: bool | str = False,
+    ) -> int:
+        row_count = await super().raw_delete(
+            skip_post_delete_hooks=skip_post_delete_hooks,
+            remove_referenced_call=remove_referenced_call,
+        )
+        if remove_referenced_call:
+            return row_count
 
         reverse_name = f"reverse_{str(self.name).lower()}"
         try:
@@ -45,6 +56,7 @@ class ContentType(saffier.Model, metaclass=ContentTypeMeta):
         if self.schema_name is not None:
             queryset = queryset.using(schema=self.schema_name)
         await queryset.raw_delete(
-            use_models=getattr(foreign_key, "use_model_based_deletion", False)
+            use_models=getattr(foreign_key, "use_model_based_deletion", False),
+            remove_referenced_call=reverse_name,
         )
         return row_count

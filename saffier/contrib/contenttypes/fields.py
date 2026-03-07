@@ -33,6 +33,8 @@ class ContentTypeField(ForeignKey):
             to=to,
             on_delete=on_delete,
             no_constraint=no_constraint,
+            remove_referenced=remove_referenced,
+            use_model_based_deletion=use_model_based_deletion,
             **kwargs,
         )
 

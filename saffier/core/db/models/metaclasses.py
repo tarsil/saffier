@@ -11,6 +11,7 @@ from typing import (
 
 import sqlalchemy
 
+import saffier
 from saffier.conf import settings
 from saffier.core.connection.registry import Registry
 from saffier.core.db import fields as saffier_fields
@@ -213,7 +214,10 @@ def _set_related_name_for_foreign_keys(
             continue
 
         if not default_related_name:
-            default_related_name = f"{model_class.__name__.lower()}s_set"
+            if getattr(foreign_key, "unique", False):
+                default_related_name = f"{model_class.__name__.lower()}"
+            else:
+                default_related_name = f"{model_class.__name__.lower()}s_set"
 
         foreign_key.related_name = default_related_name
 
@@ -270,6 +274,12 @@ def _set_related_name_for_foreign_keys(
             model_class.meta.related_names_mapping[default_related_name] = name
             target_meta.related_names_mapping[default_related_name] = name
 
+            if (
+                getattr(foreign_key, "no_constraint", False)
+                and getattr(foreign_key, "on_delete", None) == saffier.CASCADE
+            ) or getattr(foreign_key, "force_cascade_deletion_relation", False):
+                target_model.__require_model_based_deletion__ = True
+
         registry = getattr(model_class.meta, "registry", None)
         target_model = None
         if isinstance(foreign_key.to, str):
@@ -284,6 +294,9 @@ def _set_related_name_for_foreign_keys(
 
         if target_model is not None:
             bind_related_name(target_model)
+
+        if getattr(foreign_key, "remove_referenced", False):
+            model_class.__require_model_based_deletion__ = True
 
         related_names.add(default_related_name)
 
@@ -302,7 +315,18 @@ def _set_many_to_many_relation(
         target_name = m2m.to
         target_model = registry.models.get(target_name) or registry.reflected.get(target_name)
         if target_model is None:
-            setattr(model_class, relation_name, Relation(through=m2m.through, to=target_name, owner=m2m.owner))
+            setattr(
+                model_class,
+                relation_name,
+                Relation(
+                    through=m2m.through,
+                    to=target_name,
+                    owner=m2m.owner,
+                    from_foreign_key=m2m.from_foreign_key,
+                    to_foreign_key=m2m.to_foreign_key,
+                    embed_through=m2m.embed_through,
+                ),
+            )
 
             def finalize_target(resolved_target: type[Any]) -> None:
                 m2m.to = resolved_target
@@ -321,7 +345,14 @@ def _set_many_to_many_relation(
                 setattr(
                     model_class,
                     relation_name,
-                    Relation(through=through_name, to=m2m.to, owner=m2m.owner),
+                    Relation(
+                        through=through_name,
+                        to=m2m.to,
+                        owner=m2m.owner,
+                        from_foreign_key=m2m.from_foreign_key,
+                        to_foreign_key=m2m.to_foreign_key,
+                        embed_through=m2m.embed_through,
+                    ),
                 )
 
                 def finalize_relation(resolved_through: type[Any]) -> None:
@@ -329,14 +360,28 @@ def _set_many_to_many_relation(
                     setattr(
                         model_class,
                         relation_name,
-                        Relation(through=resolved_through, to=m2m.to, owner=m2m.owner),
+                        Relation(
+                            through=resolved_through,
+                            to=m2m.to,
+                            owner=m2m.owner,
+                            from_foreign_key=m2m.from_foreign_key,
+                            to_foreign_key=m2m.to_foreign_key,
+                            embed_through=m2m.embed_through,
+                        ),
                     )
 
                 registry.register_callback(through_name, finalize_relation, one_time=True)
                 return
 
     m2m.create_through_model()
-    relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
+    relation = Relation(
+        through=m2m.through,
+        to=m2m.to,
+        owner=m2m.owner,
+        from_foreign_key=m2m.from_foreign_key,
+        to_foreign_key=m2m.to_foreign_key,
+        embed_through=m2m.embed_through,
+    )
     setattr(model_class, relation_name, relation)
 
 
@@ -382,6 +427,21 @@ class BaseModelMeta(type):
         pk_attribute: str = "id"
         registry: Registry | None = None
 
+        def _to_composite_field(attr_name: str, value: Any) -> Field:
+            inner_fields = value
+            if hasattr(value, "meta"):
+                inner_fields = {
+                    field_name: field
+                    for field_name, field in value.meta.fields.items()
+                    if not getattr(field, "primary_key", False)
+                }
+            return saffier_fields.CompositeField(
+                inner_fields=inner_fields,
+                prefix_embedded=f"{attr_name}_",
+                model=value,
+                owner=value,
+            )
+
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: type, inherited_attrs: dict[str, Any]) -> None:
             """
@@ -402,6 +462,8 @@ class BaseModelMeta(type):
                 for key, value in inspect.getmembers(base):
                     if isinstance(value, Field) and key not in inherited_attrs:
                         inherited_attrs[key] = value
+                    elif isinstance(value, BaseModelMeta) and key not in inherited_attrs:
+                        inherited_attrs[key] = _to_composite_field(key, value)
 
                 _check_manager_for_bases(base, inherited_attrs)  # type: ignore[arg-type]
             else:
@@ -416,6 +478,11 @@ class BaseModelMeta(type):
                 _check_manager_for_bases(base, inherited_attrs, meta)  # type: ignore[arg-type]
 
         # Search in the base classes
+        for key in list(attrs.keys()):
+            value = attrs[key]
+            if isinstance(value, BaseModelMeta):
+                attrs[key] = _to_composite_field(key, value)
+
         inherited_fields: dict[str, Any] = {}
         for base in bases:
             __search_for_fields(base, inherited_fields)
@@ -610,6 +677,18 @@ class BaseModelMeta(type):
             )
 
         if getattr(meta, "registry", None) is None and not skip_registry_lookup:
+            if meta.abstract:
+                new_class.__db_model__ = True
+                new_class.fields = meta.fields
+                meta.model = new_class
+                meta.manager.model_class = new_class
+                for _, value in new_class.fields.items():
+                    value.owner = new_class
+                for manager_name, value in attrs.items():
+                    if isinstance(value, Manager):
+                        value.name = manager_name
+                        value.model_class = new_class
+                return new_class
             if hasattr(new_class, "__db_model__") and new_class.__db_model__:
                 meta.registry = _check_model_inherited_registry(bases)
             else:

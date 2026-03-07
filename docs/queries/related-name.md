@@ -40,6 +40,10 @@ the following format:
 ```
 Saffier will use the lowercased model name of the related model to create the reverse relation.
 
+For unique reverse relations, Saffier follows Edgy's current behavior and uses the singular model
+name instead. This applies to `OneToOneField` and to unique many-to-many reverse accessors created
+from generated through models.
+
 Imagine you have a model `Team` that has a [ForeignKey][foreign_keys] to another model
 `Organisation`.
 

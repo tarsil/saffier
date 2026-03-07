@@ -120,6 +120,9 @@ class Field:
     def expand_relationship(self, value: typing.Any) -> typing.Any:
         return value
 
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        del name, kwargs
+
     def raise_for_non_default(self, default: typing.Any, server_default: typing.Any) -> typing.Any:
         has_default: bool = True
         has_server_default: bool = True
@@ -320,6 +323,7 @@ class CompositeField(Field):
         inner_fields: typing.Any = (),
         prefix_embedded: str = "",
         absorb_existing_fields: bool = False,
+        model: typing.Any = None,
         **kwargs: typing.Any,
     ) -> None:
         kwargs.setdefault("null", True)
@@ -327,6 +331,7 @@ class CompositeField(Field):
         self.inner_fields = inner_fields
         self.prefix_embedded = prefix_embedded
         self.absorb_existing_fields = absorb_existing_fields
+        self.model = model
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Any(**kwargs)
@@ -412,11 +417,16 @@ class CompositeField(Field):
                 mapping[public_name] = public_name
         return mapping
 
-    def get_value(self, instance: typing.Any, field_name: str) -> dict[str, typing.Any]:
+    def get_value(self, instance: typing.Any, field_name: str) -> typing.Any:
         del field_name
         values: dict[str, typing.Any] = {}
         for public_name, target_name in self._mapping(instance).items():
             values[public_name] = getattr(instance, target_name, None)
+        if self.model is not None:
+            try:
+                return self.model(**values)
+            except Exception:
+                pass
         return values
 
     def set_value(self, instance: typing.Any, field_name: str, value: typing.Any) -> None:
@@ -433,6 +443,29 @@ class CompositeField(Field):
         for public_name, target_name in self._mapping(instance).items():
             if public_name in payload:
                 setattr(instance, target_name, payload[public_name])
+
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        if name not in kwargs:
+            return
+        payload = kwargs.pop(name)
+        if payload is None:
+            return
+        if hasattr(payload, "model_dump"):
+            payload = payload.model_dump()
+        elif not isinstance(payload, dict):
+            payload = {
+                attr_name: getattr(payload, attr_name)
+                for attr_name in dir(payload)
+                if not attr_name.startswith("_")
+            }
+
+        owner = getattr(self, "owner", None)
+        if owner is None:
+            return
+
+        for public_name, target_name in self._mapping(owner).items():
+            if public_name in payload:
+                kwargs[target_name] = payload[public_name]
 
 
 class ForeignKey(Field):
@@ -459,6 +492,9 @@ class ForeignKey(Field):
         related_name: str | None = None,
         embed_parent: tuple[str, str] | None = None,
         no_constraint: bool = False,
+        remove_referenced: bool = False,
+        use_model_based_deletion: bool = False,
+        force_cascade_deletion_relation: bool = False,
         **kwargs: Any,
     ):
         assert on_delete is not None, "on_delete must not be null."
@@ -485,6 +521,9 @@ class ForeignKey(Field):
         self.related_name = related_name
         self.embed_parent = embed_parent
         self.no_constraint = no_constraint
+        self.remove_referenced = remove_referenced
+        self.use_model_based_deletion = use_model_based_deletion
+        self.force_cascade_deletion_relation = force_cascade_deletion_relation
 
         if embed_parent and "__" in embed_parent[1]:
             raise FieldDefinitionError(
@@ -533,11 +572,22 @@ class ForeignKey(Field):
                     f"_{target.pkname}_{name}",
                 )
             )
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return sqlalchemy.Column(
+            name,
+            column_type,
+            *constraints,
+            nullable=self.null,
+            index=self.index,
+            unique=self.unique,
+        )
 
     def expand_relationship(self, value: typing.Any) -> typing.Any:
+        if value is None and self.null:
+            return None
         target = self.target
         if isinstance(value, target):
+            if self.null and getattr(value, "pk", None) is None:
+                return None
             return value
         if hasattr(value, "__db_model__"):
             value_cls = value.__class__
@@ -545,6 +595,8 @@ class ForeignKey(Field):
                 getattr(value_cls, "is_proxy_model", False)
                 and getattr(value_cls, "parent", None) is target
             ):
+                if self.null and getattr(value, "pk", None) is None:
+                    return None
                 return value
         return target(pk=value)
 
@@ -561,6 +613,7 @@ class ManyToManyField(Field):
         to: type["Model"] | str,
         through: type["Model"] | str | None = None,
         through_tablename: str | type[NEW_M2M_NAMING] | None = NEW_M2M_NAMING,
+        embed_through: str | bool = False,
         **kwargs: typing.Any,
     ):
         if through_tablename is OLD_M2M_NAMING:
@@ -576,6 +629,8 @@ class ManyToManyField(Field):
             )
         if isinstance(through_tablename, str) and not through_tablename.strip():
             raise FieldDefinitionError('"through_tablename" cannot be an empty string.')
+        if embed_through and isinstance(embed_through, str) and "__" in embed_through:
+            raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
         if "null" in kwargs:
             terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
@@ -585,7 +640,11 @@ class ManyToManyField(Field):
         self.to = to
         self.through = through
         self.through_tablename = through_tablename
+        self.embed_through = embed_through
         self.related_name = related_name
+        self.from_foreign_key = ""
+        self.to_foreign_key = ""
+        self.reverse_name = ""
 
         if self.related_name not in (None, False):
             assert isinstance(self.related_name, str), "related_name must be a string."
@@ -649,6 +708,23 @@ class ManyToManyField(Field):
                 registry = self.owner.meta.registry
                 self.through = registry.models.get(self.through) or registry.reflected[self.through]
 
+            if not self.from_foreign_key:
+                candidates = [
+                    field_name
+                    for field_name, field in self.through.fields.items()
+                    if isinstance(field, ForeignKey) and field.target is self.owner
+                ]
+                if len(candidates) == 1:
+                    self.from_foreign_key = candidates[0]
+            if not self.to_foreign_key:
+                candidates = [
+                    field_name
+                    for field_name, field in self.through.fields.items()
+                    if isinstance(field, ForeignKey) and field.target is self.to
+                ]
+                if len(candidates) == 1:
+                    self.to_foreign_key = candidates[0]
+
             # M2M through models in Saffier are always required to expose an
             # auto-incrementing integer "id" primary key.
             id_field = self.through.fields.get("id")
@@ -686,11 +762,17 @@ class ManyToManyField(Field):
                 id_field.autoincrement = True
 
             self.through.meta.is_multi = True
-            self.through.meta.multi_related = [self.to.__name__.lower()]
+            if not self.from_foreign_key:
+                self.from_foreign_key = self.owner.__name__.lower()
+            if not self.to_foreign_key:
+                self.to_foreign_key = self.to.__name__.lower()
+            self.through.meta.multi_related = [self.to_foreign_key]
             return self.through
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__
+        self.from_foreign_key = owner_name.lower()
+        self.to_foreign_key = to_name.lower()
         class_name = f"{owner_name}{self.name.capitalize()}Through"
         if self.through_tablename is None or self.through_tablename is NEW_M2M_NAMING:
             tablename = class_name.lower()
@@ -703,7 +785,8 @@ class ManyToManyField(Field):
             "tablename": tablename,
             "registry": self.owner.meta.registry,
             "is_multi": True,
-            "multi_related": [to_name.lower()],
+            "multi_related": [self.to_foreign_key],
+            "unique_together": [(self.from_foreign_key, self.to_foreign_key)],
         }
 
         new_meta = type("MetaInfo", (), new_meta_namespace)
@@ -711,8 +794,13 @@ class ManyToManyField(Field):
         to_related_name = (
             f"{self.related_name}"
             if self.related_name
-            else f"{to_name.lower()}_{owner_name.lower()}{to_name.lower()}s_set"
+            else (
+                f"{to_name.lower()}_{owner_name.lower()}{to_name.lower()}"
+                if self.unique
+                else f"{to_name.lower()}_{owner_name.lower()}{to_name.lower()}s_set"
+            )
         )
+        self.reverse_name = to_related_name if to_related_name is not False else ""
 
         through_model = type(
             class_name,
@@ -720,16 +808,24 @@ class ManyToManyField(Field):
             {
                 "Meta": new_meta,
                 "id": saffier.IntegerField(primary_key=True, autoincrement=True),
-                f"{owner_name.lower()}": ForeignKey(
+                f"{self.from_foreign_key}": ForeignKey(
                     self.owner,
                     on_delete=saffier.CASCADE,
+                    index=self.index,
                     null=True,
                     related_name=False,
                 ),
-                f"{to_name.lower()}": ForeignKey(
+                f"{self.to_foreign_key}": ForeignKey(
                     self.to,
                     on_delete=saffier.CASCADE,
+                    unique=self.unique,
+                    index=self.index,
                     null=True,
+                    embed_parent=(
+                        (self.from_foreign_key, self.embed_through or "")
+                        if self.embed_through is not False
+                        else None
+                    ),
                     related_name=(False if self.related_name is False else to_related_name),
                 ),
             },
@@ -862,6 +958,10 @@ class OneToOneField(ForeignKey):
     """
     Representation of a one to one field.
     """
+
+    def __init__(self, to: type["Model"] | str, **kwargs: typing.Any):
+        kwargs["unique"] = True
+        super().__init__(to, **kwargs)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         target = self.target

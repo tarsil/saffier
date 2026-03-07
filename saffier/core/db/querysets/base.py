@@ -162,6 +162,49 @@ class BaseQuerySet(
 
         return has_many, foreign_keys  # type: ignore
 
+    def _resolve_many_to_many_join_fields(
+        self,
+        previous_model_class: type["Model"] | type["ReflectModel"],
+        related_field: saffier_fields.ManyToManyField,
+    ) -> tuple[type["Model"] | type["ReflectModel"], str, str]:
+        through_model = related_field.through
+        if isinstance(through_model, str):
+            registry = getattr(previous_model_class.meta, "registry", None)
+            if registry is not None:
+                through_model = registry.models.get(through_model) or registry.reflected.get(
+                    through_model
+                )
+                related_field.through = through_model
+
+        if through_model is None or isinstance(through_model, str):
+            raise QuerySetError(
+                detail=(
+                    "Unable to resolve through model for select_related path "
+                    f"'{previous_model_class.__name__}.{related_field.name}'."
+                )
+            )
+
+        from_field: str | None = None
+        to_field: str | None = None
+        for field_name, field in through_model.fields.items():
+            if not isinstance(field, (saffier_fields.ForeignKey, saffier_fields.OneToOneField)):
+                continue
+            if field.target is previous_model_class and from_field is None:
+                from_field = field_name
+                continue
+            if field.target is related_field.target and to_field is None:
+                to_field = field_name
+
+        if from_field is None or to_field is None:
+            raise QuerySetError(
+                detail=(
+                    "Unable to resolve many-to-many join fields for "
+                    f"'{previous_model_class.__name__}.{related_field.name}'."
+                )
+            )
+
+        return cast("type[Model] | type[ReflectModel]", through_model), from_field, to_field
+
     def _build_tables_select_from_relationship(self) -> Any:
         """
         Builds the tables relationships and joins.
@@ -198,13 +241,30 @@ class BaseQuerySet(
                 previous_table = current_table
                 join_lookup_field: str | None = None
                 reverse_join = False
+                current_related_field: Any = None
+                through_table = None
+                through_from_field: str | None = None
+                through_to_field: str | None = None
                 try:
-                    related_field = model_class.fields[part]
-                    model_class = related_field.target
+                    current_related_field = model_class.fields[part]
+                    model_class = current_related_field.target
                     if isinstance(
-                        related_field, (saffier_fields.ForeignKey, saffier_fields.OneToOneField)
+                        current_related_field,
+                        (saffier_fields.ForeignKey, saffier_fields.OneToOneField),
                     ):
                         join_lookup_field = part
+                    elif isinstance(current_related_field, saffier_fields.ManyToManyField):
+                        through_model, through_from_field, through_to_field = (
+                            self._resolve_many_to_many_join_fields(
+                                previous_model_class,
+                                current_related_field,
+                            )
+                        )
+                        through_table = (
+                            through_model.table_schema(queryset.using_schema)
+                            if queryset.using_schema is not None
+                            else through_model.table
+                        )
                 except (KeyError, AttributeError):
                     # Check related fields
                     model_class = getattr(model_class, part).related_from
@@ -216,6 +276,47 @@ class BaseQuerySet(
                     table = model_class.table_schema(queryset.using_schema)
                 else:
                     table = model_class.table
+
+                if isinstance(current_related_field, saffier_fields.ManyToManyField):
+                    left_column = getattr(previous_table.c, previous_model_class.pkname, None)
+                    through_left = (
+                        getattr(through_table.c, through_from_field, None)
+                        if through_table is not None and through_from_field is not None
+                        else None
+                    )
+                    through_right = (
+                        getattr(through_table.c, through_to_field, None)
+                        if through_table is not None and through_to_field is not None
+                        else None
+                    )
+                    right_column = getattr(table.c, model_class.pkname, None)
+
+                    if any(
+                        value is None
+                        for value in (left_column, through_left, through_right, right_column)
+                    ):
+                        raise QuerySetError(
+                            detail=(
+                                "Unable to resolve many-to-many join columns for "
+                                f"select_related path '{item}'."
+                            )
+                        )
+
+                    select_from = sqlalchemy.sql.join(
+                        select_from,
+                        through_table,
+                        left_column == through_left,
+                    )
+                    select_from = sqlalchemy.sql.join(
+                        select_from,
+                        table,
+                        through_right == right_column,
+                    )
+                    prefix = part if not prefix else f"{prefix}__{part}"
+                    tables_and_models[prefix] = (table, model_class)
+                    current_table = table
+                    tables.append(table)
+                    continue
 
                 # If there is multiple FKs to the same table
                 if not has_many_fk_same_table:
@@ -404,6 +505,35 @@ class BaseQuerySet(
     def _build_select(self) -> Any:
         return self._build_select_with_tables()[0]
 
+    async def _hydrate_row(
+        self,
+        queryset: "QuerySet",
+        row: Any,
+        tables_and_models: dict[str, tuple[Any, Any]],
+        *,
+        is_only_fields: bool,
+        is_defer_fields: bool,
+    ) -> SaffierModel:
+        result = queryset.model_class.from_query_result(
+            row,
+            select_related=queryset._select_related,
+            prefetch_related=[],
+            is_only_fields=is_only_fields,
+            only_fields=queryset._only,
+            is_defer_fields=is_defer_fields,
+            using_schema=queryset.using_schema,
+            exclude_secrets=queryset._exclude_secrets,
+            reference_select=queryset._reference_select,
+            tables_and_models=tables_and_models,
+        )
+        if queryset._prefetch_related:
+            result = await queryset.model_class.apply_prefetch_related(
+                row=row,
+                model=result,
+                prefetch_related=queryset._prefetch_related,
+            )
+        return result
+
     def _filter_query(self, exclude: bool = False, or_: bool = False, **kwargs: Any) -> "QuerySet":
         clauses: list[Any] = []
         filter_clauses = self.filter_clauses
@@ -422,6 +552,7 @@ class BaseQuerySet(
             kwargs,
             escape_characters=tuple(self.ESCAPE_CHARACTERS),
             using_schema=self.using_schema,
+            embed_parent=self.embed_parent_filters,
         )
         for related_path in implied_select_related:
             if related_path not in select_related:
@@ -468,6 +599,8 @@ class BaseQuerySet(
     def _validate_kwargs(self, **kwargs: Any) -> Any:
         original_kwargs = dict(kwargs)
         fields = self.model_class.fields
+        for key, field in fields.items():
+            field.modify_input(key, kwargs)
         schema_fields = {}
         for key, value in fields.items():
             if not value.has_column():
@@ -1024,17 +1157,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        result = queryset.model_class.from_query_result(
+        result = await queryset._hydrate_row(
+            queryset,
             rows[0],
-            select_related=queryset._select_related,
+            tables_and_models,
             is_only_fields=is_only_fields,
-            only_fields=queryset._only,
             is_defer_fields=is_defer_fields,
-            prefetch_related=queryset._prefetch_related,
-            using_schema=queryset.using_schema,
-            exclude_secrets=queryset._exclude_secrets,
-            reference_select=queryset._reference_select,
-            tables_and_models=tables_and_models,
         )
         return queryset._embed_parent_in_result(result)
 
@@ -1065,17 +1193,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.model_class.raw_query = queryset.sql
 
         results = [
-            queryset.model_class.from_query_result(
+            await queryset._hydrate_row(
+                queryset,
                 row,
-                select_related=queryset._select_related,
-                prefetch_related=queryset._prefetch_related,
+                tables_and_models,
                 is_only_fields=is_only_fields,
-                only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
-                using_schema=queryset.using_schema,
-                exclude_secrets=queryset._exclude_secrets,
-                reference_select=queryset._reference_select,
-                tables_and_models=tables_and_models,
             )
             for row in rows
         ]
@@ -1116,17 +1239,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        result = queryset.model_class.from_query_result(
+        result = await queryset._hydrate_row(
+            queryset,
             rows[0],
-            select_related=queryset._select_related,
+            tables_and_models,
             is_only_fields=is_only_fields,
-            only_fields=queryset._only,
             is_defer_fields=is_defer_fields,
-            prefetch_related=queryset._prefetch_related,
-            using_schema=queryset.using_schema,
-            exclude_secrets=queryset._exclude_secrets,
-            reference_select=queryset._reference_select,
-            tables_and_models=tables_and_models,
         )
         return queryset._embed_parent_in_result(result)
 
@@ -1151,17 +1269,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not rows:
             return None
 
-        result = queryset.model_class.from_query_result(
+        result = await queryset._hydrate_row(
+            queryset,
             rows[0],
-            select_related=queryset._select_related,
+            tables_and_models,
             is_only_fields=bool(queryset._only),
-            only_fields=queryset._only,
             is_defer_fields=bool(queryset._defer),
-            prefetch_related=queryset._prefetch_related,
-            using_schema=queryset.using_schema,
-            exclude_secrets=queryset._exclude_secrets,
-            reference_select=queryset._reference_select,
-            tables_and_models=tables_and_models,
         )
         result = queryset._embed_parent_in_result(result)
         if queryset.is_m2m:
@@ -1189,17 +1302,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not rows:
             return None
 
-        result = queryset.model_class.from_query_result(
+        result = await queryset._hydrate_row(
+            queryset,
             rows[0],
-            select_related=queryset._select_related,
+            tables_and_models,
             is_only_fields=bool(queryset._only),
-            only_fields=queryset._only,
             is_defer_fields=bool(queryset._defer),
-            prefetch_related=queryset._prefetch_related,
-            using_schema=queryset.using_schema,
-            exclude_secrets=queryset._exclude_secrets,
-            reference_select=queryset._reference_select,
-            tables_and_models=tables_and_models,
         )
         result = queryset._embed_parent_in_result(result)
         if queryset.is_m2m:
@@ -1343,7 +1451,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._set_query_expression(expression)
         await queryset.database.execute_many(expression, query_list)
 
-    async def raw_delete(self, use_models: bool = False) -> int:
+    async def raw_delete(
+        self,
+        use_models: bool = False,
+        remove_referenced_call: str | bool = False,
+    ) -> int:
         queryset: QuerySet = self._clone()
         if getattr(queryset.model_class, "__require_model_based_deletion__", False):
             use_models = True
@@ -1351,7 +1463,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if use_models:
             row_count = 0
             for model in await queryset.all():
-                row_count += await model.delete()
+                row_count += await model.raw_delete(
+                    skip_post_delete_hooks=False,
+                    remove_referenced_call=remove_referenced_call,
+                )
             return row_count
 
         count_expression = sqlalchemy.func.count().select().select_from(queryset.table)
@@ -1384,12 +1499,22 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset: QuerySet = self._clone()
         if getattr(queryset.model_class, "__require_model_based_deletion__", False):
             use_models = True
-        await self.model_class.signals.pre_delete.send(sender=self.__class__, instance=self)
+        await self.model_class.signals.pre_delete.send(
+            sender=self.__class__,
+            instance=self,
+            model_instance=None,
+        )
 
-        row_count = await queryset.raw_delete(use_models=use_models)
+        row_count = await queryset.raw_delete(
+            use_models=use_models,
+            remove_referenced_call=False,
+        )
 
         await self.model_class.signals.post_delete.send(
-            sender=self.__class__, instance=self, row_count=row_count
+            sender=self.__class__,
+            instance=self,
+            model_instance=None,
+            row_count=row_count,
         )
         return row_count
 
@@ -1637,7 +1762,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             new_result = getattr(new_result, part)
 
         if self.embed_parent[1]:
-            setattr(new_result, self.embed_parent[1], result)
+            try:
+                setattr(new_result, self.embed_parent[1], result)
+            except AttributeError:
+                object.__setattr__(new_result, self.embed_parent[1], result)
         return cast("SaffierModel", new_result)
 
     async def as_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]:
@@ -1675,17 +1803,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.model_class.raw_query = queryset.sql
 
         async for row in queryset.database.iterate(expression, chunk_size=queryset._batch_size):
-            result = queryset.model_class.from_query_result(
+            result = await queryset._hydrate_row(
+                queryset,
                 row,
-                select_related=queryset._select_related,
-                prefetch_related=queryset._prefetch_related,
+                tables_and_models,
                 is_only_fields=is_only_fields,
-                only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
-                using_schema=queryset.using_schema,
-                exclude_secrets=queryset._exclude_secrets,
-                reference_select=queryset._reference_select,
-                tables_and_models=tables_and_models,
             )
 
             if not queryset.is_m2m:

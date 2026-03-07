@@ -55,11 +55,15 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     __proxy_model__: ClassVar[type["Model"] | None] = None
     __no_load_trigger_attrs__: ClassVar[set[str]] = set()
     __using_schema__: ClassVar[str | None] = None
+    __require_model_based_deletion__: ClassVar[bool] = False
+    __deletion_with_signals__: ClassVar[bool] = False
+    __skip_generic_reverse_delete__: ClassVar[bool] = False
 
     def __init__(self, *model_refs: Any, **kwargs: Any) -> None:
         self.__dict__["__no_load_trigger_attrs__"] = set(
             getattr(self.__class__, "__no_load_trigger_attrs__", set())
         )
+        self.__dict__["_db_deleted"] = False
         self.setup_model_fields_from_kwargs(model_refs, kwargs)
 
     @staticmethod
@@ -140,6 +144,17 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             if field_name not in self.__dict__:
                 continue
             await field.persist_references(self, self.__dict__[field_name])
+
+    async def _persist_related_fields(self, field_names: set[str] | None = None) -> None:
+        for field_name in self.meta.related_fields:
+            if field_names is not None and field_name not in field_names:
+                continue
+            if field_name not in self.__dict__:
+                continue
+            value = self.__dict__[field_name]
+            save_related = getattr(value, "save_related", None)
+            if callable(save_related):
+                await save_related()
 
     @property
     def pk(self) -> Any:
@@ -488,6 +503,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             return existing_proxy
 
         fields = {key: copy.copy(field) for key, field in cls.fields.items()}
+        fields["__skip_registry__"] = True
         proxy_model = ProxyModel(
             name=cls.__name__,
             module=cls.__module__,

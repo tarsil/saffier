@@ -390,6 +390,25 @@ class Customer(saffier.Model):
 
 `CompositeField` itself is virtual and does not create a database column. Embedded inner fields do.
 
+Saffier also accepts an abstract model class on the model body and converts it into a prefixed
+`CompositeField` automatically, matching Edgy's embedded-model shorthand.
+
+```python
+class Address(saffier.Model):
+    street = saffier.CharField(max_length=100)
+    city = saffier.CharField(max_length=100)
+
+    class Meta:
+        abstract = True
+
+
+class ProfileHolder(saffier.Model):
+    address = Address
+```
+
+The generated columns are `address_street` and `address_city`, while `holder.address` reads and
+writes the embedded object as a single value.
+
 #### FileField
 
 String-backed field for file references/paths.
@@ -453,6 +472,8 @@ class MyModel(saffier.Model):
 * **to** - A string [model](./models.md) name or a class object of that same model.
 * **related_name** - The name to use for the relation from the related object back to this one.
   Set it to `False` to disable the reverse relation entirely.
+  When omitted on `OneToOneField`, Saffier generates the singular reverse accessor instead of the
+  plural `*_set` name.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.
@@ -544,6 +565,12 @@ if none is provided.
   behavior as `saffier.NEW_M2M_NAMING`. You can still pass
   `saffier.NEW_M2M_NAMING` explicitly or provide a non-empty string.
   String values support `str.format(field=...)`.
+* **embed_through** - When set to a string, queryset results return the related model and attach
+  the intermediate through row on that attribute. This also enables query paths such as
+  `organisation.teams.filter(membership__team__name="Blue Team")` when
+  `embed_through="membership"`.
+* **unique** - Marks the target side of the generated through model as unique, producing a
+  reverse relation that behaves like Edgy's unique many-to-many variant.
 
 !!! Note
     Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.
