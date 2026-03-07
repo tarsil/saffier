@@ -69,7 +69,7 @@ This `Migration` class is not depending of any framework specifically, in fact, 
 when this object is created, it will plug it into any framework you desire.
 
 This makes Saffier unique and extremely flexible to be used within any of the Frameworks out there,
-such as [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic... You choose.
+such as [Ravyn](https://ravyn.dymmond.com), Starlette, FastAPI, Sanic... You choose.
 
 ```python
 from saffier import Migration
@@ -98,6 +98,30 @@ databases.
 
     <sup>Default: `None`</sup>
 
+### Settings-driven defaults
+
+Migration configuration can now be centralized in [Settings](../settings.md):
+
+* `migration_directory`: default folder used by `init` and migration commands
+* `alembic_ctx_kwargs`: extra Alembic context kwargs injected into generated `env.py`
+* `preloads`: early imports that help discovery and model registration
+
+Example:
+
+```python title="myproject/configs/settings.py"
+from saffier.conf.global_settings import SaffierSettings
+
+
+class Settings(SaffierSettings):
+    migration_directory = "db/migrations"
+    preloads = ("myproject.main",)
+    alembic_ctx_kwargs = {
+        "compare_type": True,
+        "render_as_batch": True,
+        "include_schemas": True,
+    }
+```
+
 ### How to use it
 
 Using the [Migration](#migration) class is very simple in terms of requirements. In the
@@ -121,7 +145,7 @@ This will make sure we don't create objects. Nice technique and quite practical.
 Now that we have our details about the database and registry, it is time to use the
 [Migration](#migration) object in the application.
 
-#### Using Esmerald
+#### Using Ravyn
 
 ```python title="my_project/main.py" hl_lines="9 12 32 38"
 {!> ../docs_src/migrations/migrations.py !}
@@ -435,7 +459,7 @@ Let us define our `User` model.
 ```
 
 Now we need to make sure the models are accessible in the application for discovery. Since
-this example is based on Esmerald scaffold, simply add your `User` model into the
+this example is based on Ravyn scaffold, simply add your `User` model into the
 `my_project/apps/accounts/__init__.py`.
 
 ```python title="my_project/apps/accounts/__init__.py"

@@ -4,6 +4,7 @@ import typing
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 
 from saffier.cli.constants import (
     DISCOVERY_FILES,
@@ -70,7 +71,29 @@ class MigrationEnv:
         module_str_path, app_name = path.split(":")
         module = import_module(module_str_path)
         app = getattr(module, app_name)
+        if callable(app) and not hasattr(app, SAFFIER_DB) and not hasattr(app, SAFFIER_EXTRA):
+            app = app()
         return Scaffold(path=path, app=app)
+
+    def _scaffold_from_candidate(self, value: typing.Any, path: str) -> Scaffold | None:
+        if hasattr(value, SAFFIER_DB) or hasattr(value, SAFFIER_EXTRA):
+            return Scaffold(app=value, path=path)
+        return None
+
+    def _find_app_in_module(self, module: ModuleType, dotted_path: str) -> Scaffold | None:
+        for attr, value in module.__dict__.items():
+            scaffold = self._scaffold_from_candidate(value, f"{dotted_path}:{attr}")
+            if scaffold is not None:
+                return scaffold
+
+        for func in DISCOVERY_FUNCTIONS:
+            if hasattr(module, func):
+                app_path = f"{dotted_path}:{func}"
+                fn = getattr(module, func)()
+                scaffold = self._scaffold_from_candidate(fn, app_path)
+                if scaffold is not None:
+                    return scaffold
+        return None
 
     def _get_folders(self, path: Path) -> list[str]:
         """
@@ -78,9 +101,7 @@ class MigrationEnv:
         """
         return [directory.path for directory in os.scandir(path) if directory.is_dir()]
 
-    def _find_app_in_folder(  # type: ignore
-        self, path: Path, cwd: Path
-    ) -> typing.NoReturn | typing.Callable[..., typing.Any] | Scaffold | None:
+    def _find_app_in_folder(self, path: Path, cwd: Path) -> Scaffold | None:
         """
         Iterates inside the folder and looks up to the DISCOVERY_FILES.
         """
@@ -91,26 +112,34 @@ class MigrationEnv:
 
             file_path = path / discovery_file
             dotted_path = ".".join(file_path.relative_to(cwd).with_suffix("").parts)
-
-            # Load file from module
             module = import_module(dotted_path)
+            scaffold = self._find_app_in_module(module, dotted_path)
+            if scaffold is not None:
+                return scaffold
+        return None
 
-            # Iterates through the elements of the module.
-            for attr, value in module.__dict__.items():
-                if (callable(value) and hasattr(value, SAFFIER_DB)) or (
-                    callable(value) and hasattr(value, SAFFIER_EXTRA)
-                ):
-                    app_path = f"{dotted_path}:{attr}"
-                    return Scaffold(app=value, path=app_path)
+    def _find_loaded_app_path(self, app: typing.Any) -> str | None:
+        for module in tuple(sys.modules.values()):
+            if not isinstance(module, ModuleType):
+                continue
+            for attr, value in getattr(module, "__dict__", {}).items():
+                if value is app:
+                    return f"{module.__name__}:{attr}"
+        return None
 
-            # Iterate over default pattern application functions
-            for func in DISCOVERY_FUNCTIONS:
-                if hasattr(module, func):
-                    app_path = f"{dotted_path}:{func}"
-                    fn = getattr(module, func)()
+    def load_from_instance(self, instance: typing.Any) -> "MigrationEnv":
+        app = getattr(instance, "app", instance)
+        path = getattr(instance, "path", None) or self._find_loaded_app_path(app)
 
-                    if hasattr(fn, SAFFIER_DB) or hasattr(fn, SAFFIER_EXTRA):
-                        return Scaffold(app=fn, path=app_path)
+        if path is None and app is not None:
+            path = f"{app.__module__}:app"
+
+        if path is None:
+            raise CommandEnvironmentError(
+                detail="Could not resolve the Saffier app from the active instance."
+            )
+
+        return MigrationEnv(path=path, app=app)
 
     def find_app(self, path: str | None, cwd: Path) -> Scaffold:
         """

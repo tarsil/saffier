@@ -10,15 +10,15 @@ async def create_data():
     Creates mock data
     """
     # Global users
-    john = await User.query.create(name="John Doe", email="john.doe@esmerald.dev")
-    saffier = await User.query.create(name="Saffier", email="saffier@esmerald.dev")
+    john = await User.query.create(name="John Doe", email="john.doe@ravyn.dev")
+    saffier = await User.query.create(name="Saffier", email="saffier@ravyn.dev")
 
     # Tenant
     tenant = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
 
     # HubUser - A user specific inside the saffier schema
     tenant_schema_user = await HubUser.query.using(tenant.schema_name).create(
-        name="saffier", email="saffier@esmerald.dev"
+        name="saffier", email="saffier@ravyn.dev"
     )
 
     await TenantUser.query.create(user=saffier, tenant=tenant)

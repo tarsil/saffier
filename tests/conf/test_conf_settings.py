@@ -6,7 +6,6 @@ import pytest
 
 from saffier.conf import (
     ENVIRONMENT_VARIABLE,
-    SaffierLazySettings,
     configure_settings,
     override_settings,
     reload_settings,
@@ -23,9 +22,11 @@ def test_import_string_errors_and_success():
 
     loaded = import_string("saffier.conf.global_settings.SaffierSettings")
     assert loaded.__name__ == "SaffierSettings"
+    colon_loaded = import_string("saffier.conf.global_settings:SaffierSettings")
+    assert colon_loaded.__name__ == "SaffierSettings"
 
 
-def test_lazy_settings_configure_reload_and_override(monkeypatch: pytest.MonkeyPatch):
+def test_configure_reload_and_override(monkeypatch: pytest.MonkeyPatch):
     @dataclass
     class LocalSettings:
         value: str = "base"
@@ -34,17 +35,14 @@ def test_lazy_settings_configure_reload_and_override(monkeypatch: pytest.MonkeyP
         def dict(self):
             return {"value": self.value, "lower": self.lower}
 
-    lazy = SaffierLazySettings()
-    resolved = lazy.configure(LocalSettings, value="configured")
+    resolved = configure_settings(LocalSettings, value="configured")
     assert resolved.value == "configured"
-    assert lazy.configured is True
 
-    with lazy.override(value="temp") as scoped:
+    with override_settings(value="temp") as scoped:
         assert scoped.value == "temp"
-    assert lazy.value == "configured"
 
     monkeypatch.setenv(ENVIRONMENT_VARIABLE, "saffier.conf.global_settings.SaffierSettings")
-    reloaded = lazy.reload()
+    reloaded = reload_settings()
     assert hasattr(reloaded, "default_related_lookup_field")
 
 

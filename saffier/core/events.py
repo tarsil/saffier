@@ -25,7 +25,7 @@ def is_async_callable(obj: typing.Any) -> bool:
 class AyncLifespanContextManager:
     """
     Manages and handles the on_startup and on_shutdown events
-    in an Esmerald way.
+    in an Ravyn way.
 
     This is not the same as the on_startup and on_shutdown
     from Starlette. Those are now deprecated and will be removed

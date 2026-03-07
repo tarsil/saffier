@@ -1,11 +1,9 @@
 import os
-from dataclasses import dataclass
 from typing import Any
 
 from saffier.conf.global_settings import SaffierSettings
 
 
-@dataclass
 class TenancySettings(SaffierSettings):
     """
     BaseSettings used for the contrib of Saffier tenancy

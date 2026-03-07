@@ -90,7 +90,12 @@ def run_migrations_offline() -> Any:
 
     """
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=get_metadata(), literal_binds=True)
+    context.configure(
+        url=url,
+        target_metadata=get_metadata(),
+        literal_binds=True,
+        **settings.alembic_ctx_kwargs,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
@@ -111,6 +116,7 @@ def do_run_migrations(connection: Any) -> Any:
         connection=connection,
         target_metadata=get_metadata(),
         process_revision_directives=process_revision_directives,
+        **settings.alembic_ctx_kwargs,
         **app._saffier_db["migrate"].kwargs,
     )
 

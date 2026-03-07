@@ -109,6 +109,7 @@ nav:
           - Discovery: "migrations/discovery.md"
           - Migrations: "migrations/migrations.md"
       - Settings: "settings.md"
+      - Extensions: "extensions.md"
   - Extras:
       - Exceptions: "exceptions.md"
       - Tips and Tricks: "tips-and-tricks.md"
@@ -142,11 +143,15 @@ markdown_extensions:
   - mdx_include:
       base_path: docs
   - admonition
-  - extra
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
+  - pymdownx.highlight:
+      use_pygments: true
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.tabbed:
       alternate_style: true
   - md_in_html

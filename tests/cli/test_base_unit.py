@@ -8,6 +8,7 @@ import pytest
 
 import saffier
 from saffier.cli import base as cli_base
+from saffier.conf import override_settings
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -49,6 +50,19 @@ def test_migrate_get_config_and_callbacks():
     assert empty.cmd_opts.x is None
 
 
+def test_migrate_uses_settings_defaults():
+    with override_settings(
+        migration_directory="project_migrations",
+        alembic_ctx_kwargs={"include_schemas": True, "compare_type": False},
+    ):
+        migrate, _ = _make_migrate()
+
+    assert migrate.directory == "project_migrations"
+    assert migrate.alembic_ctx_kwargs["include_schemas"] is True
+    assert migrate.alembic_ctx_kwargs["compare_type"] is True
+    assert migrate.alembic_ctx_kwargs["render_as_batch"] is True
+
+
 def test_list_templates_prints_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     template_dir = tmp_path / "templates"
     default = template_dir / "default"
@@ -68,6 +82,29 @@ def test_list_templates_prints_output(tmp_path: Path, monkeypatch: pytest.Monkey
     output = captured.getvalue()
     assert "default - Default template" in output
     assert "plain - Plain template" in output
+
+
+def test_init_without_app_uses_settings_directory(monkeypatch: pytest.MonkeyPatch):
+    called: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        cli_base.command,
+        "init",
+        lambda config, directory, template, package: called.update(
+            {
+                "directory": directory,
+                "template": template,
+                "package": package,
+                "config_file_name": config.config_file_name,
+            }
+        ),
+    )
+
+    with override_settings(migration_directory="custom_migrations"):
+        cli_base.init(app=None, directory=None, template="plain", package=False)
+
+    assert called["directory"] == "custom_migrations"
+    assert str(called["config_file_name"]).endswith("custom_migrations/alembic.ini")
 
 
 def test_edit_exit_on_old_alembic(monkeypatch: pytest.MonkeyPatch):

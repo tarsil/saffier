@@ -29,7 +29,7 @@ and yet still being able to use Saffier tools like the [shell](./shell.md).
 
 Well, its actually very similar to Migrate object in terms of setup.
 
-Let us use [Esmerald](https://esmerald.dev) again as an example like we did for the
+Let us use [Ravyn](https://ravyn.dymmond.com) again as an example like we did for the
 [tips and tricks](./tips-and-tricks.md).
 
 ```python hl_lines="12 47"

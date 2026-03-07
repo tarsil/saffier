@@ -1,6 +1,6 @@
 from typing import List
 
-from esmerald import Esmerald, Gateway, JSONResponse, get
+from ravyn import Ravyn, Gateway, JSONResponse, get
 
 import saffier
 
@@ -19,7 +19,7 @@ async def products() -> JSONResponse:
     return JSONResponse(products)
 
 
-app = Esmerald(
+app = Ravyn(
     routes=[Gateway(handler=products)],
     on_startup=[database.connect],
     on_shutdown=[database.disconnect],

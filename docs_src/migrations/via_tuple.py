@@ -5,7 +5,7 @@ from pathlib import Path
 
 from my_project.utils import get_db_connection
 
-from esmerald import Esmerald, Include
+from ravyn import Ravyn, Include
 from saffier import Migrate
 
 
@@ -28,7 +28,7 @@ def get_application():
     build_path()
     database, registry = get_db_connection()
 
-    app = Esmerald(
+    app = Ravyn(
         routes=[Include(namespace="my_project.urls")],
     )
 

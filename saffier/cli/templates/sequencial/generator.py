@@ -1,7 +1,7 @@
-import os
 import re
+from pathlib import Path
 
-MIGRATIONS_DIR = "migrations/versions"
+MIGRATIONS_DIR = Path(__file__).resolve().parent / "versions"
 FILENAME_PATTERN = re.compile(r"(\\d{4})_(.*)\\.py")
 
 
@@ -9,7 +9,7 @@ def get_next_migration_number() -> int:
     """
     Returns the next sequential migration number based on existing files.
     """
-    existing_files = os.listdir(MIGRATIONS_DIR)
+    existing_files = [path.name for path in MIGRATIONS_DIR.iterdir()]
     numbers = [
         int(match.group(1))
         for filename in existing_files

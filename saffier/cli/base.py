@@ -5,6 +5,7 @@ import typing
 import warnings
 from collections.abc import Callable
 from importlib import import_module
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 from alembic import __version__ as __alembic_version__
@@ -13,6 +14,7 @@ from alembic.config import Config as AlembicConfig
 
 from saffier.cli.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
 from saffier.cli.decorators import catch_errors
+from saffier.conf import _monkay, settings
 from saffier.core.extras.base import BaseExtra
 from saffier.utils.compat import is_class_and_subclass
 
@@ -67,6 +69,7 @@ class Migrate(BaseExtra):
         model_apps: dict[str, str] | tuple[str] | list[str] | None = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
+        directory: str | os.PathLike[str] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -97,8 +100,9 @@ class Migrate(BaseExtra):
         else:
             self.registry.models = models
 
-        self.directory = "migrations"
-        self.alembic_ctx_kwargs = kwargs
+        self.directory = str(directory or settings.migration_directory)
+        self.alembic_ctx_kwargs = dict(settings.alembic_ctx_kwargs)
+        self.alembic_ctx_kwargs.update(kwargs)
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
 
@@ -136,6 +140,14 @@ class Migrate(BaseExtra):
         migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
         object_setattr(app, SAFFIER_DB, {})
         app._saffier_db["migrate"] = migrate
+        _monkay.set_instance(
+            SimpleNamespace(
+                app=app,
+                migrate=migrate,
+                path=getattr(app, "__saffier_path__", None),
+                registry=self.registry,
+            )
+        )
 
     def configure(self, f: Callable) -> Any:
         self.configure_callbacks.append(f)
@@ -198,7 +210,7 @@ def init(
 ) -> None:
     """Creates a new migration folder"""
     if directory is None:
-        directory = "migrations"
+        directory = str(settings.migration_directory)
 
     template_directory = None
 
@@ -208,7 +220,8 @@ def init(
     config = Config(template_directory=template_directory)
     config.set_main_option("script_location", directory)
     config.config_file_name = os.path.join(directory, "alembic.ini")
-    config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)  # type: ignore
+    if app is not None and hasattr(app, SAFFIER_DB):
+        config = app._saffier_db["migrate"].migrate.call_configure_callbacks(config)  # type: ignore
 
     if template is None:
         template = DEFAULT_TEMPLATE_NAME

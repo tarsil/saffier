@@ -13,7 +13,7 @@ from sayer.params import Option
 
 import saffier
 from saffier.cli.constants import (
-    EXCLUDED_COMMANDS,
+    COMMANDS_WITHOUT_APP,
     HELP_PARAMETER,
     IGNORE_COMMANDS,
     SAFFIER_DISCOVER_APP,
@@ -39,6 +39,7 @@ from saffier.cli.operations import (
     stamp,
 )
 from saffier.cli.state import clear_migration_env, set_migration_env
+from saffier.conf import _monkay, evaluate_settings_once_ready, reload_settings
 from saffier.exceptions import CommandEnvironmentError
 
 help_text = """
@@ -76,13 +77,20 @@ def saffier_callback(
     if HELP_PARAMETER in sys.argv:
         return
 
-    if any(value in sys.argv for value in EXCLUDED_COMMANDS):
+    if any(value in sys.argv for value in COMMANDS_WITHOUT_APP):
         clear_migration_env()
         return
 
     try:
+        reload_settings()
+        evaluate_settings_once_ready()
         migration = MigrationEnv()
-        app_env = migration.load_from_env(path=app)
+        instance_env = (
+            None
+            if app or _monkay.instance is None
+            else migration.load_from_instance(_monkay.instance)
+        )
+        app_env = instance_env or migration.load_from_env(path=app)
         set_migration_env(app_env)
         ctx.obj = app_env
     except CommandEnvironmentError as exc:

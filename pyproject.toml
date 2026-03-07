@@ -43,8 +43,8 @@ dependencies = [
     "anyio>=4.9.0,<5",
     "sayer>=0.7.0,<0.8.0",
     "click>=8.3.1,<9.0.0",
-    "dymmond-settings>=1.0.4",
     "databasez>=0.9.2",
+    "monkay>=0.5.0",
     "orjson >=3.8.5,<4.0.0",
     "rich>=14.0.0,<15.0.0",
     "nest_asyncio",
@@ -168,7 +168,7 @@ SAFFIER_TESTCLIENT_TEST_PREFIX = ""
 [tool.hatch.envs.test.scripts]
 test = "pytest {args}"
 test_man = "pytest {args} -s -vv"
-check_types = "ty check saffier/conf/__init__.py saffier/conf/global_settings.py {args}"
+check_types = "ty check saffier/conf/__init__.py saffier/conf/base.py saffier/conf/global_settings.py {args}"
 
 [tool.hatch.version]
 path = "saffier/__init__.py"

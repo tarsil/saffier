@@ -225,7 +225,7 @@ Well with all the models and explanations covered, is time to create a practical
 of this is applied, this way it will make more sense to understand what is what and how everything
 works together 🔥.
 
-For this example we will be using [Esmerald][esmerald] and [Esmerald middleware][esmerald_middleware]
+For this example we will be using [Ravyn][ravyn] and [Ravyn middleware][ravyn_middleware]
 with Saffier. We will be also be creating:
 
 * [Tenant](#tenant)
@@ -233,7 +233,7 @@ with Saffier. We will be also be creating:
 * [TenantUser](#tenantuser)
 * [Settings](#tenancysettings)
 
-All of this will come together and in the end an [Esmerald][esmerald] API with middleware and an
+All of this will come together and in the end an [Ravyn][ravyn] API with middleware and an
 endpoint will be the final result.
 
 ### Create the initial models
@@ -287,7 +287,7 @@ The `TenantMiddleware` will be only reading from a given header `tenant` and mat
 against a `TenantUser`. If that tenant user exists, then sets the global application tenant
 to the found one, else ignores it.
 
-Because we won't be implementing any `authentication` system in this example where Esmerald has a lot
+Because we won't be implementing any `authentication` system in this example where Ravyn has a lot
 of examples that can be checked in the docs, we will be also passing an `email` in the header just
 to run some queries against.
 
@@ -324,7 +324,7 @@ the newly `saffier` generated schema.
 
 ### Create the API
 
-Now it is time to create the Esmerald API that will **only** read the products associated with
+Now it is time to create the Ravyn API that will **only** read the products associated with
 the user that it is querying it.
 
 ```python title="api.py"
@@ -365,7 +365,7 @@ be carefully managed by you from there on.
 
 
 [saffier]: ./saffier.md
-[esmerald]: https://esmerald.dev
-[esmerald_middleware]: https://esmerald.dev/middleware
+[ravyn]: https://ravyn.dymmond.com
+[ravyn_middleware]: https://ravyn.dymmond.com/middleware
 [django_tenants]: https://django-tenants.readthedocs.io/en/latest/
 [django_tenants_url]: https://django-tenants-url.tarsild.io/

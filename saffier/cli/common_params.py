@@ -1,6 +1,15 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from sayer import Argument, Option
+
+
+def directory_callback(ctx: Any, param: str, value: str | None) -> str | None:
+    if value is not None:
+        from saffier.conf import settings
+
+        settings.migration_directory = value
+    return value
+
 
 VerboseOption = Annotated[
     bool,
@@ -38,5 +47,6 @@ DirectoryOption = Annotated[
         None,
         "-d",
         help='Migration script directory (default is "migrations")',
+        callback=directory_callback,
     ),
 ]

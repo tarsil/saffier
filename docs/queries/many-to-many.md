@@ -97,11 +97,11 @@ format:
 
 ##### Example without related name
 
-```python hl_lines="17"
+```python
 {!> ../docs_src/queries/manytomany/no_rel.py !}
 ```
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/queries/manytomany/no_rel_query_example.py !}
 ```
 

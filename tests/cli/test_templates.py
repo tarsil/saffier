@@ -45,6 +45,13 @@ def test_init_builtin_templates(template):
     assert os.path.isfile("migrations2/alembic.ini")
     assert os.path.isfile("migrations2/env.py")
     assert os.path.isfile("migrations2/script.py.mako")
+    assert "settings.alembic_ctx_kwargs" in open("migrations2/env.py").read()
 
     if template == "sequencial":
         assert os.path.isfile("migrations2/generator.py")
+
+
+def test_init_without_app_uses_settings_defaults():
+    output, error, status = run_cmd(None, "saffier init -d migrations2 -t plain", is_app=False)
+    assert status == 0, output.decode("utf-8") + error.decode("utf-8")
+    assert os.path.isfile("migrations2/env.py")

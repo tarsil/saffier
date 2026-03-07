@@ -153,7 +153,7 @@ from saffier.core.db import set_tenant
 
 The `set_tenant` can be somehow confusing without a proper example so let us run one 😁.
 
-As usual, for this example [Esmerald][esmerald] will be used. This can be applied to any framework
+As usual, for this example [Ravyn][ravyn] will be used. This can be applied to any framework
 of your choice of course.
 
 **What are we building**:
@@ -221,7 +221,7 @@ the tenant data, which means that **there is no need for `using` or `using_with_
 Now it is time to simply create the API that will read the [created products](#generate-example-data)
 from the database and assemble everything.
 
-This will create an [Esmerald][esmerald] application, assemble the `routes` and add the
+This will create an [Ravyn][ravyn] application, assemble the `routes` and add the
 [middleware](#middleware) created in the previous step.
 
 ```python hl_lines="25"
@@ -248,5 +248,5 @@ you can actually take advantage of this.
 [registry]: ../registry.md
 [schemas]: ../registry.md#schemas
 [using_with_db_registry]: ../registry.md#extra
-[esmerald]: https://esmerald.dev
-[middleware]: https://esmerald.dev/middleware
+[ravyn]: https://ravyn.dymmond.com
+[middleware]: https://ravyn.dymmond.com/middleware

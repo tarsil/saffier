@@ -1,6 +1,15 @@
 __version__ = "1.5.0"
 
-from saffier.conf import configure_settings, override_settings, reload_settings, settings
+from saffier.conf import (
+    add_settings_extension,
+    configure_settings,
+    evaluate_settings_once_ready,
+    override_settings,
+    reload_settings,
+    settings,
+    with_settings,
+)
+from saffier.conf.base import BaseSettings
 from saffier.conf.global_settings import SaffierSettings
 
 from . import files, marshalls
@@ -142,4 +151,8 @@ __all__ = [
     "SuspiciousFileOperation",
     "ConfigMarshall",
     "FieldDefinitionError",
+    "BaseSettings",
+    "add_settings_extension",
+    "evaluate_settings_once_ready",
+    "with_settings",
 ]

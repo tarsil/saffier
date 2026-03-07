@@ -57,14 +57,13 @@ inspected.
 
 ### Changed
 
-- New lazy loading settings system making it more unique and dynamic working side by side
-with `dymmond-settings`.
+- New lazy loading settings system making runtime configuration more dynamic and centralized.
 
 ## 1.3.6
 
 ### Changed
 
-- Update internal `dymmond-settings` minimum requirement.
+- Update the internal settings implementation.
 
 ## 1.3.5
 
@@ -306,7 +305,7 @@ performance.
     bring a whole new level of performance to Saffier as well.
 
 !!! Warning
-    To use this version of Saffier with Esmerald, until it is announced compatibility with pydantic 2.0 with Esmerald, it is recommended to use saffier prior to this release.
+    To use this version of Saffier with Ravyn, until it is announced compatibility with pydantic 2.0 with Ravyn, it is recommended to use saffier prior to this release.
 
 ## 0.13.0
 
@@ -467,7 +466,7 @@ to any saffier instance.
 
 ### Changed
 
-- Updated requirements to support Esmerald >= 1.1.0 for testing.
+- Updated requirements to support Ravyn >= 1.1.0 for testing.
 - Updated testing and docs requirements.
 
 ### Added

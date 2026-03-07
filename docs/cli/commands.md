@@ -12,8 +12,12 @@ Provide it via:
 
 * `--app path.to.module:app`
 * `SAFFIER_DEFAULT_APP=path.to.module:app`
+* `preloads` in [Settings](../settings.md)
 
 See [Discovery](../migrations/discovery.md) for details.
+
+If you want centralized command behavior such as preload imports, migration directory defaults,
+custom Alembic context arguments, or shell defaults, configure them in [Settings](../settings.md).
 
 ## Command Families
 
@@ -48,10 +52,14 @@ Create migration repository files.
 
 ```shell
 $ saffier init
+$ saffier init -d db/migrations
 $ saffier init -t plain
 $ saffier init -t url
 $ saffier init -t sequencial
 ```
+
+`init` does not require an application object. When `-d/--directory` is not passed, it uses
+`settings.migration_directory`.
 
 ## Migration Generation
 
@@ -168,6 +176,28 @@ $ pip install "saffier[admin]"
 2. `saffier makemigrations`
 3. `saffier migrate`
 4. Repeat 2-3 as models evolve
+
+## Real-World Workflow
+
+With preload-based discovery in settings:
+
+```python title="myproject/configs/settings.py"
+from saffier.conf.global_settings import SaffierSettings
+
+
+class Settings(SaffierSettings):
+    preloads = ("myproject.main",)
+    migration_directory = "db/migrations"
+```
+
+Typical commands become:
+
+```shell
+$ saffier init
+$ saffier makemigrations -m "Add invoices table"
+$ saffier migrate
+$ saffier shell
+```
 
 ## See Also
 

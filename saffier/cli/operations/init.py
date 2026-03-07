@@ -4,7 +4,6 @@ from sayer import Option, command
 
 from saffier.cli.base import init as _init
 from saffier.cli.common_params import DirectoryOption
-from saffier.cli.state import get_migration_app
 
 
 @command
@@ -24,4 +23,4 @@ def init(
     directory: DirectoryOption,
 ) -> None:
     """Creates a new migration repository."""
-    _init(get_migration_app(), directory, template, package)
+    _init(None, directory, template, package)

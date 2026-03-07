@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from esmerald.conf import settings
+from ravyn.conf import settings
 
 
 @lru_cache()

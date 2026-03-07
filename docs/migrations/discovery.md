@@ -47,7 +47,7 @@ Imagine the following folder and file structure:
 ```
 
 !!! Tip
-    The `application` can be anything from Esmerald, Starlette, Sanic and even FastAPI.
+    The `application` can be anything from Ravyn, Starlette, Sanic and even FastAPI.
 
 The structure above of `myproject` has a lot of files and the one higlighted is the one that
 contains the application object with the [Migration](./migrations.md#migration) from Saffier.
@@ -110,6 +110,24 @@ Example:
 ```shell
 $ saffier --app myproject.main:app init
 ```
+
+## Using Preloads
+
+Saffier also supports preload-driven discovery through [Settings](../settings.md).
+
+Instead of passing `--app` every time, preload the module that defines your application:
+
+```python title="myproject/configs/settings.py"
+from saffier.conf.global_settings import SaffierSettings
+
+
+class Settings(SaffierSettings):
+    preloads = ("myproject.main",)
+```
+
+If `myproject.main` wires `Migrate(...)` or `SaffierExtra(...)`, the preload import sets the
+active Saffier Monkay instance. Commands such as `saffier shell`, `saffier makemigrations`, and
+`saffier migrate` can then resolve the app without an explicit `--app`.
 
 ## How to use and when to use it
 
