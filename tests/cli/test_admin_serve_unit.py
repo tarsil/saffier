@@ -20,15 +20,15 @@ def _make_app():
 
 def test_admin_serve_builds_and_runs(monkeypatch):
     app, registry = _make_app()
-    uvicorn_calls = {}
+    palfrey_calls = {}
 
     monkeypatch.setattr(admin_serve_module, "get_migration_app", lambda: app)
     monkeypatch.setattr(admin_serve_module, "create_admin_app", lambda **kwargs: "admin-app")
     monkeypatch.setattr(admin_serve_module.saffier, "run_sync", lambda coro: coro.close())
     monkeypatch.setitem(
         __import__("sys").modules,
-        "uvicorn",
-        types.SimpleNamespace(run=lambda **kwargs: uvicorn_calls.update(kwargs)),
+        "palfrey",
+        types.SimpleNamespace(run=lambda **kwargs: palfrey_calls.update(kwargs)),
     )
 
     ctx = types.SimpleNamespace(command=types.SimpleNamespace(params=[]))
@@ -44,10 +44,10 @@ def test_admin_serve_builds_and_runs(monkeypatch):
         admin_path="/admin",
     )
 
-    assert uvicorn_calls["host"] == "127.0.0.1"
-    assert uvicorn_calls["port"] == 8010
-    assert uvicorn_calls["log_level"] == "debug"
-    assert uvicorn_calls["app"] is not None
+    assert palfrey_calls["host"] == "127.0.0.1"
+    assert palfrey_calls["port"] == 8010
+    assert palfrey_calls["log_level"] == "debug"
+    assert palfrey_calls["config_or_app"] is not None
 
 
 def test_admin_serve_auto_generates_password(monkeypatch, capsys):
@@ -57,7 +57,7 @@ def test_admin_serve_auto_generates_password(monkeypatch, capsys):
     monkeypatch.setattr(admin_serve_module, "create_admin_app", lambda **kwargs: "admin")
     monkeypatch.setitem(
         __import__("sys").modules,
-        "uvicorn",
+        "palfrey",
         types.SimpleNamespace(run=lambda **kwargs: None),
     )
     monkeypatch.setattr(admin_serve_module.secrets, "token_urlsafe", lambda n: "token")

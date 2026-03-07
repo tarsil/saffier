@@ -83,9 +83,9 @@ def admin_serve(
     Starts Saffier admin server.
     """
     try:
-        import uvicorn
+        import palfrey
     except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("Uvicorn is required to run `saffier admin_serve`.") from exc
+        raise RuntimeError("Palfrey is required to run `saffier admin_serve`.") from exc
 
     app = get_migration_app()
     if not hasattr(app, SAFFIER_DB):
@@ -125,8 +125,8 @@ def admin_serve(
     if create_all:
         saffier.run_sync(registry.create_all())
 
-    uvicorn.run(
-        app=final_app,
+    palfrey.run(
+        config_or_app=final_app,
         host=host,
         port=port,
         reload=False,

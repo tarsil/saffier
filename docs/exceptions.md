@@ -58,6 +58,21 @@ Or simply:
 from saffier import ImproperlyConfigured
 ```
 
+## MarshallFieldDefinitionError
+
+Raised when a marshall declaration is incomplete or inconsistent.
+
+Examples:
+
+* missing `marshall_config`
+* using both `fields` and `exclude`
+* forgetting `ClassVar` on `marshall_config`
+* declaring a `MarshallMethodField` without its matching `get_<field>()`
+
+```python
+from saffier.exceptions import MarshallFieldDefinitionError
+```
+
 ## SuspiciousFileOperation
 
 Raised when file/path utilities detect an unsafe filename or path traversal.

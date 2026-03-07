@@ -329,6 +329,16 @@ class BaseModelMeta(type):
             __search_for_fields(base, inherited_fields)
 
         if inherited_fields:
+            declared_primary_keys = [
+                key
+                for key, value in attrs.items()
+                if isinstance(value, Field) and value.primary_key
+            ]
+            if declared_primary_keys and "id" not in declared_primary_keys:
+                inherited_id = inherited_fields.get("id")
+                if isinstance(inherited_id, Field) and inherited_id.primary_key:
+                    inherited_fields.pop("id", None)
+
             # Making sure the inherited fields are before the new defined.
             attrs = {**inherited_fields, **attrs}
 

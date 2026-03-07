@@ -61,6 +61,7 @@ async def test_improperly_configured_for_multiple_primary_keys():
     with pytest.raises(ImproperlyConfigured) as raised:
 
         class BaseModel(saffier.Model):
+            id = saffier.IntegerField(primary_key=True)
             name = saffier.IntegerField(primary_key=True)
             query = ObjectsManager()
             languages = ObjectsManager()

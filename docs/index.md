@@ -110,6 +110,7 @@ specific queries and querysets at ease.
 * **Content types** - Generic content type support via `Registry(..., with_content_type=True)`.
 * **Permissions contrib** - Reusable permission model and permission manager helpers.
 * **Admin subsystem** - Python-native admin site and optional ASGI admin app.
+* **Python-native marshalls** - DTO/serializer layer with custom fields, context, schema output, and save support.
 * **Standalone file storage API** - `saffier.files` now exposes file objects, storage backends, and safe filesystem handling.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you

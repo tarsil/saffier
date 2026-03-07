@@ -101,6 +101,7 @@ nav:
       - Registry: "registry.md"
       - CLI Commands: "cli/commands.md"
       - Admin: "admin/admin.md"
+      - Marshalls: "marshalls.md"
       - Files and Storage: "files.md"
       - Shell Support: "shell.md"
       - Inspect DB: "inspectdb.md"
@@ -118,6 +119,7 @@ nav:
       - Model: "references/models.md"
       - ReflectModel: "references/reflect-model.md"
       - Manager: "references/manager.md"
+      - Marshalls: "references/marshalls.md"
       - QuerySet: "references/queryset.md"
       - Signals: "references/signals.md"
       - Fields:

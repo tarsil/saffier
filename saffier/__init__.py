@@ -3,7 +3,7 @@ __version__ = "1.5.0"
 from saffier.conf import configure_settings, override_settings, reload_settings, settings
 from saffier.conf.global_settings import SaffierSettings
 
-from . import files
+from . import files, marshalls
 from .cli import Migrate
 from .core.connection.database import Database
 from .core.connection.registry import Registry
@@ -51,12 +51,15 @@ from .core.db.models.managers import BaseManager, Manager, RedirectManager
 from .core.db.querysets import Q, QuerySet, and_, not_, or_
 from .core.db.querysets.prefetch import Prefetch
 from .core.extras import SaffierExtra
+from .core.marshalls import ConfigMarshall, Marshall, MarshallField, MarshallMethodField
 from .core.signals import Signal
 from .core.utils.sync import run_sync
 from .exceptions import (
     DatabaseNotConnectedWarning,
+    FieldDefinitionError,
     FileOperationError,
     InvalidStorageError,
+    MarshallFieldDefinitionError,
     MultipleObjectsReturned,
     ObjectNotFound,
     SuspiciousFileOperation,
@@ -100,6 +103,10 @@ __all__ = [
     "BaseManager",
     "InvalidStorageError",
     "Manager",
+    "Marshall",
+    "MarshallField",
+    "MarshallFieldDefinitionError",
+    "MarshallMethodField",
     "RedirectManager",
     "Migrate",
     "Model",
@@ -130,6 +137,9 @@ __all__ = [
     "override_settings",
     "reload_settings",
     "fields",
+    "marshalls",
     "run_sync",
     "SuspiciousFileOperation",
+    "ConfigMarshall",
+    "FieldDefinitionError",
 ]

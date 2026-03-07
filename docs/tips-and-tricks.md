@@ -55,7 +55,7 @@ codebase and making sure you **do not generate** extra objects and this is exact
 Use the example above, let us now create a new file called `utils.py` where we will be applying
 the `lru_cache` technique for our `db_connection`.
 
-```python title="utils.py" hl_lines="6"
+```python
 {!> ../docs_src/tips/lru.py !}
 ```
 

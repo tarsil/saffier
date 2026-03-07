@@ -32,6 +32,16 @@ class Profile(saffier.Model):
         tablename = "profiles"
 
 
+class SpecialProfile(saffier.Model):
+    special_id = saffier.IntegerField(primary_key=True, autoincrement=True)
+    language = saffier.CharField(max_length=200, null=True)
+    age = saffier.IntegerField()
+
+    class Meta:
+        registry = models
+        tablename = "special_profiles"
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
@@ -60,3 +70,12 @@ async def test_model_custom_primary_key():
 
     assert len(profiles) == 1
     assert profiles[0].pk == profile.pk
+
+
+async def test_model_custom_primary_key_with_non_id_name():
+    profile = await SpecialProfile.query.create(language="EN", age=18)
+    profiles = await SpecialProfile.query.filter()
+
+    assert len(profiles) == 1
+    assert profiles[0].special_id == profile.special_id
+    assert profiles[0].pk == profile.special_id
