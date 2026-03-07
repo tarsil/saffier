@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING, Any, cast
 
 from saffier.core.db.context_vars import get_schema, get_tenant, set_tenant
@@ -64,11 +65,21 @@ class Manager(BaseManager):
             ...
     """
 
-    def __get__(self, _: Any, owner: Any) -> type["QuerySet"]:
-        return cast(
-            "type[QuerySet]",
-            self.__class__(owner=owner, inherit=self.inherit, name=self.name),
-        )
+    def __get__(self, instance: Any, owner: Any) -> Any:
+        self.owner = owner
+        if instance is None:
+            self.instance = None
+            return self
+
+        cached = instance.__dict__.get(self.name)
+        if cached is not None:
+            return cached
+
+        manager = copy.copy(self)
+        manager.owner = owner
+        manager.instance = instance
+        instance.__dict__[self.name] = manager
+        return manager
 
     def get_queryset(self) -> "QuerySet":
         """
@@ -129,16 +140,21 @@ class RedirectManager(Manager):
         self.redirect_name = redirect_name
         super().__init__(**kwargs)
 
-    def __get__(self, _: Any, owner: Any) -> type["QuerySet"]:
-        return cast(
-            "type[QuerySet]",
-            self.__class__(
-                redirect_name=self.redirect_name,
-                owner=owner,
-                inherit=self.inherit,
-                name=self.name,
-            ),
-        )
+    def __get__(self, instance: Any, owner: Any) -> Any:
+        self.owner = owner
+        if instance is None:
+            self.instance = None
+            return self
+
+        cached = instance.__dict__.get(self.name)
+        if cached is not None:
+            return cached
+
+        manager = copy.copy(self)
+        manager.owner = owner
+        manager.instance = instance
+        instance.__dict__[self.name] = manager
+        return manager
 
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_") or name == self.name:

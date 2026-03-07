@@ -4,6 +4,10 @@ The managers are a great tool that **Saffier** offers. Heavily inspired by Djang
 allow you to build unique tailored queries ready to be used by your models.
 
 **Saffier** by default uses the the manager called `query` which it makes it simple to understand.
+Managers are class- and instance-aware: accessing a manager on a model class returns the
+class-bound manager, while accessing it on a model instance returns a shallow copied manager bound
+to that instance. Instance-bound managers are cached per instance, so later class-manager changes
+only affect managers materialized after that change.
 
 Let us see an example.
 

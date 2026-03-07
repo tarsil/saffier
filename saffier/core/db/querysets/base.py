@@ -66,7 +66,7 @@ class BaseQuerySet(
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
-        self.distinct_on = [] if distinct_on is None else distinct_on
+        self.distinct_on = distinct_on
         self._only = [] if only_fields is None else only_fields
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
@@ -117,8 +117,11 @@ class BaseQuerySet(
 
     def _build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
         """Filters selects only specific fields"""
-        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
-        expression = expression.distinct(*distinct_on)
+        if not distinct_on:
+            expression = expression.distinct()
+        else:
+            distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
+            expression = expression.distinct(*distinct_on)
         return expression
 
     def _is_multiple_foreign_key(
@@ -311,7 +314,13 @@ class BaseQuerySet(
         expression = expression.select_from(select_from)
 
         if queryset._only:
-            expression = expression.with_only_columns(*queryset._only)
+            only_columns = []
+            for field in queryset._only:
+                if isinstance(field, str):
+                    only_columns.append(select_from.columns[field])
+                else:
+                    only_columns.append(field)
+            expression = expression.with_only_columns(*only_columns)
 
         if queryset._defer:
             columns = [
@@ -350,7 +359,7 @@ class BaseQuerySet(
                 queryset._group_by, expression=expression
             )
 
-        if queryset.distinct_on:
+        if queryset.distinct_on is not None:
             expression = queryset._build_select_distinct(
                 queryset.distinct_on, expression=expression
             )
@@ -819,12 +828,17 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str) -> "QuerySet":
+    def distinct(self, first: bool | str = True, *distinct_on: str) -> "QuerySet":
         """
         Returns a queryset with distinct results.
         """
         queryset: QuerySet = self._clone()
-        queryset.distinct_on = distinct_on
+        if first is False:
+            queryset.distinct_on = None
+        elif first is True:
+            queryset.distinct_on = []
+        else:
+            queryset.distinct_on = [first, *distinct_on]
         return queryset
 
     def only(self, *fields: Sequence[str]) -> "QuerySet":
@@ -832,9 +846,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns a list of models with the selected only fields and always the primary
         key.
         """
-        only_fields = [sqlalchemy.text(field) for field in fields]
-        if self.model_class.pkname not in fields:
-            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+        only_fields = list(fields)
+        for pkcolumn in reversed(tuple(self.model_class.pkcolumns)):
+            if pkcolumn not in only_fields:
+                only_fields.insert(0, pkcolumn)
 
         queryset: QuerySet = self._clone()
         queryset._only = only_fields
@@ -1065,9 +1080,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: QuerySet = self._clone()
         if kwargs:
-            return await queryset.filter(**kwargs).order_by("id").get()
+            queryset = queryset.filter(**kwargs)
 
-        rows = await queryset.limit(1).order_by("id").all()
+        if not queryset._order_by:
+            queryset = queryset.order_by(queryset.pkname)
+
+        rows = await queryset.limit(1).all()
         if rows:
             return rows[0]
         return None
@@ -1078,9 +1096,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: QuerySet = self._clone()
         if kwargs:
-            return await queryset.filter(**kwargs).order_by("-id").get()
+            queryset = queryset.filter(**kwargs)
 
-        rows = await queryset.order_by("-id").all()
+        if not queryset._order_by:
+            queryset = queryset.order_by(queryset.pkname)
+
+        rows = await queryset.reverse().limit(1).all()
         if rows:
             return rows[0]
         return None
@@ -1651,7 +1672,7 @@ class CombinedQuerySet(QuerySet):
                     ) from exc
             expression = expression.group_by(*groups)
 
-        if queryset.distinct_on:
+        if queryset.distinct_on is not None:
             try:
                 distinct_fields = [subquery.c[field] for field in queryset.distinct_on]
             except KeyError as exc:

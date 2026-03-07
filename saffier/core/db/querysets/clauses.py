@@ -95,7 +95,10 @@ def build_lookup_clauses(
         if hasattr(value, "pk"):
             value = value.pk
 
-        clause = getattr(column, op_attr)(value)
+        if op == "isnull":
+            clause = column.is_(None) if value else column.is_not(None)
+        else:
+            clause = getattr(column, op_attr)(value)
         if hasattr(clause, "modifiers"):
             clause.modifiers["escape"] = "\\" if has_escaped_character else None
         clauses.append(clause)

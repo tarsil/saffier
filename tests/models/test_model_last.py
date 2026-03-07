@@ -41,3 +41,14 @@ async def test_model_last():
     assert await User.query.last(name="Jane") == jane
     assert await User.query.filter(name="Test").last() == Test
     assert await User.query.filter(name="Lucy").last() is None
+
+
+async def test_model_last_respects_existing_ordering():
+    await User.query.create(name="Zulu")
+    alpha = await User.query.create(name="Alpha")
+
+    last = await User.query.order_by("name").last()
+
+    assert last != alpha
+    assert last is not None
+    assert last.name == "Zulu"

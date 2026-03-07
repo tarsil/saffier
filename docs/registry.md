@@ -110,6 +110,24 @@ registry = Registry(database=database, automigrate_config=Settings)
 This delegates to the normal migration `upgrade()` flow and is still controlled by
 `settings.allow_automigrations`.
 
+## Synchronous Registry Environments
+
+When you need to drive async registry lifecycle and ORM calls from synchronous code, use
+`Registry.with_async_env()`:
+
+```python
+import saffier
+
+
+with models.with_async_env():
+    saffier.run_sync(models.create_all())
+    user = saffier.run_sync(User.query.create(name="Saffier"))
+    fetched = saffier.run_sync(User.query.get(pk=user.pk))
+```
+
+This binds `run_sync()` to the registry-managed event loop for the duration of the context and
+cleans the registry up on exit. Nested `with_async_env()` blocks are supported.
+
 ## Schemas
 
 This is another great supported feature from Saffier. This allows you to manipulate database schema

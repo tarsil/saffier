@@ -1,7 +1,8 @@
 import asyncio
+import contextlib
 import copy
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from functools import cached_property
 from typing import Any, cast
 
@@ -16,6 +17,7 @@ from saffier.conf import _monkay, settings
 from saffier.core.connection.database import Database
 from saffier.core.connection.schemas import Schema
 from saffier.core.db.constants import CASCADE
+from saffier.core.utils.sync import current_eventloop, run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -857,6 +859,30 @@ class Registry:
         for _, database in reversed(self._iter_databases()):
             if database.is_connected:
                 await database.disconnect()
+
+    @contextlib.contextmanager
+    def with_async_env(
+        self, loop: asyncio.AbstractEventLoop | None = None
+    ) -> Generator["Registry", None, None]:
+        close = False
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = current_eventloop.get()
+                if loop is None:
+                    loop = asyncio.new_event_loop()
+                    close = True
+
+        token = current_eventloop.set(loop)
+        try:
+            yield cast("Registry", run_sync(self.__aenter__(), loop=loop))
+        finally:
+            run_sync(self.__aexit__(), loop=loop)
+            current_eventloop.reset(token)
+            if close:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
 
     def refresh_metadata(
         self,
