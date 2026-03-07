@@ -272,7 +272,11 @@ class BaseMarshall:
         cls,
         *,
         include_callable_defaults: bool = False,
+        schema_generator: Any | None = None,
+        mode: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
+        del schema_generator, mode, kwargs
         properties: dict[str, Any] = {}
         required: list[str] = []
         for field_name, binding in cls.model_fields.items():
@@ -281,7 +285,7 @@ class BaseMarshall:
             schema = _annotation_to_schema(binding.field_type)
             if binding.has_default:
                 default = binding.default
-                if callable(default):
+                if binding.callable_default:
                     default = default() if include_callable_defaults else _NO_DEFAULT
                 if default is not _NO_DEFAULT:
                     schema["default"] = default

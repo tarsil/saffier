@@ -578,9 +578,8 @@ if none is provided.
     `id` as the primary key.
 
 !!! Warning
-    Saffier intentionally does not support Edgy's legacy `OLD_M2M_NAMING`
-    marker. Auto-generated through models always use the field-based naming
-    path unless you provide an explicit table name yourself.
+    Saffier intentionally keeps `saffier.NEW_M2M_NAMING` as the single supported
+    auto-generated naming path unless you provide an explicit table name yourself.
 
 !!! Tip
     String values for `through_tablename` are formatted with `field=self` before

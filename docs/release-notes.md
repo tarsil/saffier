@@ -8,6 +8,8 @@
 - QuerySet `bulk_get_or_create` with `bulk_select_or_insert` alias.
 - QuerySet `local_or`, `batch_size`, `extra_select`, and `reference_select` APIs.
 - Settings runtime helpers: `configure_settings`, `reload_settings`, and `override_settings`.
+- Edgy compatibility modules for legacy imports across queryset, tenancy, admin, Lilya middleware, and model helpers.
+- Pure-Python `Model.model_json_schema(...)` compatibility and richer tenancy helpers such as `with_schema(...)` and `using(database=..., schema=...)`.
 
 ### Changed
 

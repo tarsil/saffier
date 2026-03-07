@@ -9,6 +9,7 @@ from sqlalchemy.engine.result import Row
 import saffier
 from saffier.conf import settings
 from saffier.core.db.models.base import SaffierBaseReflectModel
+from saffier.core.db.models.mixins.admin import AdminMixin
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
 from saffier.core.utils.schemas import Schema
@@ -17,7 +18,7 @@ from saffier.core.utils.sync import run_sync
 saffier_setattr = object.__setattr__
 
 
-class Model(ModelRow, DeclarativeMixin):
+class Model(ModelRow, DeclarativeMixin, AdminMixin):
     """
     The models will always have an id attribute as primery key.
     The primary key can be whatever desired, from IntegerField, FloatField to UUIDField as long as the `id` field is explicitly declared or else it defaults to BigIntegerField.
@@ -41,6 +42,31 @@ class Model(ModelRow, DeclarativeMixin):
                     tablename = "users"
 
         """
+
+    @classmethod
+    def model_json_schema(
+        cls,
+        *,
+        schema_generator: Any | None = None,
+        mode: str | None = None,
+        phase: str | None = None,
+        include_callable_defaults: bool | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        del kwargs
+        if phase is None:
+            phase = "create" if mode == "validation" else "view"
+        if include_callable_defaults is None:
+            marker = getattr(schema_generator, "include_callable_defaults", None)
+            if marker is None:
+                schema_name = getattr(schema_generator, "__name__", "")
+                include_callable_defaults = schema_name != "NoCallableDefaultJsonSchema"
+            else:
+                include_callable_defaults = bool(marker)
+        marshall_class = cls.get_admin_marshall_class(phase=phase, for_schema=True)
+        return marshall_class.model_json_schema(
+            include_callable_defaults=bool(include_callable_defaults)
+        )
 
     def __getattribute__(self, name: str) -> Any:
         value = super().__getattribute__(name)

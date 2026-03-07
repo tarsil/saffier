@@ -39,6 +39,7 @@ class MarshallFieldBinding:
     null: bool = False
     default: Any = None
     has_default: bool = False
+    callable_default: bool = False
     read_only: bool = False
     source: str | None = None
     is_method: bool = False
@@ -58,14 +59,16 @@ def _build_model_binding(name: str, field: Field) -> MarshallFieldBinding:
     if annotation in (None, Any):
         annotation = _infer_field_type(field)
     validator = field.validator
+    default = getattr(validator, "default", None)
     return MarshallFieldBinding(
         name=name,
         field_type=annotation,
         exclude=False,
         required=not field.null and not validator.has_default() and not validator.read_only,
         null=field.null,
-        default=validator.get_default_value() if validator.has_default() else None,
+        default=default if validator.has_default() else None,
         has_default=validator.has_default(),
+        callable_default=callable(default) if validator.has_default() else False,
         read_only=bool(validator.read_only),
         source=name,
         is_method=False,
@@ -105,14 +108,16 @@ def _build_declared_binding(
     field: BaseMarshallField,
     model_field: Field | None,
 ) -> MarshallFieldBinding:
+    default = getattr(field, "default", None)
     return MarshallFieldBinding(
         name=name,
         field_type=field.field_type,
         exclude=field.exclude,
         required=field.is_required(),
         null=field.null,
-        default=field.get_default_value() if field.has_default() else None,
+        default=default if field.has_default() else None,
         has_default=field.has_default(),
+        callable_default=callable(default) if field.has_default() else False,
         read_only=False,
         source=field.source,
         is_method=field.__is_method__,
