@@ -206,7 +206,13 @@ class RelatedField:
             if owner_database is None:
                 owner_registry = getattr(getattr(self.related_to, "meta", None), "registry", None)
                 owner_database = getattr(owner_registry, "database", None)
-        return bool(self.foreign_key.is_cross_db(owner_database))
+        target_database = getattr(self.foreign_key.owner, "database", None)
+        if target_database is None:
+            target_registry = getattr(getattr(self.foreign_key.owner, "meta", None), "registry", None)
+            target_database = getattr(target_registry, "database", None)
+        if owner_database is None or target_database is None:
+            return False
+        return str(owner_database.url) != str(target_database.url)
 
     def get_related_model_for_admin(self) -> Any | None:
         registry = getattr(getattr(self.related_from, "meta", None), "registry", None)
