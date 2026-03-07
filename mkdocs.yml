@@ -101,6 +101,7 @@ nav:
       - Registry: "registry.md"
       - CLI Commands: "cli/commands.md"
       - Admin: "admin/admin.md"
+      - Files and Storage: "files.md"
       - Shell Support: "shell.md"
       - Inspect DB: "inspectdb.md"
       - Migrations:

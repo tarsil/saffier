@@ -49,6 +49,13 @@ with override_settings(default_related_lookup_field="uuid"):
 
 - `ipython_args`: arguments passed to `saffier shell` with IPython.
 - `ptpython_config_file`: config path for `saffier shell --kernel ptpython`.
+- `file_upload_temp_dir`: optional temp directory for upload workflows.
+- `file_upload_permissions`: filesystem permissions applied to saved files.
+- `file_upload_directory_permissions`: filesystem permissions applied to created directories.
+- `media_root`: default root directory for filesystem-backed storage.
+- `media_url`: base URL used by filesystem-backed storage.
+- `storages`: configured storage backends available through `saffier.files.storages`.
+- `use_tz`: controls timezone-aware timestamps in file storage date accessors.
 - `default_related_lookup_field`: default related lookup key (default: `id`).
 - `orm_concurrency_enabled`: enables/disables internal concurrent execution helpers.
 - `orm_concurrency_limit`: default batch size limit for `run_concurrently` utilities (`None` means unrestricted gather).

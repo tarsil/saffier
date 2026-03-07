@@ -3,6 +3,7 @@ __version__ = "1.5.0"
 from saffier.conf import configure_settings, override_settings, reload_settings, settings
 from saffier.conf.global_settings import SaffierSettings
 
+from . import files
 from .cli import Migrate
 from .core.connection.database import Database
 from .core.connection.registry import Registry
@@ -55,6 +56,7 @@ from .core.utils.sync import run_sync
 from .exceptions import (
     DatabaseNotConnectedWarning,
     FileOperationError,
+    InvalidStorageError,
     MultipleObjectsReturned,
     ObjectNotFound,
     SuspiciousFileOperation,
@@ -84,6 +86,7 @@ __all__ = [
     "EmailField",
     "ExcludeField",
     "FileField",
+    "files",
     "FloatField",
     "FileOperationError",
     "ForeignKey",
@@ -95,6 +98,7 @@ __all__ = [
     "ManyToMany",
     "ManyToManyField",
     "BaseManager",
+    "InvalidStorageError",
     "Manager",
     "RedirectManager",
     "Migrate",

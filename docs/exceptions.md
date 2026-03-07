@@ -74,6 +74,14 @@ Raised when a file operation cannot be completed safely.
 from saffier.exceptions import FileOperationError
 ```
 
+## InvalidStorageError
+
+Raised when a configured storage alias or backend cannot be loaded.
+
+```python
+from saffier.exceptions import InvalidStorageError
+```
+
 ## DatabaseNotConnectedWarning
 
 Warning category for operations that require a connected database but run disconnected.

@@ -1,4 +1,6 @@
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import ClassVar
 
 from dymmond_settings import Settings
@@ -8,6 +10,19 @@ from dymmond_settings import Settings
 class SaffierSettings(Settings):
     ipython_args: ClassVar[list[str]] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
+    file_upload_temp_dir: str | os.PathLike[str] | None = None
+    file_upload_permissions: int | None = 0o644
+    file_upload_directory_permissions: int | None = None
+    media_root: str | os.PathLike[str] = Path("media")
+    media_url: str = ""
+    storages: dict[str, dict[str, object]] = field(
+        default_factory=lambda: {
+            "default": {
+                "backend": "saffier.core.files.storage.filesystem.FileSystemStorage",
+            }
+        }
+    )
+    use_tz: bool = True
 
     # Dialects
     postgres_dialects: ClassVar[set[str]] = {"postgres", "postgresql"}
