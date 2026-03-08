@@ -113,7 +113,7 @@ using the `post_save` signal. The reason for the `post_save` it it because the n
 be sent **after** the creation of the record and not before. If it was before, the `pre_save` would
 be the one to use.
 
-```python hl_lines="11-12"
+```python
 {!> ../docs_src/signals/receiver/post_save.py !}
 ```
 
@@ -145,7 +145,7 @@ model.
 
 The way you define the receiver for both can simply be achieved like this:
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/signals/receiver/post_multiple.py !}
 ```
 
@@ -171,7 +171,7 @@ This will make sure that every receiver will execute the given defined action.
 If you wish to disconnect the receiver and stop it from running for a fiven model, you can also
 achieve this in a simple way.
 
-```python hl_lines="20 23"
+```python
 {!> ../docs_src/signals/receiver/disconnect.py !}
 ```
 
@@ -193,7 +193,7 @@ and logic.
 
 So define it, you can simply do:
 
-```python hl_lines="17"
+```python
 {!> ../docs_src/signals/custom.py !}
 ```
 
@@ -206,7 +206,7 @@ Yes, this simple. You simply need to add a new signal `on_verify` to the model s
 
 Now you want to create a custom functionality to be listened in your new Signal.
 
-```python hl_lines="21 30"
+```python
 {!> ../docs_src/signals/register.py !}
 ```
 
@@ -220,7 +220,7 @@ custom enough for the needs of the business logic.
 
 For simplification, the example below will be a very simple logic.
 
-```python hl_lines="17"
+```python
 {!> ../docs_src/signals/logic.py !}
 ```
 
@@ -230,6 +230,6 @@ As you can see, the `on_verify`, it is only triggered if the user is verified an
 
 The process of disconnecting the signal is exactly the [same as before](#disconnecting-receivers).
 
-```python hl_lines="10"
+```python
 {!> ../docs_src/signals/disconnect.py !}
 ```

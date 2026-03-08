@@ -1,3 +1,5 @@
+"""Internal validator objects backing Saffier model fields."""
+
 import decimal
 import re
 import typing
@@ -24,8 +26,16 @@ NO_DEFAULT = object()
 
 
 class SaffierField(ArbitraryHashableBaseModel):
-    """
-    The base of all fields used by Saffier
+    """Base validator shared by all Saffier field types.
+
+    Args:
+        title: Optional display title used by schema generation.
+        description: Human-readable field description.
+        help_text: Additional guidance exposed by schema helpers.
+        default: Default value or callable default for the field.
+        null: Whether `None` is accepted.
+        read_only: Whether write-time validation should reject client input.
+        **kwargs: Additional model attributes forwarded to the base model.
     """
 
     error_messages: dict[str, str] = {}
@@ -86,9 +96,7 @@ class SaffierField(ArbitraryHashableBaseModel):
 
 
 class String(SaffierField):
-    """
-    SaffierField representation of a String.
-    """
+    """Validate textual input with length, format, and pattern checks."""
 
     error_messages: dict[str, str] = {
         "type": "Must be a string.",
@@ -174,6 +182,8 @@ class String(SaffierField):
 
 
 class Number(SaffierField):
+    """Base numeric validator for integer, float, and decimal field types."""
+
     field_type: typing.Any = None
     error_messages: dict[str, str] = {
         "type": "Must be a number.",
@@ -271,18 +281,26 @@ class Number(SaffierField):
 
 
 class Integer(Number):
+    """Integer-specialized numeric validator."""
+
     field_type: typing.Any = int
 
 
 class Float(Number):
+    """Floating-point-specialized numeric validator."""
+
     field_type: typing.Any = float
 
 
 class Decimal(Number):
+    """Decimal-specialized numeric validator."""
+
     field_type: typing.Any = decimal.Decimal
 
 
 class Boolean(SaffierField):
+    """Validate booleans with optional coercion from common string values."""
+
     error_messages: dict[str, str] = {
         "type": "Must be a boolean.",
         "null": "May not be null.",
@@ -325,6 +343,8 @@ class Boolean(SaffierField):
 
 
 class Duration(SaffierField):
+    """Validate `timedelta` values or second-like numeric input."""
+
     error_messages: dict[str, str] = {
         "type": "Must be a timedelta or seconds.",
         "null": "May not be null.",
@@ -355,6 +375,8 @@ class Duration(SaffierField):
 
 
 class Binary(SaffierField):
+    """Validate bytes-like payloads for binary storage fields."""
+
     error_messages: dict[str, str] = {
         "type": "Must be bytes.",
         "null": "May not be null.",
@@ -391,6 +413,8 @@ class Binary(SaffierField):
 
 
 class Choice(SaffierField):
+    """Validate that a value belongs to a predefined set of choices."""
+
     error_messages: dict[str, str] = {
         "null": "May not be null.",
         "required": "This field is required.",
@@ -427,26 +451,36 @@ class Choice(SaffierField):
 
 
 class Text(String):
+    """String validator configured for unconstrained text values."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="text", **kwargs)
 
 
 class Date(String):
+    """String validator configured for date input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="date", **kwargs)
 
 
 class Time(String):
+    """String validator configured for time input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="time", **kwargs)
 
 
 class DateTime(String):
+    """String validator configured for datetime input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="datetime", **kwargs)
 
 
 class Union(SaffierField):
+    """Validate a value against multiple candidate validators."""
+
     error_messages: dict[str, str] = {
         "null": "May not be null.",
         "union": "Did not match any valid type.",
@@ -485,14 +519,14 @@ class Union(SaffierField):
 
 
 class Any(SaffierField):
+    """Pass-through validator that accepts any value."""
+
     def check(self, value: typing.Any) -> typing.Any:
         return value
 
 
 class Const(SaffierField):
-    """
-    Only ever matches the given given value.
-    """
+    """Validate that a value exactly matches a predefined constant."""
 
     error_messages: dict[str, str] = {
         "only_null": "Must be null.",
@@ -513,25 +547,35 @@ class Const(SaffierField):
 
 
 class UUID(String):
+    """String validator configured for UUID input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="uuid", **kwargs)
 
 
 class Email(String):
+    """String validator configured for e-mail input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="email", **kwargs)
 
 
 class Password(String):
+    """String validator configured for password-like input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="password", **kwargs)
 
 
 class IPAddress(String):
+    """String validator configured for IP address input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="ipaddress", **kwargs)
 
 
 class URL(String):
+    """String validator configured for absolute URL input."""
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="url", **kwargs)

@@ -68,7 +68,7 @@ This is the base of all models that **require the table to be created inside the
 The `TenantModel` already inherits from the base `saffier.Model` which means it will apply all the needed
 core functionalities but introduces a new internam `metaclass` required for the `is_tenant` attribute.
 
-```python hl_lines="2 5 8 19"
+```python
 {!> ../docs_src/tenancy/contrib/tenant_model.py !}
 ```
 
@@ -90,7 +90,7 @@ created for the purpose of useing the Saffier contrib module where it adds some 
 integration easier, such as the `tenant_models` object which is internally used to understand
 which models should be generated upon the creation of a `Tenant` automatically.
 
-```python hl_lines="2 5 8 19"
+```python
 {!> ../docs_src/tenancy/contrib/tenant_registry.py !}
 ```
 
@@ -163,7 +163,7 @@ When a new tenant is created, upon the `save` of the record, **it will create th
 
 The way the `TenantMixin` should be used it is very simple.
 
-```python hl_lines="3 9"
+```python
 {!> ../docs_src/tenancy/contrib/tenant_mixin.py !}
 ```
 
@@ -187,7 +187,7 @@ The domain table it is the place where that information is stored.
 
 The way the `DomainMixin` should be used it is very simple.
 
-```python hl_lines="3 18"
+```python
 {!> ../docs_src/tenancy/contrib/domain_mixin.py !}
 ```
 
@@ -219,7 +219,7 @@ designs.
 
 The way the `DomainMixin` should be used it is very simple.
 
-```python hl_lines="3 27"
+```python
 {!> ../docs_src/tenancy/contrib/tenant_user_mixin.py !}
 ```
 

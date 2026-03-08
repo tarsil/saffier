@@ -226,7 +226,7 @@ tenant exist.
     Do not use this example in production, the way it is done it is not safe. A real lookup example
     would need more validations besides a direct headers check.
 
-```python hl_lines="7 29 34"
+```python
 {!> ../docs_src/tenancy/example/middleware.py !}
 ```
 
@@ -244,7 +244,7 @@ from the database and assemble everything.
 This will create an [Ravyn][ravyn] application, assemble the `routes` and add the
 [middleware](#middleware) created in the previous step.
 
-```python hl_lines="25"
+```python
 {!> ../docs_src/tenancy/example/api.py !}
 ```
 

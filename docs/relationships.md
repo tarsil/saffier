@@ -1,17 +1,27 @@
 # Relationships
 
-Creating relationships in **Saffier** is as simple as importing the fields and apply them into
-the models.
+Relationships are where Saffier stops looking like a collection of individual
+models and starts behaving like an ORM.
 
-There are currently two types, the [ForeignKey](./fields.md#foreignkey)
-and the [OneToOneField](./fields.md#onetoonefield).
+At declaration time, relation fields describe how models point to each other.
+At runtime, those same fields install reverse descriptors, normalize nested
+objects during save operations, and control how eager loading works in
+querysets.
 
-When declaring a foreign key, you can pass the value in two ways, as a string or as a model
-object. Internally **Saffier** lookups up inside the [registry](./models.md#registry) and maps
-your fields.
+This page focuses on the three important mental models:
 
-When declaring a model you can have one or more ForeignKey pointing to different tables or
-multiple foreign keys pointing to the same table as well.
+* declaration: how to describe the relation
+* runtime access: what you get back on model instances
+* persistence: what happens when related objects are unsaved, nullable, or
+  reverse-managed
+
+There are currently two direct relation field types documented here:
+[ForeignKey](./fields.md#foreignkey) and
+[OneToOneField](./fields.md#onetoonefield).
+
+When declaring a relation, you can target another model either by passing the
+model class directly or by using a string name that the registry resolves
+later.
 
 !!! Tip
     Have a look at the [related name](./queries/related-name.md) documentation to understand how
@@ -40,9 +50,17 @@ await Profile.query.create(user=user)
 What if you want to have multiple foreign keys pointing to the same model? This is also easily
 possible to achieve.
 
-```python hl_lines="20-29"
+```python
 {!> ../docs_src/relationships/multiple.py !}
 ```
+
+In real applications this pattern shows up in audit tables, approval flows, and
+messaging systems where one model can play several roles in the same row:
+
+* `created_by`
+* `updated_by`
+* `approved_by`
+* `owner`
 
 !!! Tip
     Have a look at the [related name](./queries/related-name.md) documentation to understand how
@@ -147,7 +165,7 @@ When declaring a foreign key or a one to one key, the **on_delete must be provid
 
 Looking back to the previous example.
 
-```python hl_lines="20"
+```python
 {!> ../docs_src/relationships/model.py !}
 ```
 
@@ -173,7 +191,7 @@ Creating an `OneToOneField` relationship between models is basically the same as
 [ForeignKey](#foreignkey) with the key difference that it uses `unique=True` on the foreign key
 column.
 
-```python hl_lines="20"
+```python
 {!> ../docs_src/relationships/onetoone.py !}
 ```
 

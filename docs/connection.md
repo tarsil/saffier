@@ -32,7 +32,7 @@ For this example, since the author is the same as the one of [Ravyn](https://rav
 we will be using it for explanatory purposes, feel free to apply the same principle in your favourite
 framework.
 
-```python hl_lines="10-11"
+```python
 {!> ../docs_src/connections/simple.py !}
 ```
 

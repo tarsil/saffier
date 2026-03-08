@@ -1,3 +1,5 @@
+"""Concrete field classes used when declaring Saffier models."""
+
 import copy
 import decimal
 import enum
@@ -43,8 +45,13 @@ CHAR_LIMIT = 63
 
 
 class Field:
-    """
-    Base field for the model declaration fields.
+    """Base class for Saffier model fields.
+
+    A field coordinates three layers of behavior: runtime validation through an
+    internal validator, SQLAlchemy column generation, and ORM-specific input or
+    relation normalization. Concrete subclasses usually override at least the
+    validator or the column type, while relation-aware fields also override
+    input normalization and pre-save behavior.
     """
 
     is_virtual: bool = False
@@ -86,8 +93,14 @@ class Field:
         self.secret = kwargs.pop("secret", False)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
-        """
-        Returns a column type for the model field.
+        """Build the SQLAlchemy column used to persist this field.
+
+        Args:
+            name: Logical field name declared on the model.
+
+        Returns:
+            sqlalchemy.Column: SQLAlchemy column configured from the field
+            options and validator metadata.
         """
         column_type = self.get_column_type()
         constraints = self.get_constraints()
@@ -150,6 +163,17 @@ class Field:
     def clean(
         self, name: str, value: typing.Any, *, for_query: bool = False
     ) -> dict[str, typing.Any]:
+        """Normalize one logical field value into column-value pairs.
+
+        Args:
+            name: Logical field name.
+            value: User-facing field value.
+            for_query: Reserved for field implementations that need distinct
+                query-time normalization.
+
+        Returns:
+            dict[str, Any]: Database payload keyed by column name.
+        """
         del for_query
         if not self.has_column():
             return {}
@@ -194,6 +218,17 @@ class Field:
         table: sqlalchemy.Table,
         value: typing.Any,
     ) -> typing.Any:
+        """Translate one lookup operator into a SQLAlchemy clause.
+
+        Args:
+            field_name: Logical field name being filtered.
+            operator: Saffier lookup suffix such as `exact` or `isnull`.
+            table: SQLAlchemy table containing the target column.
+            value: Lookup value supplied by the caller.
+
+        Returns:
+            Any: SQLAlchemy boolean clause implementing the lookup.
+        """
         column = table.columns[field_name]
         mapped_operator = settings.filter_operators.get(operator, operator)
 
@@ -209,8 +244,10 @@ class Field:
 
 
 class CharField(Field):
-    """
-    Representation a StringField text with a max_length.
+    """Variable-length string field with an explicit maximum length.
+
+    This is the standard field for bounded text columns and uses the string
+    validator's `max_length` setting to size the SQL column.
     """
 
     def __init__(self, **kwargs: typing.Any) -> None:
@@ -228,8 +265,10 @@ class CharField(Field):
 
 
 class TextField(Field):
-    """
-    Representation of a TextField for a big length of text
+    """Unbounded text field backed by a SQL `TEXT` column.
+
+    Use this for large text payloads where a database-level length limit is not
+    required.
     """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
@@ -240,8 +279,10 @@ class TextField(Field):
 
 
 class IntegerField(Field):
-    """
-    Representation of an IntegerField
+    """Integer field with optional auto-increment-on-save behavior.
+
+    Besides standard integer storage, the field can increment itself during save
+    operations, which is useful for counters and lightweight sequence fields.
     """
 
     def __init__(self, increment_on_save: int = 0, **kwargs: typing.Any) -> None:
@@ -297,18 +338,14 @@ class IntegerField(Field):
 
 
 class SmallIntegerField(IntegerField):
-    """
-    Representation of a SmallIntegerField.
-    """
+    """Integer field stored using the database's small-integer type."""
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.SmallInteger()
 
 
 class FloatField(Field):
-    """
-    Representation of a Decimal floating field
-    """
+    """Floating-point numeric field backed by a SQL `FLOAT` column."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Float(**kwargs)
@@ -321,9 +358,7 @@ class FloatField(Field):
 
 
 class BigIntegerField(Field):
-    """
-    Represents a BigIntegerField
-    """
+    """Integer field stored using the database's big-integer type."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Integer(**kwargs)
@@ -333,9 +368,7 @@ class BigIntegerField(Field):
 
 
 class BooleanField(Field):
-    """
-    Representation of a boolean
-    """
+    """Boolean field backed by a SQL `BOOLEAN` column."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Boolean(**kwargs)
@@ -348,8 +381,10 @@ class BooleanField(Field):
 
 
 class AutoNowMixin(Field):
-    """
-    Represents a date time with defaults for automatic now()
+    """Mixin for date/time fields that auto-populate themselves.
+
+    `auto_now` refreshes the value on every save, while `auto_now_add` sets it
+    only when the row is first created.
     """
 
     def __init__(
@@ -365,9 +400,7 @@ class AutoNowMixin(Field):
 
 
 class DateTimeField(AutoNowMixin):
-    """
-    Representation of a datetime
-    """
+    """Date-time field with optional automatic timestamping."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         if self.auto_now_add or self.auto_now:
@@ -379,9 +412,7 @@ class DateTimeField(AutoNowMixin):
 
 
 class DateField(AutoNowMixin):
-    """
-    Representation of a Date
-    """
+    """Date-only field with optional automatic timestamping."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         if self.auto_now_add or self.auto_now:
@@ -393,9 +424,7 @@ class DateField(AutoNowMixin):
 
 
 class TimeField(Field):
-    """
-    Representation of time
-    """
+    """Time-only field backed by a SQL `TIME` column."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Time(**kwargs)
@@ -405,9 +434,7 @@ class TimeField(Field):
 
 
 class DurationField(Field):
-    """
-    Representation of a duration/timedelta.
-    """
+    """Timedelta field stored as a SQL interval/duration type."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Duration(**kwargs)
@@ -420,8 +447,10 @@ class DurationField(Field):
 
 
 class JSONField(Field):
-    """
-    JSON Representation of an object field
+    """JSON field for arbitrary structured payloads.
+
+    The field treats JSON `null` as empty for `isnull` and `isempty` lookups so
+    query behavior remains intuitive across databases.
     """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
@@ -443,10 +472,12 @@ class JSONField(Field):
 
 
 class CompositeField(Field):
-    """
-    Virtual field that groups multiple model fields under a single logical attribute.
+    """Virtual field that groups multiple model fields under one logical attribute.
 
-    It can expose existing fields by name and/or inject embedded fields declared inline.
+    Composite fields let a model present several persisted columns as a single
+    higher-level value object. They can wrap existing fields by name, inject new
+    embedded fields inline, or instantiate a helper model/class when reading the
+    value back from an instance.
     """
 
     is_virtual: bool = True
@@ -608,8 +639,13 @@ class CompositeField(Field):
 
 
 class ForeignKey(Field):
-    """
-    ForeignKey field object
+    """Field that stores a relation to another Saffier model.
+
+    Foreign keys in Saffier are capable of targeting simple or composite
+    primary keys, deferred string references, cross-registry relations, and
+    relation-aware deletion behavior. The field can therefore expand one
+    logical attribute into multiple database columns and optionally manage the
+    lifecycle of nested related objects during save operations.
     """
 
     class ForeignKeyValidator(SaffierField):
@@ -674,6 +710,11 @@ class ForeignKey(Field):
 
     @property
     def target_registry(self) -> typing.Any:
+        """Return the registry used to resolve string relation targets.
+
+        Explicit `target_registry` overrides take precedence, followed by the
+        owning model registry and finally the field-level registry fallback.
+        """
         if self._target_registry is not None:
             return self._target_registry
         owner_registry = getattr(getattr(self.owner, "meta", None), "registry", None)
@@ -687,6 +728,14 @@ class ForeignKey(Field):
 
     @property
     def target(self) -> typing.Any:
+        """Resolve and cache the target model class for this relation.
+
+        String targets are looked up lazily so models can reference classes that
+        are declared later in the import graph.
+
+        Returns:
+            Any: Resolved target model class.
+        """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
                 try:
@@ -705,6 +754,16 @@ class ForeignKey(Field):
 
     @property
     def related_columns(self) -> dict[str, sqlalchemy.Column | None]:
+        """Return target columns used by the relation mapping.
+
+        Composite foreign keys can point to multiple target columns. When
+        explicit `related_fields` are not provided, the target model primary-key
+        columns are used.
+
+        Returns:
+            dict[str, sqlalchemy.Column | None]: Mapping of target column names to
+            SQLAlchemy columns where available.
+        """
         target = self.target
         columns: dict[str, sqlalchemy.Column | None] = {}
         if self.related_fields:
@@ -798,6 +857,18 @@ class ForeignKey(Field):
         *,
         schema: str | None = None,
     ) -> typing.Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
+        """Build cross-table constraints and indexes for the foreign key columns.
+
+        Args:
+            name: Logical field name on the owning model.
+            columns: Physical columns generated for the relation.
+            schema: Optional schema override for the target table reference.
+
+        Returns:
+            typing.Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
+                SQLAlchemy constraints and indexes that should be attached to
+                the owning table.
+        """
         owner_registry = getattr(self.owner.meta, "registry", None)
         target = self.target
         target_registry = getattr(target.meta, "registry", None)
@@ -918,6 +989,21 @@ class ForeignKey(Field):
         original_value: typing.Any,
         is_update: bool,
     ) -> dict[str, typing.Any]:
+        """Save nested related objects before persisting the owning row.
+
+        The callback allows callers to pass an unsaved related model instance or
+        a dictionary payload. When necessary, the related object is saved first
+        and the method returns the concrete foreign-key column values to persist
+        on the owning model.
+
+        Args:
+            value: Current relation value being persisted.
+            original_value: Previous relation value used during updates.
+            is_update: Whether the owning model is performing an update.
+
+        Returns:
+            dict[str, typing.Any]: Database-ready foreign-key column payload.
+        """
         target = self.target
         if value is None or (isinstance(value, dict) and not value):
             value = original_value
@@ -960,6 +1046,18 @@ class ForeignKey(Field):
         return {self.name: value}
 
     def expand_relationship(self, value: typing.Any) -> typing.Any:
+        """Normalize relation values into lightweight target model instances.
+
+        Raw primary-key values, dictionaries, proxy models, and already-loaded
+        target instances are all accepted so callers can assign foreign keys in a
+        natural way while the ORM preserves a consistent in-memory shape.
+
+        Args:
+            value: Incoming relation value.
+
+        Returns:
+            typing.Any: Target model instance or `None`.
+        """
         if value is None:
             return None
         target = self.target
@@ -1028,8 +1126,13 @@ class ForeignKey(Field):
 
 
 class ManyToManyField(Field):
-    """
-    Representation of a ManyToManyField based on a foreignkey.
+    """Virtual field describing a many-to-many relation via a through model.
+
+    A many-to-many field never maps directly to columns on the owning model.
+    Instead it manages or creates an intermediate through model, exposes a
+    `Relation` descriptor for runtime access, and carries the metadata needed to
+    build reverse relation names, embedded through objects, and auto-generated
+    junction table definitions.
     """
 
     is_virtual: bool = True
@@ -1077,6 +1180,11 @@ class ManyToManyField(Field):
 
     @property
     def target(self) -> typing.Any:
+        """Resolve and cache the many-to-many target model class.
+
+        Returns:
+            typing.Any: Target model class for the relation.
+        """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
                 self._target = (
@@ -1102,17 +1210,21 @@ class ManyToManyField(Field):
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
 
     def add_model_to_register(self, model: type["Model"]) -> None:
-        """
-        Adds the model to the registry to make sure it can be generated by the Migrations
+        """Register an auto-generated through model on the owning registry.
+
+        Args:
+            model: Through model created for the relation.
         """
         self.registry.models[model.__name__] = model
 
     def get_fk_name(self, name: str) -> str:
-        """
-        Builds the fk name for the engine.
-        Engines have a limitation of the foreign key being bigger than 63
-        characters.
-        if that happens, we need to assure it is small.
+        """Build a stable FK constraint name for the through table.
+
+        Args:
+            name: Local field or column name participating in the constraint.
+
+        Returns:
+            str: Constraint name truncated to common identifier limits.
         """
         fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
         if not len(fk_name) > CHAR_LIMIT:
@@ -1120,11 +1232,14 @@ class ManyToManyField(Field):
         return fk_name[:CHAR_LIMIT]
 
     def create_through_model(self) -> typing.Any:
-        """
-        Creates the default empty through model.
+        """Create or normalize the through model used to persist the relation.
 
-        Generates a middle model based on the owner of the field and the field itself and adds
-        it to the main registry to make sure it generates the proper models and migrations.
+        Returns:
+            typing.Any: Concrete through model class used by the relation.
+
+        Raises:
+            ImproperlyConfigured: If an explicit through model does not expose a
+                valid integer `id` primary key.
         """
         self.to = typing.cast(type["Model"], self.target)
 
@@ -1276,8 +1391,12 @@ ManyToMany = ManyToManyField
 
 
 class RefForeignKey(ForeignKey):
-    """
-    ForeignKey variant used for explicit reference-style declarations.
+    """Foreign key variant used for explicit reference-style declarations.
+
+    `RefForeignKey` can operate in two modes. In normal mode it behaves like a
+    regular foreign key. In model-reference mode it becomes a virtual field that
+    stages lightweight reference objects and later persists them through the
+    reverse relation declared by the referenced `ModelRef` type.
     """
 
     def __init__(
@@ -1304,6 +1423,12 @@ class RefForeignKey(ForeignKey):
 
     @property
     def is_model_reference(self) -> bool:
+        """Return whether the field currently behaves as a virtual model reference.
+
+        Returns:
+            bool: `True` when the field is staging `ModelRef` objects instead of
+            storing a direct foreign key column.
+        """
         return self.model_ref is not None
 
     def has_column(self) -> bool:
@@ -1366,6 +1491,12 @@ class RefForeignKey(ForeignKey):
         return list(value)
 
     async def persist_references(self, instance: typing.Any, value: typing.Any) -> None:
+        """Persist staged `ModelRef` objects through the generated reverse relation.
+
+        Args:
+            instance: Parent model instance that owns the relation.
+            value: Staged reference payload previously assigned to the field.
+        """
         if not self.is_model_reference or not value:
             return
 
@@ -1385,8 +1516,10 @@ class RefForeignKey(ForeignKey):
 
 
 class OneToOneField(ForeignKey):
-    """
-    Representation of a one to one field.
+    """Foreign-key field that enforces a unique reverse relationship.
+
+    The field is implemented as a standard foreign key with `unique=True`, which
+    gives it one-to-one semantics while reusing the full foreign-key machinery.
     """
 
     def __init__(self, to: type["Model"] | str, **kwargs: typing.Any):
@@ -1401,8 +1534,10 @@ OneToOne = OneToOneField
 
 
 class ChoiceField(Field):
-    """
-    Representation of an Enum
+    """Field that stores enumerated values.
+
+    The field accepts either a Python `Enum` subclass or a static list of choice
+    values and maps them to a SQL enum type.
     """
 
     def __init__(
@@ -1435,8 +1570,10 @@ class ChoiceField(Field):
 
 
 class CharChoiceField(Field):
-    """
-    Choice field stored as character values.
+    """Choice field stored as plain text rather than a SQL enum.
+
+    This is useful when portability matters more than native enum constraints or
+    when the database should not own the enum definition.
     """
 
     def __init__(
@@ -1459,8 +1596,10 @@ class CharChoiceField(Field):
 
 
 class DecimalField(Field):
-    """
-    Representation of a DecimalField
+    """Fixed-precision numeric field backed by SQL `NUMERIC`/`DECIMAL`.
+
+    The field preserves decimal precision and is appropriate for money-like
+    values that should not be stored in a floating-point type.
     """
 
     def __init__(self, max_digits: int, decimal_places: int, **kwargs: typing.Any):
@@ -1481,9 +1620,7 @@ class DecimalField(Field):
 
 
 class UUIDField(Field):
-    """
-    Representation of UUID
-    """
+    """Field that stores UUID values using the database UUID type."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return UUID(**kwargs)
@@ -1493,9 +1630,7 @@ class UUIDField(Field):
 
 
 class PasswordField(CharField):
-    """
-    Representation of a Password
-    """
+    """Character field that applies password-format validation."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Password(**kwargs)
@@ -1505,9 +1640,7 @@ class PasswordField(CharField):
 
 
 class IPAddressField(Field):
-    """
-    Representation of UUUID
-    """
+    """Field that stores IPv4 or IPv6 address values."""
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return CoreIPAddress(**kwargs)
@@ -1517,6 +1650,8 @@ class IPAddressField(Field):
 
 
 class EmailField(CharField):
+    """Character field with e-mail address validation."""
+
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Email(**kwargs)
 
@@ -1525,6 +1660,8 @@ class EmailField(CharField):
 
 
 class URLField(CharField):
+    """Character field with absolute-URL validation."""
+
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return URL(**kwargs)
 
@@ -1533,8 +1670,10 @@ class URLField(CharField):
 
 
 class BinaryField(Field):
-    """
-    Representation of bytes/binary data.
+    """Binary field for arbitrary bytes payloads.
+
+    The field optionally enforces a maximum length and stores data in a SQL
+    large-binary column.
     """
 
     def __init__(self, max_length: int | None = None, **kwargs: typing.Any):
@@ -1553,8 +1692,10 @@ class BinaryField(Field):
 
 
 class ExcludeField(Field):
-    """
-    Virtual field used to reserve an attribute name without creating a DB column.
+    """Virtual field that reserves an attribute name without creating a column.
+
+    It is primarily used for placeholders and internal relation plumbing where a
+    model attribute must exist in metadata but should never be persisted.
     """
 
     is_virtual = True
@@ -1576,14 +1717,16 @@ class ExcludeField(Field):
 
 
 class PlaceholderField(ExcludeField):
-    """
-    Explicit alias for placeholders used by relation internals.
-    """
+    """Named placeholder field used by reverse-relation internals."""
 
 
 class ComputedField(Field):
-    """
-    Virtual field whose value is resolved by getter/setter callbacks.
+    """Virtual field whose value is resolved by getter/setter callbacks.
+
+    Computed fields do not create database columns. They allow models to expose
+    derived or delegated attributes while still participating in model dumps,
+    admin marshalling, and assignment flows through explicit getter and setter
+    callables.
     """
 
     is_virtual = True
@@ -1695,9 +1838,7 @@ class ComputedField(Field):
 
 
 class FileField(CharField):
-    """
-    Lightweight file path/reference field stored as text.
-    """
+    """Text field intended for file path or storage reference values."""
 
     def __init__(self, max_length: int = 255, **kwargs: typing.Any) -> None:
         kwargs.setdefault("max_length", max_length)
@@ -1705,14 +1846,14 @@ class FileField(CharField):
 
 
 class ImageField(FileField):
-    """
-    Lightweight image path/reference field stored as text.
-    """
+    """File-like text field intended for image references."""
 
 
 class PGArrayField(Field):
-    """
-    PostgreSQL ARRAY field with mutable list tracking.
+    """PostgreSQL `ARRAY` field with mutable list tracking.
+
+    The field wraps the array type in SQLAlchemy's `MutableList` helper so
+    in-place list mutations are detected and persisted.
     """
 
     def __init__(self, item_type: sqlalchemy.types.TypeEngine, **kwargs: typing.Any) -> None:

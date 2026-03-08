@@ -1,3 +1,5 @@
+"""Registry objects that coordinate databases, models, and metadata."""
+
 import asyncio
 import contextlib
 import copy
@@ -23,6 +25,17 @@ logger = logging.getLogger(__name__)
 
 
 class MetaDataDict(dict[str | None, sqlalchemy.MetaData]):
+    """Lazily provision `MetaData` containers for a registry.
+
+    A registry can target the primary database plus any number of named extra
+    databases. This mapping ensures each database name receives its own
+    SQLAlchemy `MetaData` object only when it is first accessed, while still
+    enforcing that callers only request configured extra-database keys.
+
+    Attributes:
+        registry: Registry that owns the metadata containers.
+    """
+
     def __init__(self, registry: "Registry") -> None:
         self.registry = registry
         super().__init__()
@@ -50,6 +63,17 @@ class MetaDataDict(dict[str | None, sqlalchemy.MetaData]):
 
 
 class MetaDataByUrlDict(dict[str, str | None]):
+    """Translate database URL strings into registry metadata objects.
+
+    Query and table-building code often receives a concrete database object
+    rather than an extra-database name. This helper keeps a reverse mapping from
+    URL string to metadata name so the registry can consistently select the
+    correct `MetaData` container for the active database connection.
+
+    Attributes:
+        registry: Registry that owns the metadata containers.
+    """
+
     def __init__(self, registry: "Registry") -> None:
         self.registry = registry
         super().__init__()
@@ -81,9 +105,17 @@ class MetaDataByUrlDict(dict[str, str | None]):
 
 
 class Registry:
-    """
-    The command center for the models being generated
-    for Saffier.
+    """Central model registry for Saffier applications.
+
+    A registry owns the primary database connection, optional extra databases,
+    all registered model classes, and the SQLAlchemy metadata containers used
+    for table generation, reflection, and migrations. It is the hub where model
+    registration, content-type integration, schema helpers, registry copying,
+    reflection, and CLI migration preparation all meet.
+
+    Most user-facing Saffier applications create a single registry and point
+    every model at it, but the implementation also supports copied registries,
+    extra databases, pattern-based reflection, and delayed relation callbacks.
     """
 
     def __init__(
@@ -127,11 +159,33 @@ class Registry:
             self._set_content_type(with_content_type)
 
     def _make_metadata(self) -> sqlalchemy.MetaData:
+        """Create a fresh SQLAlchemy metadata container for this registry.
+
+        When the registry is pinned to a default schema, every metadata object
+        created here is initialized with that schema so table creation,
+        reflection, and migration preparation all operate in the same namespace.
+
+        Returns:
+            sqlalchemy.MetaData: New metadata object for the registry.
+        """
         if self.db_schema is not None:
             return sqlalchemy.MetaData(schema=self.db_schema)
         return sqlalchemy.MetaData()
 
     def extra_name_check(self, name: Any) -> bool:
+        """Validate one entry key from the registry `extra` mapping.
+
+        Saffier accepts arbitrary names for extra databases, but empty or
+        non-string keys make later lookups ambiguous. This helper centralizes the
+        validation and logs user-facing diagnostics before registry creation
+        proceeds.
+
+        Args:
+            name: Candidate extra-database name.
+
+        Returns:
+            bool: `True` when the key is usable, otherwise `False`.
+        """
         if not isinstance(name, str):
             logger.error("Extra database name: %r is not a string.", name)
             return False
@@ -152,6 +206,20 @@ class Registry:
         return None
 
     def _is_auto_through_model(self, model_class: type[Any]) -> bool:
+        """Detect auto-generated many-to-many through models.
+
+        Registry copying skips Saffier-generated through models during the first
+        pass because they are recreated or patched after their owning models have
+        been copied. This helper matches both the older and newer generated
+        naming conventions so copied registries preserve many-to-many behavior
+        without duplicating synthetic models.
+
+        Args:
+            model_class: Model class to inspect.
+
+        Returns:
+            bool: `True` if the model looks like an auto-generated through model.
+        """
         from saffier.core.db.fields.base import ManyToManyField
 
         for owner_model in self.models.values():
@@ -197,6 +265,16 @@ class Registry:
         return dependencies
 
     def _sorted_model_names_for_copy(self) -> list[str]:
+        """Topologically order model names for registry copying.
+
+        Models with foreign-key dependencies should be copied after their
+        targets whenever possible so string references and through-model patches
+        are minimized. Auto-generated through models are skipped entirely here
+        because they are handled separately after the base copy pass.
+
+        Returns:
+            list[str]: Model names ordered for safe copying.
+        """
         skipped = {
             name
             for name, model_class in self.models.items()
@@ -228,6 +306,24 @@ class Registry:
         *,
         pending_m2m_patches: list[tuple[str, str, str]],
     ) -> type[Any]:
+        """Clone one model class into a target registry.
+
+        The copied class receives copied field and manager instances so later
+        mutations in migration preparation or isolated test registries do not
+        leak back into the source registry. Same-registry relation targets are
+        rewritten to string references until the target registry has all of its
+        models in place, at which point pending many-to-many through models are
+        patched separately.
+
+        Args:
+            model_class: Source model to copy.
+            registry: Target registry receiving the copied model.
+            pending_m2m_patches: Collector for many-to-many fields whose through
+                model must be rebound after all models have been copied.
+
+        Returns:
+            type[Any]: Newly created copied model class.
+        """
         from saffier.core.db.fields.base import ForeignKey, ManyToManyField
         from saffier.core.db.models.managers import Manager
         from saffier.core.utils.models import create_saffier_model
@@ -301,6 +397,16 @@ class Registry:
         )
 
     def __copy__(self) -> "Registry":
+        """Copy the registry and all registered models into an isolated registry instance.
+
+        The copy operation is intentionally deep for model definitions: each
+        copied model gets copied fields, managers, metadata, and many-to-many
+        relation descriptors so migration preparation or test isolation does not
+        mutate the live application registry.
+
+        Returns:
+            Registry: A new registry instance containing copied model classes.
+        """
         registry_copy = type(self)(
             self.database,
             schema=self.db_schema,
@@ -364,6 +470,22 @@ class Registry:
         return registry_copy
 
     def _set_content_type(self, with_content_type: bool | type[Any]) -> None:
+        """Enable and normalize content-type support for the registry.
+
+        The registry accepts either `True` to use the built-in content type
+        model or an explicit model class. Abstract or detached content type
+        models are copied into this registry as needed, then all registered
+        concrete models are updated so they expose a content-type relation and
+        pre-save hook.
+
+        Args:
+            with_content_type: Flag or model class describing the content-type
+                model to use.
+
+        Raises:
+            TypeError: If the provided value is neither a boolean flag nor a
+                model class.
+        """
         from saffier.contrib.contenttypes.models import ContentType
 
         content_type_model = ContentType if with_content_type is True else with_content_type
@@ -393,6 +515,11 @@ class Registry:
         self._attach_content_type_to_registered_models()
 
     def _attach_content_type_to_registered_models(self) -> None:
+        """Attach content-type integration to every registered concrete model.
+
+        This method is idempotent. It is called after registry creation, after
+        registry copies, and whenever a registry gains a new content type model.
+        """
         if self.content_type is None:
             return
         for model in self.models.values():
@@ -404,6 +531,17 @@ class Registry:
         self._attach_content_type_to_model(model_class)
 
     def _attach_content_type_to_model(self, model_class: type[Any]) -> None:
+        """Install or normalize the content-type field on one model class.
+
+        The helper handles three cases: models that already declare a
+        `ContentTypeField`, models that declare an alternate content type field
+        name, and models that need the default synthetic `content_type` field
+        injected. It also refreshes reverse descriptors, deletion behavior, and
+        proxy-model caches when the model definition changes.
+
+        Args:
+            model_class: Concrete model to update.
+        """
         if self.content_type is None:
             return
         if model_class in (self.content_type, getattr(self.content_type, "proxy_model", None)):
@@ -547,6 +685,17 @@ class Registry:
         model_class.__proxy_model__.parent = model_class
 
     def _clear_model_table_cache(self, model_class: type[Any]) -> None:
+        """Invalidate cached SQLAlchemy tables for one model.
+
+        Content-type injection and similar runtime mutations change the effective
+        table definition. Rather than mutating SQLAlchemy tables in place, the
+        registry drops any cached table objects from the primary metadata and
+        schema-specific metadata caches so the next `build()` call recreates
+        them from the updated model definition.
+
+        Args:
+            model_class: Model whose cached tables should be removed.
+        """
         model_class._table = None
         model_class._db_schemas = {}
 
@@ -567,6 +716,16 @@ class Registry:
                     metadata.remove(existing_table)
 
     def _bind_content_type_pre_save(self, model_class: type[Any]) -> None:
+        """Register a pre-save hook that guarantees content-type rows exist.
+
+        Saffier content types are created lazily. Before a model instance is
+        saved, the bound hook inspects every content-type field on the sender and
+        creates the matching `ContentType` row when the field is missing or still
+        points to an unsaved object.
+
+        Args:
+            model_class: Model class that should receive the hook.
+        """
         if model_class.__name__ in self._content_type_models_bound:
             return
         if self.content_type is None:
@@ -607,6 +766,15 @@ class Registry:
 
     @property
     def metadata(self) -> Any:
+        """Return the primary metadata container for the registry.
+
+        Accessing this property forces registered models to build their tables so
+        callers such as migration tools and schema helpers observe a metadata
+        object that already includes all declared models.
+
+        Returns:
+            Any: Primary SQLAlchemy metadata object.
+        """
         for model_class in self.models.values():
             model_class.build(schema=self.db_schema)
         return self.metadata_by_name[None]
@@ -619,6 +787,16 @@ class Registry:
 
     @property
     def metadata_by_name(self) -> MetaDataDict:
+        """Return metadata containers keyed by database alias.
+
+        The property eagerly builds registered models and best-effort builds
+        reflected models so callers receive a stable mapping that includes the
+        current table definitions for the primary database and every configured
+        extra database.
+
+        Returns:
+            MetaDataDict: Metadata mapping keyed by database alias.
+        """
         for model_class in self.models.values():
             model_class.build(schema=self.db_schema)
         for model_class in self.reflected.values():
@@ -645,6 +823,11 @@ class Registry:
 
     @property
     def metadata_by_url(self) -> MetaDataByUrlDict:
+        """Return metadata containers addressable by database URL string.
+
+        Returns:
+            MetaDataByUrlDict: Reverse metadata mapping keyed by URL string.
+        """
         return self._metadata_by_url
 
     @property
@@ -653,6 +836,15 @@ class Registry:
 
     @cached_property
     def declarative_base(self) -> Any:
+        """Create a declarative base bound to the registry schema.
+
+        This is primarily used by SQLAlchemy integration and reflection helpers
+        that need a conventional declarative base sharing the registry schema
+        configuration.
+
+        Returns:
+            Any: SQLAlchemy declarative base class.
+        """
         if self.db_schema:
             metadata = sqlalchemy.MetaData(schema=self.db_schema)
         else:
@@ -661,11 +853,24 @@ class Registry:
 
     @property
     def engine(self) -> AsyncEngine:
+        """Return the started async SQLAlchemy engine for the primary database.
+
+        Returns:
+            AsyncEngine: Connected async engine for the main database.
+
+        Raises:
+            AssertionError: If the database has not been connected yet.
+        """
         assert self.database.engine, "database not started, no engine found."
         return self.database.engine
 
     @property
     def sync_engine(self) -> Engine:
+        """Return the synchronous engine wrapper for the primary database.
+
+        Returns:
+            Engine: Synchronous engine used by reflection and sync-only helpers.
+        """
         return self.engine.sync_engine
 
     async def create_all(
@@ -673,6 +878,14 @@ class Registry:
         refresh_metadata: bool = True,
         databases: Sequence[str | None] = (None,),
     ) -> None:
+        """Create all tables registered in the target databases.
+
+        Args:
+            refresh_metadata: Whether to rebuild registry metadata before
+                creating tables.
+            databases: Database names to operate on. `None` refers to the
+                primary database.
+        """
         self._attach_content_type_to_registered_models()
         if refresh_metadata:
             await self.arefresh_metadata(multi_schema=True)
@@ -685,6 +898,12 @@ class Registry:
         )
 
     async def drop_all(self, databases: Sequence[str | None] = (None,)) -> None:
+        """Drop the registry schema and registered tables from selected databases.
+
+        Args:
+            databases: Database aliases to operate on. `None` targets the primary
+                database.
+        """
         await self.schema.drop_schema(
             self.db_schema,
             cascade=True,
@@ -706,6 +925,32 @@ class Registry:
         include_reflected: bool = True,
         include_pattern: bool = False,
     ) -> Any:
+        """Resolve a model by name from the registry.
+
+        Resolution checks normal registered models first, then reflected models,
+        and optionally pattern-generated models. If the stored class is a proxy
+        model created for SQLAlchemy compatibility, the parent model is returned
+        instead so callers always receive the public ORM model class.
+
+        Args:
+            model_name: Name of the model to resolve.
+            include_content_type_attr: Whether the synthetic `ContentType`
+                attribute should be considered.
+            include_reflected: Whether reflected models should be searched.
+            include_pattern: Whether pattern-generated reflected models should
+                be searched.
+
+        Returns:
+            Any: The resolved model class.
+
+        Raises:
+            LookupError: If no matching model exists in the configured sources.
+
+        Examples:
+            Resolve a model declared elsewhere in the project:
+
+            >>> registry.get_model("User")
+        """
         if (
             include_content_type_attr
             and model_name == "ContentType"
@@ -729,6 +974,18 @@ class Registry:
         raise LookupError(f"Registry doesn't have a {model_name} model.")
 
     def delete_model(self, model_name: str) -> bool:
+        """Remove a model from any registry model mapping.
+
+        The helper checks concrete, reflected, and pattern-generated model
+        collections. It is used by conflict-resolution code when copying or
+        re-registering models.
+
+        Args:
+            model_name: Name of the model to remove.
+
+        Returns:
+            bool: `True` when a model entry was removed.
+        """
         for model_dict in (self.models, self.reflected, self.pattern_models):
             if model_name in model_dict:
                 del model_dict[model_name]
@@ -742,6 +999,17 @@ class Registry:
         *,
         one_time: bool = False,
     ) -> None:
+        """Register a callback that runs once a model with the given name is available.
+
+        This is used heavily by lazy relation wiring. A field pointing to a
+        string model name can register a callback and finish installing reverse
+        descriptors as soon as the target model is added to the registry.
+
+        Args:
+            model_reference: Target model class or model name to wait for.
+            callback: Function called with the resolved model class.
+            one_time: When `True`, discard the callback after the first run.
+        """
         model_name = (
             model_reference if isinstance(model_reference, str) else model_reference.__name__
         )
@@ -758,6 +1026,15 @@ class Registry:
                 self._model_callbacks.pop(model_name, None)
 
     def execute_model_callbacks(self, model_class: type[Any]) -> None:
+        """Run deferred callbacks waiting for a model to become available.
+
+        Lazy relation wiring registers callbacks keyed by model name. Once the
+        target model is registered, this helper executes the callbacks and drops
+        one-time entries.
+
+        Args:
+            model_class: Newly available model class.
+        """
         if getattr(model_class, "is_proxy_model", False):
             return
         callbacks = list(self._model_callbacks.get(model_class.__name__, ()))
@@ -778,6 +1055,15 @@ class Registry:
     def init_models(
         self, *, init_column_mappers: bool = True, init_class_attrs: bool = True
     ) -> None:
+        """Eagerly initialize metadata caches for registered models.
+
+        This is mainly useful for tooling and tests that want all column-mapping
+        caches, table properties, and proxy-model attributes prepared up front.
+
+        Args:
+            init_column_mappers: Whether to populate column-to-field mappings.
+            init_class_attrs: Whether to warm class-level table and proxy caches.
+        """
         for model_class in self.models.values():
             model_class.meta.full_init(
                 init_column_mappers=init_column_mappers,
@@ -790,12 +1076,23 @@ class Registry:
             )
 
     def invalidate_models(self, *, clear_class_attrs: bool = True) -> None:
+        """Invalidate metadata caches for all registered and reflected models.
+
+        Args:
+            clear_class_attrs: Whether to also clear cached tables, PK metadata,
+                and proxy-model caches on the model classes themselves.
+        """
         for model_class in self.models.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
 
     def get_tablenames(self) -> set[str]:
+        """Collect table names across concrete and reflected models.
+
+        Returns:
+            set[str]: All known table names currently tracked by the registry.
+        """
         tables = set()
         for model_class in self.models.values():
             tables.add(model_class.meta.tablename)
@@ -833,6 +1130,23 @@ class Registry:
         database_name: str | None = None,
         database: Database | None = None,
     ) -> None:
+        """Instantiate pattern-based reflected models from live database tables.
+
+        Pattern models act as templates that decide which reflected tables should
+        become real runtime models. This method reflects matching schemas, tests
+        include and exclude patterns, validates field compatibility, and creates
+        concrete reflected models for every matching table exactly once per
+        database alias.
+
+        Args:
+            database_name: Optional alias of the database being reflected.
+            database: Explicit database object to use instead of looking it up
+                from the alias.
+
+        Raises:
+            RuntimeError: If a reflected pattern would generate a model name that
+                conflicts with an existing model.
+        """
         if not self.pattern_models:
             return
         if database_name in self._pattern_reflected_dbs:
@@ -896,6 +1210,13 @@ class Registry:
         metadata: sqlalchemy.MetaData,
         schema: str | None,
     ) -> None:
+        """Reflect every table from one schema into a metadata object.
+
+        Args:
+            connection: SQLAlchemy connection used for reflection.
+            metadata: Metadata container receiving reflected tables.
+            schema: Schema name to inspect, or `None` for the default schema.
+        """
         inspector = sqlalchemy.inspect(connection)
         table_names = inspector.get_table_names(schema=schema)
         for table_name in table_names:
@@ -910,6 +1231,15 @@ class Registry:
                 continue
 
     async def __aenter__(self) -> "Registry":
+        """Connect the registry and prepare runtime metadata.
+
+        Entering the async context connects every configured database, runs
+        automigrations once when enabled, and reflects any pattern-based models
+        for each database alias.
+
+        Returns:
+            Registry: Connected registry instance.
+        """
         connected: list[Database] = []
         try:
             for name, database in self._iter_databases():
@@ -926,6 +1256,7 @@ class Registry:
         return self
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+        """Disconnect all configured databases in reverse registration order."""
         for _, database in reversed(self._iter_databases()):
             if database.is_connected:
                 await database.disconnect()
@@ -934,6 +1265,21 @@ class Registry:
     def with_async_env(
         self, loop: asyncio.AbstractEventLoop | None = None
     ) -> Generator["Registry", None, None]:
+        """Run registry lifecycle management inside synchronous code.
+
+        The context manager starts the registry, binds the event loop used by
+        `run_sync()`, and tears everything down when the block exits. It is the
+        bridge that allows CLI tools, synchronous test helpers, or scripts to
+        drive Saffier's async APIs without manually managing the registry
+        connection lifecycle.
+
+        Args:
+            loop: Optional event loop to reuse. A new loop is created when no
+                running or stored loop is available.
+
+        Yields:
+            Registry: The connected registry instance.
+        """
         close = False
         if loop is None:
             try:
@@ -961,12 +1307,22 @@ class Registry:
         multi_schema: bool | str | object = False,
         ignore_schema_pattern: str | object | None = None,
     ) -> "Registry":
-        """
-        Rebuild metadata containers used by migrations and schema reflection.
+        """Rebuild metadata containers used by migrations and schema reflection.
 
-        The current Saffier implementation keeps the refresh intentionally simple:
-        it clears cached table objects and reinitialises the per-database metadata
-        containers so subsequent `build()` calls recreate the SQLAlchemy tables.
+        Saffier keeps metadata refresh deliberately explicit. Rather than trying
+        to patch SQLAlchemy table objects in place, this method clears registry
+        metadata containers and table caches so subsequent `build()` calls
+        recreate tables from the current model definitions.
+
+        Args:
+            update_only: When `True`, keep the current top-level metadata
+                containers and only clear model-level table caches.
+            multi_schema: Accepted for API compatibility with migration helpers.
+            ignore_schema_pattern: Accepted for API compatibility with migration
+                helpers.
+
+        Returns:
+            Registry: The current registry for fluent-style usage.
         """
         del multi_schema, ignore_schema_pattern
 
@@ -993,6 +1349,11 @@ class Registry:
         multi_schema: bool | str | object = False,
         ignore_schema_pattern: str | object | None = None,
     ) -> "Registry":
+        """Async wrapper around `refresh_metadata()` for API compatibility.
+
+        Returns:
+            Registry: The refreshed registry instance.
+        """
         return self.refresh_metadata(
             update_only=update_only,
             multi_schema=multi_schema,

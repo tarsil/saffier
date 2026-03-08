@@ -23,7 +23,7 @@ Let us see a practical example of what does this mean.
 
 Imagine the following folder and file structure:
 
-```shell hl_lines="16" title="myproject"
+```shell title="myproject"
 .
 ├── Taskfile.yaml
 └── myproject
@@ -140,7 +140,7 @@ understand the auto discovery but in practice, how would that work?
 
 Let us see again the structure, in case you have forgotten already.
 
-```shell hl_lines="20" title="myproject"
+```shell title="myproject"
 .
 ├── Taskfile.yaml
 └── src

@@ -70,7 +70,7 @@ We have now three [related names](./related-name.md):
 * All the tracks that belong to a specific `Company`. The tracks are associated with `albums` and
 `studios`.
 
-```python hl_lines="33-35"
+```python
 {!> ../docs_src/prefetch/second/prefetch.py !}
 ```
 
@@ -156,7 +156,7 @@ With all the data generated for the models, we now want to query:
 * All the posts associated to each user.
 * All the articles associated to each user.
 
-```python hl_lines="33-36"
+```python
 {!> ../docs_src/prefetch/first/prefetch.py !}
 ```
 
@@ -186,7 +186,7 @@ What if you want to use the `queryset` parameter of the [Prefetch](#prefetch). L
 * All the tracks that belong to a specific `Company`. The tracks are associated with `albums` and
 `studios` **but** the `Track` will be also internally filtered.
 
-```python hl_lines="14"
+```python
 {!> ../docs_src/prefetch/second/prefetch_filtered.py !}
 ```
 

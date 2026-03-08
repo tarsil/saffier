@@ -1,18 +1,31 @@
 # Registry
 
-When using the **Saffier** ORM, you must use the **Registry** object to tell exactly where the
-database is going to be.
+The `Registry` is the runtime hub of a Saffier application.
 
-Imagine the registry as a mapping between your models and the database where is going to be written.
+Models point at a registry, querysets resolve tables and metadata through it,
+reflection code stores reflected models inside it, and migration helpers use it
+as the source of truth for generated SQLAlchemy metadata.
 
-And is just that, nothing else and very simple but effective object.
+If you only remember one thing, remember this:
 
-The registry is also the object that you might want to use when generating migrations using
-Alembic.
+*models describe structure, the registry describes where that structure lives.*
 
-```python hl_lines="19"
+```python
 {!> ../docs_src/registry/model.py !}
 ```
+
+## Mental model
+
+A registry owns:
+
+* the primary `Database`
+* any `extra=` databases
+* registered models
+* reflected models
+* SQLAlchemy metadata for each configured database
+
+That is why it appears in model declarations, migration setup, reflection, and
+multi-database applications.
 
 ## Parameters
 
@@ -32,12 +45,25 @@ that is not the default.
     registry = Registry(database=..., schema="custom-schema")
     ```
 
+## Practical single-registry setup
+
+Most applications only need one registry:
+
+```python
+database = saffier.Database(
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/app"
+)
+models = saffier.Registry(database=database)
+```
+
+Then every model declares `registry = models` inside `Meta`.
+
 ## Custom registry
 
 Can you have your own custom Registry? Yes, of course! You simply need to subclass the `Registry`
 class and continue from there like any other python class.
 
-```python hl_lines="15 29"
+```python
 {!> ../docs_src/registry/custom_registry.py !}
 ```
 
@@ -46,7 +72,7 @@ class and continue from there like any other python class.
 Sometimes you might want to work with multiple databases across different functionalities and
 that is also possible thanks to the registry with [Meta](./models.md#the-meta-class) combination.
 
-```python hl_lines="26 33"
+```python
 {!> ../docs_src/registry/multiple.py !}
 ```
 
@@ -147,7 +173,7 @@ As the name suggests, it is the functionality that allows you to create database
 
     <sup>Default: `False`</sup>
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/registry/create_schema.py !}
 ```
 
@@ -181,7 +207,7 @@ it will drop it from the database.
 
     <sup>Default: `False`</sup>
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/registry/drop_schema.py !}
 ```
 
@@ -202,7 +228,7 @@ Postgres calls it `public` and MSSQLServer calls it `dbo`.
 This is just an helper in case you need to know the default schema name for any needed purpose of
 your application.
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/registry/default_schema.py !}
 ```
 

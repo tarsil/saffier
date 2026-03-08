@@ -1,3 +1,5 @@
+"""Low-level value parsers used by Saffier field validators."""
+
 import datetime
 import ipaddress
 import re
@@ -38,6 +40,8 @@ IPV6_REGEX = re.compile(r"(?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4}")
 
 
 class BaseFormat:
+    """Base protocol for converting textual input into native Python values."""
+
     error_messages: dict[str, str] = {}
 
     def validation_error(self, code: str) -> ValidationError:
@@ -52,6 +56,8 @@ class BaseFormat:
 
 
 class DateFormat(BaseFormat):
+    """Parse ISO-like `YYYY-MM-DD` strings into `datetime.date`."""
+
     error_messages = {
         "format": "Must be a valid date format.",
         "invalid": "Must be a real date.",
@@ -73,6 +79,8 @@ class DateFormat(BaseFormat):
 
 
 class TimeFormat(BaseFormat):
+    """Parse ISO-like time strings into `datetime.time`."""
+
     error_messages = {
         "format": "Must be a valid time format.",
         "invalid": "Must be a real time.",
@@ -98,6 +106,8 @@ class TimeFormat(BaseFormat):
 
 
 class DateTimeFormat(BaseFormat):
+    """Parse ISO-like datetime strings with optional timezone offsets."""
+
     error_messages = {
         "format": "Must be a valid datetime format.",
         "invalid": "Must be a real datetime.",
@@ -136,6 +146,8 @@ class DateTimeFormat(BaseFormat):
 
 
 class UUIDFormat(BaseFormat):
+    """Validate UUID strings before converting them to `uuid.UUID`."""
+
     error_messages = {"format": "Must be a valid UUID format."}
 
     def is_native_type(self, value: typing.Any) -> bool:
@@ -150,6 +162,8 @@ class UUIDFormat(BaseFormat):
 
 
 class EmailFormat(BaseFormat):
+    """Validate e-mail addresses using Saffier's regex-based parser."""
+
     error_messages = {"format": "Must be a valid email format."}
 
     def is_native_type(self, value: typing.Any) -> bool:
@@ -164,6 +178,8 @@ class EmailFormat(BaseFormat):
 
 
 class IPAddressFormat(BaseFormat):
+    """Validate IPv4 and IPv6 strings and return `ipaddress` objects."""
+
     error_messages = {
         "format": "Must be a valid IP format.",
         "invalid": "Must be a real IP.",
@@ -185,6 +201,8 @@ class IPAddressFormat(BaseFormat):
 
 
 class URLFormat(BaseFormat):
+    """Validate absolute URLs with a scheme and network location."""
+
     error_messages = {"invalid": "Must be a real URL."}
 
     def is_native_type(self, value: typing.Any) -> bool:

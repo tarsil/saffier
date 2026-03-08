@@ -160,7 +160,7 @@ Assuming you have a `utils.py` where you place your information about the databa
 
 Something like this:
 
-```python title="my_project/utils.py" hl_lines="6-9"
+```python title="my_project/utils.py"
 {!> ../docs_src/migrations/lru.py !}
 ```
 
@@ -171,7 +171,7 @@ Saffier `Instance` in the application.
 
 #### Using Ravyn
 
-```python title="my_project/main.py" hl_lines="9 12 32 38"
+```python title="my_project/main.py"
 {!> ../docs_src/migrations/migrations.py !}
 ```
 
@@ -180,7 +180,7 @@ Saffier `Instance` in the application.
 As mentioned before, Saffier is framework agnostic so you can also use it in your FastAPI
 application.
 
-```python title="my_project/main.py" hl_lines="6 9 29 33"
+```python title="my_project/main.py"
 {!> ../docs_src/migrations/fastapi.py !}
 ```
 
@@ -188,7 +188,7 @@ application.
 
 The same goes for Starlette.
 
-```python title="my_project/main.py" hl_lines="6 9 29 33"
+```python title="my_project/main.py"
 {!> ../docs_src/migrations/starlette.py !}
 ```
 
@@ -403,7 +403,7 @@ placed.
 
 Let us see how our structrure now looks like after generating the migrations.
 
-```shell hl_lines="4-9"
+```shell
 .
 └── README.md
 └── .gitignore
@@ -507,7 +507,7 @@ Yes, it is this simple 😁
 
 Your new migration should now be inside `migrations/versions/`. Something like this:
 
-```shell hl_lines="10"
+```shell
 .
 └── README.md
 └── .gitignore
@@ -528,7 +528,7 @@ Or you can attach a message your migration that will then added to the file name
 $ saffier --app my_project.main makemigrations -m "Initial migrations"
 ```
 
-```shell hl_lines="10"
+```shell
 .
 └── README.md
 └── .gitignore
