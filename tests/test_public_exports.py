@@ -19,6 +19,11 @@ def test_database_url_is_exported_and_masks_passwords() -> None:
 
 
 def test_core_exports_cover_new_parity_surface() -> None:
+    assert issubclass(saffier.PydanticModelEngine, saffier.ModelEngine)
+    assert issubclass(saffier.MsgspecModelEngine, saffier.ModelEngine)
+    assert saffier.get_model_engine("pydantic").name == "pydantic"
+    assert saffier.get_model_engine("msgspec").name == "msgspec"
+    assert callable(saffier.register_model_engine)
     assert saffier.StrictModel is StrictModel
     assert saffier.ModelRef is ModelRef
     assert saffier.SQLAlchemyModelMixin is SQLAlchemyModelMixin

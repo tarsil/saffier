@@ -47,6 +47,15 @@ class BaseModelType(Protocol):
     @classmethod
     def generate_proxy_model(cls) -> type[Model]: ...
 
+    @classmethod
+    def get_model_engine_name(cls) -> str | None: ...
+
+    @classmethod
+    def get_model_engine(cls) -> Any: ...
+
+    @classmethod
+    def get_engine_model_class(cls, *, mode: str = "projection") -> type[Any]: ...
+
     async def load(self, only_needed: bool = False) -> None: ...
 
     async def update(self, **kwargs: Any) -> BaseModelType: ...
@@ -56,6 +65,22 @@ class BaseModelType(Protocol):
         force_insert: bool = False,
         values: dict[str, Any] | set[str] | list[str] | None = None,
     ) -> BaseModelType: ...
+
+    def to_engine_model(
+        self, *, include: Any = None, exclude: Any = None, exclude_none: bool = False
+    ) -> Any: ...
+
+    def engine_dump(
+        self, *, include: Any = None, exclude: Any = None, exclude_none: bool = False
+    ) -> dict[str, Any]: ...
+
+    def engine_dump_json(
+        self,
+        *,
+        include: Any = None,
+        exclude: Any = None,
+        exclude_none: bool = False,
+    ) -> str: ...
 
     @classmethod
     def table_schema(cls, schema: str | None = None) -> sqlalchemy.Table: ...

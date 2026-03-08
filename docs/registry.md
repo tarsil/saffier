@@ -45,6 +45,12 @@ that is not the default.
     registry = Registry(database=..., schema="custom-schema")
     ```
 
+* **model_engine** - Optional default engine adapter used by models in this registry.
+
+    ```python
+    registry = Registry(database=..., model_engine="pydantic")
+    ```
+
 ## Practical single-registry setup
 
 Most applications only need one registry:
@@ -57,6 +63,24 @@ models = saffier.Registry(database=database)
 ```
 
 Then every model declares `registry = models` inside `Meta`.
+
+## Registry-wide model engine defaults
+
+If most models in one application should expose the same engine-backed
+projection, configure it once on the registry:
+
+```python
+models = saffier.Registry(database=database, model_engine="pydantic")
+```
+
+Models then inherit that default unless they override it with `Meta.model_engine`
+or opt out via `Meta.model_engine = False`.
+
+This keeps engine selection at the same application boundary where database,
+metadata, and model registration are already configured.
+
+The built-in adapter names are currently `pydantic` and `msgspec`, but custom
+engines can also be registered.
 
 ## Custom registry
 

@@ -29,11 +29,13 @@ from saffier.core.db.models.metaclasses import (
 )
 from saffier.core.db.models.model_proxy import ProxyModel
 from saffier.core.utils.models import DateParser, create_saffier_model, generify_model_fields
+from saffier.engines.base import EngineIncludeExclude, resolve_model_engine
 from saffier.exceptions import ImproperlyConfigured, ValidationError
 
 if TYPE_CHECKING:
     from saffier import Model
     from saffier.core.signals import Broadcaster
+    from saffier.engines.base import ModelEngine
 
 saffier_setattr = object.__setattr__
 
@@ -261,6 +263,134 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         for field_name, field in cls.fields.items():
             field.modify_input(field_name, payload)
         return payload
+
+    @classmethod
+    def get_model_engine_name(cls) -> str | None:
+        """Return the configured engine name for the model, if any.
+
+        Returns:
+            str | None: Explicit model engine name, inherited registry default,
+                or `None` when engine support is disabled.
+        """
+        configured = getattr(cls.meta, "model_engine", None)
+        if configured is False:
+            return None
+        if configured is None:
+            configured = getattr(getattr(cls.meta, "registry", None), "model_engine", None)
+        if configured in (None, False):
+            return None
+        if isinstance(configured, str):
+            return configured
+        return cast("str", getattr(configured, "name", None))
+
+    @classmethod
+    def get_model_engine(cls) -> "ModelEngine | None":
+        """Resolve and return the configured engine adapter for the model."""
+        configured = getattr(cls.meta, "model_engine", None)
+        if configured is False:
+            return None
+        if configured is None:
+            configured = getattr(getattr(cls.meta, "registry", None), "model_engine", None)
+        return resolve_model_engine(configured)
+
+    @classmethod
+    def require_model_engine(cls) -> "ModelEngine":
+        """Return the model engine or raise when none is configured."""
+        engine = cls.get_model_engine()
+        if engine is None:
+            raise ImproperlyConfigured(f"Model '{cls.__name__}' has no model engine configured.")
+        return engine
+
+    @classmethod
+    def get_engine_model_class(cls, *, mode: str = "projection") -> type[Any]:
+        """Return the engine-backed class for the model."""
+        return cls.require_model_engine().get_model_class(cls, mode=mode)
+
+    @classmethod
+    def engine_validate(cls, value: Any, *, mode: str = "validation") -> Any:
+        """Validate external data through the configured engine adapter."""
+        return cls.require_model_engine().validate_model(cls, value, mode=mode)
+
+    @classmethod
+    def from_engine(cls, value: Any, *, exclude_unset: bool = True) -> "Self":
+        """Build a Saffier model instance from an engine-backed value.
+
+        Args:
+            value: Engine-backed object or input payload accepted by the engine.
+            exclude_unset: Whether engine defaults absent from the original
+                input should be omitted from the Saffier constructor payload.
+
+        Returns:
+            Self: New Saffier model instance.
+        """
+        payload = cls.require_model_engine().to_saffier_data(
+            cls,
+            value,
+            exclude_unset=exclude_unset,
+        )
+        return cls(**payload)
+
+    @classmethod
+    def engine_json_schema(cls, *, mode: str = "projection", **kwargs: Any) -> dict[str, Any]:
+        """Return the engine-generated JSON schema for the model."""
+        return cls.require_model_engine().json_schema(cls, mode=mode, **kwargs)
+
+    def to_engine_model(
+        self,
+        *,
+        include: EngineIncludeExclude = None,
+        exclude: EngineIncludeExclude = None,
+        exclude_none: bool = False,
+    ) -> Any:
+        """Project the current instance into the configured engine model."""
+        return (
+            type(self)
+            .require_model_engine()
+            .project_model(
+                self,
+                include=include,
+                exclude=exclude,
+                exclude_none=exclude_none,
+            )
+        )
+
+    def engine_dump(
+        self,
+        *,
+        include: EngineIncludeExclude = None,
+        exclude: EngineIncludeExclude = None,
+        exclude_none: bool = False,
+    ) -> dict[str, Any]:
+        """Serialize the engine-backed projection of the current instance."""
+        return (
+            type(self)
+            .require_model_engine()
+            .dump_model(
+                self,
+                include=include,
+                exclude=exclude,
+                exclude_none=exclude_none,
+            )
+        )
+
+    def engine_dump_json(
+        self,
+        *,
+        include: EngineIncludeExclude = None,
+        exclude: EngineIncludeExclude = None,
+        exclude_none: bool = False,
+    ) -> str:
+        """Serialize the engine-backed projection of the current instance to JSON."""
+        return (
+            type(self)
+            .require_model_engine()
+            .dump_model_json(
+                self,
+                include=include,
+                exclude=exclude,
+                exclude_none=exclude_none,
+            )
+        )
 
     async def _persist_model_references(self, field_names: set[str] | None = None) -> None:
         """Persist staged `RefForeignKey` values after a successful save.
@@ -686,6 +816,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                 "constraints": list(getattr(cls.meta, "constraints", []) or []),
                 "reflect": getattr(cls.meta, "reflect", False),
                 "abstract": getattr(cls.meta, "abstract", False),
+                "model_engine": getattr(cls.meta, "model_engine", None),
                 "is_tenant": getattr(cls.meta, "is_tenant", None),
                 "register_default": getattr(cls.meta, "register_default", None),
             },
