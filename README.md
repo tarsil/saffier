@@ -33,7 +33,7 @@
 
 ## Saffier 2.0+
 
-Saffier is currently revamped to be more powerful and flexible, while maintaining the same familiar interface.
+Saffier is currently revamped, powered up and ready to be more powerful and flexible, while maintaining the same familiar interface.
 The new version will be released as **Saffier 2.0** and the versioning will grow from there. The supported version will always be the latest released,
 so if you are using Saffier, make sure to keep it updated to the latest version to get the best experience and all the new features.
 
