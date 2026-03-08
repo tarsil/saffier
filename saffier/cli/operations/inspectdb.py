@@ -16,7 +16,7 @@ def inspect_db(
             ),
         ),
     ],
-    schema: Annotated[str | None, Option(None, help="Database schema to be applied.")],
+    schema: Annotated[str, Option(None, help="Database schema to be applied.")],
 ) -> None:
     """
     Inspects an existing database and generates the Saffier reflect models.

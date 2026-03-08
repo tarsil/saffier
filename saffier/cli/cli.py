@@ -64,7 +64,7 @@ saffier_cli = Sayer(
 def saffier_callback(
     ctx: click.Context,
     app: typing.Annotated[
-        str | None,
+        str,
         Option(
             None,
             help=(
@@ -75,7 +75,7 @@ def saffier_callback(
         ),
     ] = None,
     path: typing.Annotated[
-        str | None,
+        str,
         Option(
             None,
             help=(
@@ -86,6 +86,9 @@ def saffier_callback(
     ] = None,
 ) -> None:
     """Perform database migration directives."""
+    app_value = typing.cast("str | None", app)
+    path_value = typing.cast("str | None", path)
+
     if HELP_PARAMETER in sys.argv:
         return
 
@@ -95,7 +98,7 @@ def saffier_callback(
 
     try:
         reload_settings()
-        cwd = Path.cwd() if path is None else Path(path)
+        cwd = Path.cwd() if path_value is None else Path(path_value)
         sys_path = getattr(sys, "path", None)
         if sys_path is not None and str(cwd) not in sys_path:
             sys_path.insert(0, str(cwd))
@@ -103,10 +106,10 @@ def saffier_callback(
         migration = MigrationEnv()
         instance_env = (
             None
-            if app or _monkay.instance is None
+            if app_value or _monkay.instance is None
             else migration.load_from_instance(_monkay.instance)
         )
-        app_env = instance_env or migration.load_from_env(path=app)
+        app_env = instance_env or migration.load_from_env(path=app_value)
         app_value = getattr(app_env, "app", None)
         if app_value is not None and _monkay.instance is None:
             set_instance_from_app(app_value, path=getattr(app_env, "path", None))

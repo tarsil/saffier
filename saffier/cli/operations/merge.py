@@ -11,11 +11,11 @@ from saffier.cli.state import get_migration_app
 def merge(
     message: MessageOption,
     branch_label: Annotated[
-        str | None,
+        str,
         Option(None, help="Specify a branch label to apply to the new revision"),
     ],
     rev_id: Annotated[
-        str | None,
+        str,
         Option(None, help="Specify a hardcoded revision id instead of generating one"),
     ],
     revisions: Annotated[list[str], Argument(nargs=-1)],

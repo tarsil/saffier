@@ -31,15 +31,15 @@ def makemigrations(
         ),
     ],
     branch_label: Annotated[
-        str | None,
+        str,
         Option(None, help="Specify a branch label to apply to the new revision"),
     ],
     version_path: Annotated[
-        str | None,
+        str,
         Option(None, help="Specify specific path from config for version file"),
     ],
     rev_id: Annotated[
-        str | None,
+        str,
         Option(None, help="Specify a hardcoded revision id instead of generating one"),
     ],
     arg: ExtraArgOption,

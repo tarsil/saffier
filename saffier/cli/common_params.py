@@ -30,7 +30,7 @@ SQLOption = Annotated[
 ]
 RevisionHeadArgument = Annotated[str, Argument("head")]
 TagOption = Annotated[
-    str | None,
+    str,
     Option(
         None,
         help='Arbitrary "tag" name - can be used by custom env.py scripts',
@@ -40,9 +40,9 @@ ExtraArgOption = Annotated[
     list[str],
     Option((), "-x", multiple=True, help="Additional arguments consumed by custom env.py scripts"),
 ]
-MessageOption = Annotated[str | None, Option(None, "-m", help="Revision message")]
+MessageOption = Annotated[str, Option(None, "-m", help="Revision message")]
 DirectoryOption = Annotated[
-    str | None,
+    str,
     Option(
         None,
         "-d",

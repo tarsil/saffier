@@ -9,7 +9,7 @@ from saffier.cli.common_params import DirectoryOption
 @command
 def init(
     template: Annotated[
-        str | None,
+        str,
         Option(None, "-t", help='Repository template to use (default is "default")'),
     ],
     package: Annotated[
