@@ -57,13 +57,13 @@ async def cleanup_prepare_db():
 def test_migrate_upgrade(create_folders):
     asyncio.run(cleanup_prepare_db())
     (o, e, ss) = run_cmd("tests.cli.main:app", "saffier init -t ./custom")
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     (o, e, ss) = run_cmd("tests.cli.main:app", "saffier makemigrations")
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     (o, e, ss) = run_cmd("tests.cli.main:app", "saffier migrate")
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     with open("migrations/README") as f:
         assert f.readline().strip() == "Custom template"

@@ -59,17 +59,17 @@ def test_migrate_upgrade_with_app_flag(create_folders):
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app init -t ./custom", is_app=False
     )
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app makemigrations", is_app=False
     )
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app migrate", is_app=False
     )
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     with open("migrations/README") as f:
         assert f.readline().strip() == "Custom template"
