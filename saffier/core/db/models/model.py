@@ -1,3 +1,4 @@
+import copy
 import typing
 from collections.abc import Sequence
 from typing import Any, cast
@@ -5,9 +6,11 @@ from typing import Any, cast
 import orjson
 import sqlalchemy
 from sqlalchemy.engine.result import Row
+from sqlalchemy.sql.elements import ColumnElement
 
 import saffier
 from saffier.conf import settings
+from saffier.core.db.context_vars import CURRENT_INSTANCE, EXPLICIT_SPECIFIED_VALUES
 from saffier.core.db.models.base import SaffierBaseReflectModel
 from saffier.core.db.models.mixins.admin import AdminMixin
 from saffier.core.db.models.mixins.generics import DeclarativeMixin
@@ -85,7 +88,7 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
             and getattr(field, "null", False)
             and isinstance(field, (saffier.ForeignKey, saffier.OneToOneField))
         ):
-            return field.target(pk=None)
+            return None
         return value
 
     def model_dump(
@@ -103,7 +106,11 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
 
         def is_included(
             field_name: str,
-            include_rule: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None,
+            include_rule: set[int]
+            | set[str]
+            | dict[int, typing.Any]
+            | dict[str, typing.Any]
+            | None,
         ) -> bool:
             if include_rule is None:
                 return True
@@ -113,7 +120,11 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
 
         def is_excluded(
             field_name: str,
-            exclude_rule: set[int] | set[str] | dict[int, typing.Any] | dict[str, typing.Any] | None,
+            exclude_rule: set[int]
+            | set[str]
+            | dict[int, typing.Any]
+            | dict[str, typing.Any]
+            | None,
         ) -> bool:
             if exclude_rule is None:
                 return False
@@ -157,10 +168,7 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
                     return value.model_dump(**kwargs)
 
             if isinstance(value, dict):
-                return {
-                    key: serialize(inner_value)
-                    for key, inner_value in value.items()
-                }
+                return {key: serialize(inner_value) for key, inner_value in value.items()}
 
             if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
                 return [serialize(item) for item in value]
@@ -212,34 +220,152 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
             option=orjson.OPT_NON_STR_KEYS,
         ).decode("utf-8")
 
+    async def execute_pre_save_hooks(
+        self,
+        field_values: dict[str, typing.Any],
+        original_values: dict[str, typing.Any] | None = None,
+        *,
+        is_update: bool,
+    ) -> dict[str, typing.Any]:
+        hook_values: dict[str, typing.Any] = {}
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            all_field_names = {*field_values.keys(), *((original_values or {}).keys())}
+            for field_name in all_field_names:
+                field = self.fields.get(field_name)
+                if field is None:
+                    continue
+                pre_save_callback = getattr(field, "pre_save_callback", None)
+                if not callable(pre_save_callback):
+                    continue
+                hook_values.update(
+                    await pre_save_callback(
+                        field_values.get(field_name),
+                        (original_values or {}).get(field_name),
+                        is_update=is_update,
+                    )
+                )
+            return hook_values
+        finally:
+            CURRENT_INSTANCE.reset(token)
+
+    def _should_force_insert(self) -> bool:
+        for field_name in type(self).pknames:
+            field = self.fields.get(field_name)
+            if field is None:
+                continue
+            value = getattr(self, field_name, None)
+            column = getattr(self.table.c, field_name, None)
+            if value is None and column is not None and getattr(column, "autoincrement", False):
+                return True
+            if getattr(field, "increment_on_save", 0) != 0 or getattr(field, "auto_now", False):
+                return True
+            if getattr(field, "auto_now_add", False) and value is None:
+                return True
+        return False
+
+    def _apply_persisted_db_values(self, db_kwargs: dict[str, typing.Any]) -> None:
+        grouped_values: dict[str, dict[str, typing.Any]] = {}
+
+        for key, value in db_kwargs.items():
+            field_name = self.meta.columns_to_field.get(key)
+            if field_name is None:
+                field_name = key if key in self.fields else None
+            if field_name is None or field_name not in self.fields:
+                continue
+            grouped_values.setdefault(field_name, {})[key] = value
+
+        for field_name, field_values in grouped_values.items():
+            field = self.fields[field_name]
+            if getattr(field, "increment_on_save", 0) != 0 and any(
+                isinstance(value, ColumnElement) for value in field_values.values()
+            ):
+                self.__dict__.pop(field_name, None)
+                continue
+
+            payload = dict(field_values)
+            field.modify_input(field_name, payload)
+
+            resolved_value = payload.get(field_name)
+            if resolved_value is None and len(field_values) == 1:
+                resolved_value = next(iter(field_values.values()))
+
+            if isinstance(field, (saffier.ForeignKey, saffier.OneToOneField)):
+                current_value = self.__dict__.get(field_name)
+                if current_value is not None and hasattr(current_value, "pk"):
+                    if resolved_value is None:
+                        self.__dict__[field_name] = None
+                        continue
+                    try:
+                        current_value.pk = (
+                            getattr(resolved_value, "pk", resolved_value)
+                            if not isinstance(resolved_value, dict)
+                            else resolved_value
+                        )
+                        continue
+                    except Exception:
+                        pass
+
+            if field_name in payload:
+                setattr(self, field_name, payload[field_name])
+                continue
+
+            if len(field_values) == 1:
+                setattr(self, field_name, next(iter(field_values.values())))
+
     async def update(self, **kwargs: typing.Any) -> typing.Any:
         """
         Update operation of the database fields.
         """
         await self.signals.pre_update.send(sender=self.__class__, instance=self)
 
-        db_kwargs = {
-            key: value
-            for key, value in kwargs.items()
-            if key in self.fields and self.fields[key].has_column()
+        normalized_kwargs = self.__class__.normalize_field_kwargs(kwargs)
+        original_field_values = {
+            key: getattr(self, key, None) for key in normalized_kwargs if key in self.fields
         }
-        fields = {key: field.validator for key, field in self.fields.items() if key in db_kwargs}
+        self.update_from_dict(normalized_kwargs)
+        field_values = {key: getattr(self, key) for key in normalized_kwargs if key in self.fields}
+        db_kwargs = {
+            key: value for key, value in field_values.items() if self.fields[key].has_column()
+        }
+        fields = {}
+        for key, field in self.fields.items():
+            if key not in db_kwargs:
+                continue
+            field_validator = field.validator
+            if field_validator.read_only:
+                field_validator = copy.copy(field_validator)
+                field_validator.read_only = False
+            fields[key] = field_validator
         validator = Schema(fields=fields)
-        db_kwargs = self._update_auto_now_fields(validator.check(db_kwargs), self.fields)
+        token = EXPLICIT_SPECIFIED_VALUES.set(set(normalized_kwargs.keys()))
+        try:
+            hook_values = await self.execute_pre_save_hooks(
+                field_values,
+                original_field_values,
+                is_update=True,
+            )
+        finally:
+            EXPLICIT_SPECIFIED_VALUES.reset(token)
+        validated_kwargs = validator.check(db_kwargs)
+        db_kwargs = self.__class__.extract_column_values(
+            validated_kwargs,
+            is_update=True,
+            is_partial=True,
+            phase="prepare_update",
+            instance=self,
+            model_instance=self,
+        )
+        db_kwargs.update(hook_values)
+        db_kwargs = self._update_auto_now_fields(db_kwargs, self.fields)
 
         if db_kwargs:
-            pk_column = getattr(self.table.c, self.pkname)
-            expression = self.table.update().values(**db_kwargs).where(pk_column == self.pk)
+            expression = self.table.update().values(**db_kwargs).where(*self.identifying_clauses())
             check_db_connection(self.database)
             async with self.database as database:
                 await database.execute(expression)
         await self.signals.post_update.send(sender=self.__class__, instance=self)
-
-        # Update the model instance.
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-        for key, value in db_kwargs.items():
-            setattr(self, key, value)
+        self._apply_persisted_db_values(db_kwargs)
 
         return self
 
@@ -266,6 +392,8 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
 
             related = field.expand_relationship(value)
             if related is None:
+                continue
+            if hasattr(related, "can_load") and not related.can_load:
                 continue
 
             remove_call: str | bool = related_name or True
@@ -323,15 +451,14 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
                 model_instance=self,
             )
 
-        pk_column = getattr(self.table.c, self.pkname)
         count_expression = sqlalchemy.func.count().select().select_from(self.table)
-        count_expression = count_expression.where(pk_column == self.pk)
+        count_expression = count_expression.where(*self.identifying_clauses())
         check_db_connection(self.database)
         async with self.database as database:
             row_count = cast("int", await database.fetch_val(count_expression) or 0)
 
         if row_count:
-            expression = self.table.delete().where(pk_column == self.pk)
+            expression = self.table.delete().where(*self.identifying_clauses())
             async with self.database as database:
                 await database.execute(expression)
 
@@ -381,16 +508,24 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
             return
 
         # Build the select expression.
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.select().where(pk_column == self.pk)
+        expression = self.table.select().where(*self.identifying_clauses())
 
         # Perform the fetch.
         check_db_connection(self.database)
         async with self.database as database:
             row = await database.fetch_one(expression)
 
-        # Update the instance.
-        for key, value in dict(row._mapping).items():
+        if row is None:
+            return
+
+        loaded = self.__class__.from_query_result(
+            row,
+            using_schema=self.get_active_instance_schema(),
+        )
+        for key, value in loaded.__dict__.items():
+            if key.startswith("_"):
+                self.__dict__[key] = value
+                continue
             setattr(self, key, value)
 
     async def _save(self, **kwargs: typing.Any) -> "Model":
@@ -401,20 +536,31 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         check_db_connection(self.database)
         async with self.database as database:
             autoincrement_value = await database.execute(expression)
+        persisted_values = dict(kwargs)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column
             if column is not None and isinstance(autoincrement_value, Row):
-                autoincrement_value = autoincrement_value._mapping[column.name]
+                mapping = autoincrement_value._mapping
+                autoincrement_value = mapping.get(column.key, mapping.get(column.name))
             # can be explicit set, which causes an invalid value returned
             if column is not None and column.key not in kwargs:
-                saffier_setattr(self, column.key, autoincrement_value)
+                persisted_values[column.key] = autoincrement_value
+        self._apply_persisted_db_values(persisted_values)
+        for field_name, field in self.fields.items():
+            if field_name in self.__dict__:
+                continue
+            if not getattr(field, "null", False):
+                continue
+            if isinstance(field, (saffier.ForeignKey, saffier.OneToOneField)):
+                self.__dict__[field_name] = None
         return self
 
     async def save(
         self,
-        force_save: bool = False,
+        force_save: bool | None = None,
         values: typing.Any = None,
+        force_insert: bool | None = None,
         **kwargs: typing.Any,
     ) -> type["Model"] | Any:
         """
@@ -422,76 +568,126 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
-        await self.signals.pre_save.send(sender=self.__class__, instance=self)
+        if force_insert is None:
+            force_insert = bool(force_save)
+        self.__dict__["_saffier_save_in_progress"] = True
+        try:
+            await self.signals.pre_save.send(sender=self.__class__, instance=self)
 
-        extracted_fields = self.extract_db_fields()
+            extracted_fields = self.extract_db_fields()
+            original_extracted_fields = dict(extracted_fields)
+            explicit_field_values: dict[str, typing.Any] | None = None
+            explicit_field_names: set[str] = set()
 
-        if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
-            extracted_fields.pop(self.pkname, None)
+            if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
+                extracted_fields.pop(self.pkname, None)
+            else:
+                for field_name in type(self).pknames:
+                    field = self.fields[field_name]
+                    if field.autoincrement and getattr(self, field_name, None) is None:
+                        extracted_fields.pop(field_name, None)
 
-        self.update_from_dict(dict(extracted_fields.items()))
-        is_create = getattr(self, "pk", None) is None or force_save
+            if isinstance(values, (set, list, tuple)):
+                explicit_field_names = set(values)
+                values = None
 
-        fields = {
-            key: field.validator for key, field in self.fields.items() if key in extracted_fields
-        }
-        if values:
-            db_values = {
-                key: value
-                for key, value in values.items()
-                if key in self.fields and self.fields[key].has_column()
-            }
-            if is_create:
-                for key, field in self.fields.items():
-                    if not field.has_column() or not field.validator.read_only:
-                        continue
-                    if key in extracted_fields:
-                        expanded = field.expand_relationship(extracted_fields[key])
-                        db_values[key] = field.validator.check(expanded)
-                    elif field.validator.has_default():
-                        db_values[key] = field.validator.get_default_value()
-            kwargs = self._update_auto_now_fields(db_values, self.fields)
-        else:
+            if values:
+                normalized_values = self.__class__.normalize_field_kwargs(values)
+                self.update_from_dict(normalized_values)
+                explicit_field_values = {
+                    key: getattr(self, key) for key in normalized_values if key in self.fields
+                }
+                explicit_field_names = set(explicit_field_values)
+                extracted_fields.update(explicit_field_values)
+
+            self.update_from_dict(dict(extracted_fields.items()))
+            is_create = bool(force_insert) or not self.can_load or self._should_force_insert()
+            token = EXPLICIT_SPECIFIED_VALUES.set(explicit_field_names)
+            try:
+                hook_values = await self.execute_pre_save_hooks(
+                    extracted_fields,
+                    original_extracted_fields,
+                    is_update=not is_create,
+                )
+            finally:
+                EXPLICIT_SPECIFIED_VALUES.reset(token)
+
+            input_values = (
+                extracted_fields
+                if is_create or explicit_field_values is None
+                else explicit_field_values
+            )
+            fields = {}
+            for key, field in self.fields.items():
+                if key not in input_values:
+                    continue
+                field_validator = field.validator
+                if field_validator.read_only:
+                    field_validator = copy.copy(field_validator)
+                    field_validator.read_only = False
+                fields[key] = field_validator
             validator = Schema(fields=fields)
-            validated = validator.check(extracted_fields)
+            validated = validator.check(input_values)
+            kwargs = self.__class__.extract_column_values(
+                validated,
+                is_update=not is_create,
+                is_partial=not is_create and explicit_field_values is not None,
+                phase="prepare_insert" if is_create else "prepare_update",
+                instance=self,
+                model_instance=self,
+            )
+            kwargs.update(hook_values)
+            kwargs = self._update_auto_now_fields(kwargs, self.fields)
+
+            # Performs the update or the create based on a possible existing primary key
             if is_create:
-                for key, field in self.fields.items():
-                    if not field.has_column() or not field.validator.read_only:
-                        continue
-                    if key in extracted_fields:
-                        expanded = field.expand_relationship(extracted_fields[key])
-                        validated[key] = field.validator.check(expanded)
-                    elif field.validator.has_default():
-                        validated[key] = field.validator.get_default_value()
-            kwargs = self._update_auto_now_fields(validated, self.fields)
+                await self._save(**kwargs)
+            else:
+                await self.signals.pre_update.send(
+                    sender=self.__class__, instance=self, kwargs=kwargs
+                )
+                if kwargs:
+                    expression = (
+                        self.table.update().values(**kwargs).where(*self.identifying_clauses())
+                    )
+                    check_db_connection(self.database)
+                    async with self.database as database:
+                        await database.execute(expression)
+                await self.signals.post_update.send(sender=self.__class__, instance=self)
+                self._apply_persisted_db_values(kwargs)
 
-        # Performs the update or the create based on a possible existing primary key
-        if is_create:
-            await self._save(**kwargs)
-        else:
-            await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
-            await self.update(**kwargs)
-            await self.signals.post_update.send(sender=self.__class__, instance=self)
+            # Refresh the results
+            if any(
+                field.server_default is not None
+                for name, field in self.fields.items()
+                if name not in extracted_fields
+            ):
+                await self.load()
 
-        # Refresh the results
-        if any(
-            field.server_default is not None
-            for name, field in self.fields.items()
-            if name not in extracted_fields
-        ):
-            await self.load()
+            await self._persist_model_references()
+            await self._persist_related_fields()
+            await self.signals.post_save.send(sender=self.__class__, instance=self)
+            return self
+        finally:
+            self.__dict__.pop("_saffier_save_in_progress", None)
 
-        await self._persist_model_references()
-        await self._persist_related_fields()
-        await self.signals.post_save.send(sender=self.__class__, instance=self)
-        return self
+    async def real_save(
+        self,
+        force_insert: bool = False,
+        values: typing.Any = None,
+        force_save: bool | None = None,
+        **kwargs: typing.Any,
+    ) -> type["Model"] | Any:
+        if force_save is not None:
+            force_insert = force_save
+        return await self.save(force_insert=force_insert, values=values, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
         """
         Run an one off query to populate any foreign key making sure
         it runs only once per foreign key avoiding multiple database calls.
         """
-        if name not in self.__dict__ and name in self.fields and name != self.pkname:
+        if name not in self.__dict__ and name in self.fields and name not in type(self).pknames:
             field = self.fields[name]
             if getattr(field, "is_computed", False):
                 return field.get_value(self, name)
@@ -511,7 +707,7 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
+        return f"{self.__class__.__name__}({self.join_identifiers_to_string()})"
 
 
 class StrictModel(Model):
@@ -536,6 +732,11 @@ class StrictModel(Model):
                 and not getattr(field, "is_computed", False)
             ):
                 value = field.validator.check(value)
+            return super().__setattr__(key, value)
+
+        plain_fields = getattr(type(self), "__plain_model_fields__", {})
+        if key in plain_fields:
+            value = type(self).validate_plain_field_value(key, value)
             return super().__setattr__(key, value)
 
         if key.startswith("_") or key in self.__dict__ or hasattr(type(self), key):

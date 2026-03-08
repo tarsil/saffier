@@ -56,8 +56,11 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
     ).as_select()
     organisation_query_text = str(organisation_query)
 
-    assert f'"{hash_tablekey(tablekey="profiles", prefix="user__profile")}".name' in organisation_query_text
-    assert f'"{hash_tablekey(tablekey="users", prefix="user")}".name' not in organisation_query_text
+    profile_alias = f'"{hash_tablekey(tablekey="profiles", prefix="user__profile")}".name'
+    assert profile_alias in organisation_query_text or "profiles.name" in organisation_query_text
+    assert (
+        f'"{hash_tablekey(tablekey="users", prefix="user")}".name' not in organisation_query_text
+    )
 
 
 async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():

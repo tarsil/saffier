@@ -36,7 +36,9 @@ async def rollback_connections():
 
 
 async def test_raise_QuerySetError_on_only_and_defer():
-    saffier.run_sync(User.query.create(name="John", language="PT", description="A simple description"))
+    saffier.run_sync(
+        User.query.create(name="John", language="PT", description="A simple description")
+    )
 
     with pytest.raises(QuerySetError):
         saffier.run_sync(User.query.only("name").defer("language"))

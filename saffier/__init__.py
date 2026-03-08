@@ -137,7 +137,9 @@ def _package_find_missing(
             missing.setdefault(name, set()).add("missing_attr")
 
     for search_path in search_pathes or ():
-        module_name = f"{__name__}{search_path}" if str(search_path).startswith(".") else str(search_path)
+        module_name = (
+            f"{__name__}{search_path}" if str(search_path).startswith(".") else str(search_path)
+        )
         try:
             imported = importlib.import_module(module_name)
         except Exception:

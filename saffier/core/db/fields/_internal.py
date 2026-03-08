@@ -42,6 +42,7 @@ class SaffierField(ArbitraryHashableBaseModel):
         **kwargs: typing.Any,
     ) -> None:
         super().__init__(**kwargs)
+        self.explicit_none = default is None
         if null and default is NO_DEFAULT:
             default = None
 
@@ -65,7 +66,10 @@ class SaffierField(ArbitraryHashableBaseModel):
         return ValidationResult(value=value, error=None)
 
     def has_default(self) -> bool:
-        return hasattr(self, "default")
+        if not hasattr(self, "default"):
+            return False
+        default = self.default
+        return default is not None or self.explicit_none
 
     def validation_error(self, code: str, value: typing.Any | None = None) -> ValidationError:
         text = self.get_error_message(code)

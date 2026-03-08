@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 CHECK_DB_CONNECTION_SILENCED = ContextVar("CHECK_DB_CONNECTION_SILENCED", default=False)
 FORCE_FIELDS_NULLABLE = ContextVar(
     "FORCE_FIELDS_NULLABLE",
-    default=tuple(),
+    default=(),
 )
 
 

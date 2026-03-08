@@ -102,7 +102,7 @@ def create_admin_app(
             page=page,
             page_size=per_page,
             search=search,
-            order_by=model.pkname,
+            order_by=None,
         )
         objects = [{"instance": obj, "pk": site.create_object_pk(obj)} for obj in page_obj.content]
         return templates.TemplateResponse(

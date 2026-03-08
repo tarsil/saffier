@@ -27,6 +27,7 @@
 - Removed core runtime dependence on Pydantic (`saffier/core/datastructures.py` and `saffier/core/db/models/model_proxy.py` are now Python-native).
 - QuerySet cache parity improved for `all(clear_cache=True)`, cached `get()`, SQL rendering, and `select_for_update(...)`.
 - Permission, pagination, lazy-import, and nested `exclude_secrets()` compatibility now align more closely with Edgy behavior.
+- Model save/create extraction now matches Edgy for nullable/default fields, explicit read-only primary-key values, and composite-key / related-field inserts.
 
 ## 1.4.2
 

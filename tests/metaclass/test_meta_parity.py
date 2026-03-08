@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 import sqlalchemy
 
@@ -128,8 +130,8 @@ def test_manager_inherit_false_is_not_propagated() -> None:
     registry_obj = build_registry()
 
     class BaseEntity(saffier.Model):
-        active = ActiveManager()
-        hidden = Manager(inherit=False)
+        active: ClassVar[Manager] = ActiveManager()
+        hidden: ClassVar[Manager] = Manager(inherit=False)
 
         class Meta:
             registry = registry_obj

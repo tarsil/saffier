@@ -35,7 +35,7 @@ class User(saffier.Model):
 
     class Meta:
         registry = models
-        name = "manager_simple_users"
+        tablename = "manager_simple_users"
 
 
 @pytest.fixture(autouse=True, scope="function")

@@ -1,7 +1,7 @@
 import copy
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast, get_args, get_origin
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -9,6 +9,12 @@ from typing_extensions import Self
 
 import saffier
 from saffier.conf import settings
+from saffier.core.db.context_vars import (
+    CURRENT_FIELD_CONTEXT,
+    CURRENT_INSTANCE,
+    CURRENT_MODEL_INSTANCE,
+    CURRENT_PHASE,
+)
 from saffier.core.db.datastructures import Index, UniqueConstraint
 from saffier.core.db.models.managers import Manager, RedirectManager
 from saffier.core.db.models.metaclasses import (
@@ -21,7 +27,7 @@ from saffier.core.db.models.metaclasses import (
 )
 from saffier.core.db.models.model_proxy import ProxyModel
 from saffier.core.utils.models import DateParser, create_saffier_model, generify_model_fields
-from saffier.exceptions import ImproperlyConfigured
+from saffier.exceptions import ImproperlyConfigured, ValidationError
 
 if TYPE_CHECKING:
     from saffier import Model
@@ -64,6 +70,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             getattr(self.__class__, "__no_load_trigger_attrs__", set())
         )
         self.__dict__["_db_deleted"] = False
+        self.__dict__["transaction"] = functools.partial(self._instance_transaction)
         self.setup_model_fields_from_kwargs(model_refs, kwargs)
 
     @staticmethod
@@ -122,18 +129,75 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         Loops and setup the kwargs of the model
         """
         kwargs = self.__class__.merge_model_refs(model_refs, kwargs)
+        kwargs = self.__class__.normalize_field_kwargs(kwargs)
 
         if "pk" in kwargs:
-            kwargs[self.pkname] = kwargs.pop("pk")
+            self.pk = kwargs.pop("pk")
 
         for key, value in kwargs.items():
             if key not in self.fields and not hasattr(self, key):
                 raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
+            if key in self.get_plain_model_fields():
+                value = self.validate_plain_field_value(key, value)
+
             # Set model field and add to the kwargs dict
             setattr(self, key, value)
             kwargs[key] = value
         return kwargs
+
+    @classmethod
+    def get_plain_model_fields(cls) -> dict[str, dict[str, Any]]:
+        return cast("dict[str, dict[str, Any]]", getattr(cls, "__plain_model_fields__", {}))
+
+    @classmethod
+    def _matches_plain_annotation(cls, annotation: Any, value: Any) -> bool:
+        del cls
+        if annotation in (Any, None):
+            return True
+
+        origin = get_origin(annotation)
+        if origin is None:
+            if annotation is type(None):
+                return value is None
+            if isinstance(annotation, type):
+                if annotation is int and isinstance(value, bool):
+                    return False
+                return isinstance(value, annotation)
+            return True
+
+        if str(origin) in {"typing.Union", "types.UnionType"}:
+            return any(
+                SaffierBaseModel._matches_plain_annotation(arg, value)
+                for arg in get_args(annotation)
+            )
+
+        if origin in (list, set, tuple, dict):
+            return isinstance(value, origin)
+
+        if origin in (Sequence,):
+            return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
+
+        if isinstance(origin, type):
+            return isinstance(value, origin)
+        return True
+
+    @classmethod
+    def validate_plain_field_value(cls, key: str, value: Any) -> Any:
+        plain_field = cls.get_plain_model_fields().get(key)
+        if plain_field is None:
+            return value
+        annotation = plain_field.get("annotation")
+        if cls._matches_plain_annotation(annotation, value):
+            return value
+        raise ValidationError(text=f"Invalid value for '{key}'.", code="type")
+
+    @classmethod
+    def normalize_field_kwargs(cls, kwargs: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = dict(kwargs or {})
+        for field_name, field in cls.fields.items():
+            field.modify_input(field_name, payload)
+        return payload
 
     async def _persist_model_references(self, field_names: set[str] | None = None) -> None:
         for field_name, field in self.fields.items():
@@ -156,16 +220,52 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             if callable(save_related):
                 await save_related()
 
+    @staticmethod
+    def _normalize_identifier_value(value: Any) -> Any:
+        if hasattr(value, "__db_model__"):
+            return getattr(value, "pk", None)
+        return value
+
+    def _pk_values(self) -> dict[str, Any]:
+        return {
+            field_name: self._normalize_identifier_value(getattr(self, field_name, None))
+            for field_name in type(self).pknames
+        }
+
+    def _instance_transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Any:
+        return self.database.transaction(force_rollback=force_rollback, **kwargs)
+
     @property
     def pk(self) -> Any:
-        attr = getattr(self, self.pkname, None)
-        if hasattr(attr, "__db_model__"):
-            return getattr(attr, attr.pkname, None)  # type: ignore[union-attr]
-        return attr
+        values = self._pk_values()
+        if len(values) == 1:
+            return next(iter(values.values()))
+        if values and all(value is None for value in values.values()):
+            return None
+        return values
 
     @pk.setter
     def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
+        if len(type(self).pknames) == 1:
+            if isinstance(value, dict):
+                value = value.get(self.pkname)
+            setattr(self, self.pkname, value)
+            return
+
+        if value is None:
+            payload = dict.fromkeys(type(self).pknames)
+        elif hasattr(value, "__db_model__"):
+            payload = getattr(value, "pk", None) or {}
+        else:
+            payload = value
+
+        if not isinstance(payload, dict):
+            raise ValueError(
+                f"Composite primary keys on '{self.__class__.__name__}' require a mapping value."
+            )
+
+        for field_name in type(self).pknames:
+            setattr(self, field_name, payload.get(field_name))
 
     @property
     def raw_query(self) -> Any:
@@ -178,8 +278,15 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
 
+    def join_identifiers_to_string(self, *, sep: str = ", ", sep_inner: str = "=") -> str:
+        pairs = [
+            f"{field_name}{sep_inner}{self._normalize_identifier_value(getattr(self, field_name, None))}"
+            for field_name in self.identifying_db_fields
+        ]
+        return sep.join(pairs)
+
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
+        return f"{self.__class__.__name__}({self.join_identifiers_to_string()})"
 
     @property
     def table(self) -> sqlalchemy.Table:
@@ -238,8 +345,28 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         """
         return (
             self.__class__,
-            *(getattr(self, field_name, None) for field_name in self.identifying_db_fields),
+            *(
+                self._normalize_identifier_value(getattr(self, field_name, None))
+                for field_name in self.identifying_db_fields
+            ),
         )
+
+    def identifying_clauses(
+        self,
+        *,
+        table: sqlalchemy.Table | None = None,
+        fields: Sequence[str] | None = None,
+    ) -> list[Any]:
+        active_table = table or self.table
+        clauses = []
+        for field_name in tuple(fields or self.identifying_db_fields):
+            column = getattr(active_table.c, field_name, None)
+            if column is None:
+                continue
+            clauses.append(
+                column == self._normalize_identifier_value(getattr(self, field_name, None))
+            )
+        return clauses
 
     def _has_loaded_db_fields(self) -> bool:
         return all(
@@ -311,6 +438,8 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
         definitions: dict[str, Any] = {}
         source_registry = getattr(cls.meta, "registry", None)
+        existing_annotations = dict(getattr(cls, "__annotations__", {}))
+        manager_annotations: dict[str, Any] = {}
 
         for field_name, field in cls.fields.items():
             if getattr(field, "no_copy", False):
@@ -329,12 +458,18 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                             field_copy.related_name = False
                 elif isinstance(field_copy, ManyToManyField):
                     target = field.target
-                    if getattr(target.meta, "registry", None) is source_registry and unlink_same_registry:
+                    if (
+                        getattr(target.meta, "registry", None) is source_registry
+                        and unlink_same_registry
+                    ):
                         field_copy.to = target.__name__
                     through = getattr(field_copy, "through", None)
-                    if isinstance(through, type) and getattr(through.meta, "registry", None) is source_registry:
-                        if unlink_same_registry:
-                            field_copy.through = through.__name__
+                    if (
+                        isinstance(through, type)
+                        and getattr(through.meta, "registry", None) is source_registry
+                        and unlink_same_registry
+                    ):
+                        field_copy.through = through.__name__
 
             definitions[field_name] = field_copy
 
@@ -342,6 +477,16 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             manager = getattr(cls, manager_name, None)
             if isinstance(manager, Manager):
                 definitions[manager_name] = copy.copy(manager)
+                manager_annotations[manager_name] = existing_annotations.get(
+                    manager_name,
+                    ClassVar[Any],
+                )
+
+        if manager_annotations:
+            definitions["__annotations__"] = {
+                **existing_annotations,
+                **manager_annotations,
+            }
 
         return definitions
 
@@ -353,14 +498,29 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         unlink_same_registry: bool = True,
         on_conflict: str = "error",
     ) -> type["Model"]:
+        existing_annotations = dict(getattr(cls, "__annotations__", {}))
         definitions = {
             key: value
             for key, value in cls.__dict__.items()
             if key not in _MODEL_COPY_EXCLUDED_ATTRS and not key.startswith("__")
         }
         definitions.update(
-            cls._copy_model_definitions(registry=registry, unlink_same_registry=unlink_same_registry)
+            cls._copy_model_definitions(
+                registry=registry, unlink_same_registry=unlink_same_registry
+            )
         )
+        manager_annotations = dict(definitions.get("__annotations__", {}))
+        for manager_name, value in definitions.items():
+            if isinstance(value, Manager):
+                manager_annotations.setdefault(
+                    manager_name,
+                    existing_annotations.get(manager_name, ClassVar[Any]),
+                )
+        if manager_annotations:
+            definitions["__annotations__"] = {
+                **existing_annotations,
+                **manager_annotations,
+            }
         definitions["__skip_registry__"] = True
 
         meta = type(
@@ -446,7 +606,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         for field_name, field in cls.fields.items():
             field.owner = cls
             field.registry = registry
-            if field.primary_key:
+            if field.primary_key and field_name == cls.meta.pk_attribute:
                 cls.pkname = field_name
 
         for manager_name in getattr(cls.meta, "managers", []):
@@ -560,9 +720,14 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         table_constraints = cls.meta.constraints
 
         columns = []
+        field_constraints = []
         for name, field in cls.fields.items():
             if field.has_column():
-                columns.append(field.get_column(name))
+                field_columns = list(field.get_columns(name))
+                columns.extend(field_columns)
+                field_constraints.extend(
+                    field.get_global_constraints(name, field_columns, schema=schema)
+                )
 
         # Handle the uniqueness together
         uniques = []
@@ -579,6 +744,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         constraints = []
         for constraint in table_constraints or []:
             constraints.append(constraint)
+        constraints.extend(field_constraints)
 
         return sqlalchemy.Table(
             tablename,
@@ -598,17 +764,32 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         The columns must be a a list, tuple of strings or a UniqueConstraint object.
         """
         if isinstance(columns, str):
-            return sqlalchemy.UniqueConstraint(columns)
+            expanded = cls._expand_constraint_field_names((columns,))
+            return sqlalchemy.UniqueConstraint(*expanded)
         elif isinstance(columns, UniqueConstraint):
-            return sqlalchemy.UniqueConstraint(*columns.fields)
-        return sqlalchemy.UniqueConstraint(*columns)
+            expanded = cls._expand_constraint_field_names(columns.fields)
+            return sqlalchemy.UniqueConstraint(*expanded)
+        expanded = cls._expand_constraint_field_names(columns)
+        return sqlalchemy.UniqueConstraint(*expanded)
 
     @classmethod
     def _get_indexes(cls, index: Index) -> sqlalchemy.Index | None:
         """
         Creates the index based on the Index fields
         """
-        return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
+        expanded = cls._expand_constraint_field_names(index.fields or ())
+        return sqlalchemy.Index(index.name, *expanded)  # type: ignore
+
+    @classmethod
+    def _expand_constraint_field_names(cls, names: Sequence[str]) -> tuple[str, ...]:
+        expanded: list[str] = []
+        for name in names:
+            field = cls.fields.get(name)
+            if field is not None and hasattr(field, "get_column_names"):
+                expanded.extend(field.get_column_names(name))
+            else:
+                expanded.append(name)
+        return tuple(expanded)
 
     def update_from_dict(self, dict_values: dict[str, Any]) -> Self:
         """Updates the current model object with the new fields"""
@@ -616,16 +797,99 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             setattr(self, key, value)
         return self
 
-    def extract_db_fields(self) -> dict[str, Any]:
+    def extract_db_fields(self, only: Sequence[str] | None = None) -> dict[str, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
         """
+        if only is not None:
+            allowed = set(only)
+            return {
+                k: v
+                for k, v in self.__dict__.items()
+                if k in allowed and k in self.fields and self.fields[k].has_column()
+            }
         return {
             k: v
             for k, v in self.__dict__.items()
             if k in self.fields and self.fields[k].has_column()
         }
+
+    @classmethod
+    def extract_column_values(
+        cls,
+        extracted_values: dict[str, Any],
+        is_update: bool = False,
+        is_partial: bool = False,
+        phase: str = "",
+        instance: Any | None = None,
+        model_instance: Any | None = None,
+        evaluate_values: bool = False,
+    ) -> dict[str, Any]:
+        validated: dict[str, Any] = {}
+        token = CURRENT_PHASE.set(phase)
+        token2 = CURRENT_INSTANCE.set(instance)
+        token3 = CURRENT_MODEL_INSTANCE.set(model_instance)
+        field_dict: dict[str, Any] = {}
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+
+        try:
+            extracted_values = cls.normalize_field_kwargs(extracted_values)
+            if evaluate_values:
+                new_extracted_values: dict[str, Any] = {}
+                for key, value in extracted_values.items():
+                    if callable(value):
+                        field_dict.clear()
+                        field_dict["field"] = cls.meta.fields.get(key)
+                        value = value()
+                    new_extracted_values[key] = value
+                extracted_values = new_extracted_values
+            else:
+                extracted_values = dict(extracted_values)
+
+            if cls.meta.input_modifying_fields:
+                for field_name in cls.meta.input_modifying_fields:
+                    cls.meta.fields[field_name].modify_input(field_name, extracted_values)
+
+            need_second_pass = []
+            for field_name, field in cls.meta.fields.items():
+                field_dict.clear()
+                field_dict["field"] = field
+                if field.validator.read_only:
+                    if field_name in extracted_values:
+                        for sub_name, value in field.clean(
+                            field_name, extracted_values[field_name]
+                        ).items():
+                            if sub_name in validated:
+                                raise ValueError(f"value set twice for key: {sub_name}")
+                            validated[sub_name] = value
+                    elif (
+                        not is_partial or (field.inject_default_on_partial_update and is_update)
+                    ) and field.has_default():
+                        validated.update(field.get_default_values(field_name, validated))
+                    continue
+                if field_name in extracted_values:
+                    item = extracted_values[field_name]
+                    for sub_name, value in field.clean(field_name, item).items():
+                        if sub_name in validated:
+                            raise ValueError(f"value set twice for key: {sub_name}")
+                        validated[sub_name] = value
+                elif (
+                    not is_partial or (field.inject_default_on_partial_update and is_update)
+                ) and field.has_default():
+                    need_second_pass.append(field)
+
+            for field in need_second_pass:
+                field_dict.clear()
+                field_dict["field"] = field
+                if field.name not in validated:
+                    validated.update(field.get_default_values(field.name, validated))
+        finally:
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+            CURRENT_MODEL_INSTANCE.reset(token3)
+            CURRENT_INSTANCE.reset(token2)
+            CURRENT_PHASE.reset(token)
+        return validated
 
     def __setattr__(self, key: Any, value: Any) -> Any:
         if key == "__using_schema__":
@@ -646,6 +910,9 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                     field.set_value(self, key, value)
                     return
                 super().__setattr__(key, value)
+                return
+            if hasattr(field, "set_value") and not isinstance(field, saffier.ManyToManyField):
+                field.set_value(self, key, value)
                 return
             value = self.fields[key].expand_relationship(value)
         super().__setattr__(key, value)
@@ -697,11 +964,11 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
 
     @property
     def pk(self) -> Any:
-        return getattr(self, self.pkname, None)
+        return super().pk
 
     @pk.setter
     def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
+        SaffierBaseModel.pk.fset(self, value)
 
     @classmethod
     def build(cls, schema: str | None = None) -> sqlalchemy.Table:

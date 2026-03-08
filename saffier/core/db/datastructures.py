@@ -104,7 +104,9 @@ class QueryModelResultCache:
                 key.append(str(getattr(instance, attr)))
         return tuple(key)
 
-    def get_category(self, model_class: type[Any], prefix: str | None = None) -> dict[tuple[Any, ...], Any]:
+    def get_category(
+        self, model_class: type[Any], prefix: str | None = None
+    ) -> dict[tuple[Any, ...], Any]:
         return self.cache.setdefault(self.create_category(model_class, prefix=prefix), {})
 
     def update(

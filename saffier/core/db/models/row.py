@@ -11,8 +11,30 @@ from saffier.exceptions import QuerySetError
 if TYPE_CHECKING:  # pragma: no cover
     from saffier import Model, Prefetch, QuerySet
 
+saffier_setattr = object.__setattr__
+
 
 class ModelRow(SaffierBaseModel):
+    @staticmethod
+    def _row_value(row: Row, key: str) -> Any:
+        if key in row._mapping:
+            return row._mapping[key]
+        return getattr(row, key, None)
+
+    @classmethod
+    def _table_row_value(cls, row: Row, table: Any, key: str) -> Any:
+        column = getattr(getattr(table, "c", None), key, None)
+        if column is not None and column in row._mapping:
+            return row._mapping[column]
+        return cls._row_value(row, key)
+
+    @classmethod
+    def _build_related_pk_filter(cls, path: str, row: Row, model_class: Any) -> dict[str, Any]:
+        target_class = model_class if isinstance(model_class, type) else type(model_class)
+        return {
+            f"{path}__{pk_name}": cls._row_value(row, pk_name) for pk_name in target_class.pknames
+        }
+
     @classmethod
     async def apply_prefetch_related(
         cls,
@@ -42,6 +64,7 @@ class ModelRow(SaffierBaseModel):
         reference_select: dict[str, Any] | None = None,
         tables_and_models: dict[str, tuple[Any, Any]] | None = None,
         root_model_class: type["Model"] | None = None,
+        prefix: str = "",
     ) -> type["Model"] | None:
         """
         Class method to convert a SQLAlchemy Row result into a SaffierModel row type.
@@ -62,7 +85,10 @@ class ModelRow(SaffierBaseModel):
         prefetch_related = prefetch_related or []
         reference_select = reference_select or {}
         root_model_class = root_model_class or cast("type[Model]", cls)
-        model_table = cls.table_schema(using_schema) if using_schema is not None else cls.table
+        if tables_and_models is not None and prefix in tables_and_models:
+            model_table = tables_and_models[prefix][0]
+        else:
+            model_table = cls.table_schema(using_schema) if using_schema is not None else cls.table
 
         secret_fields = cls.meta.secret_fields if exclude_secrets else set()
 
@@ -82,6 +108,7 @@ class ModelRow(SaffierBaseModel):
                     exclude_secrets=exclude_secrets,
                     tables_and_models=tables_and_models,
                     root_model_class=root_model_class,
+                    prefix=(first_part if not prefix else f"{prefix}__{first_part}"),
                 )
             else:
                 try:
@@ -94,6 +121,7 @@ class ModelRow(SaffierBaseModel):
                     exclude_secrets=exclude_secrets,
                     tables_and_models=tables_and_models,
                     root_model_class=root_model_class,
+                    prefix=(related if not prefix else f"{prefix}__{related}"),
                 )
 
         # Populate the related names
@@ -111,20 +139,43 @@ class ModelRow(SaffierBaseModel):
 
             child_item: dict[str, Any] = {}
             if related not in secret_fields:
-                foreign_key_value = getattr(row, related, None)
-                if foreign_key_value is not None:
-                    child_item[model_related.pkname] = foreign_key_value
+                column_names = (
+                    foreign_key.get_column_names(related)
+                    if hasattr(foreign_key, "get_column_names")
+                    else (related,)
+                )
+                related_keys = (
+                    tuple(foreign_key.related_columns.keys())
+                    if hasattr(foreign_key, "related_columns")
+                    else (model_related.pkname,)
+                )
+                for related_key, column_name in zip(related_keys, column_names, strict=False):
+                    foreign_key_value = cls._table_row_value(row, model_table, column_name)
+                    if foreign_key_value is not None:
+                        child_item[related_key] = foreign_key_value
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
             if related not in secret_fields:
-                related_instance = model_related(**child_item)
-                if exclude_secrets:
-                    related_instance.__no_load_trigger_attrs__.update(model_related.meta.secret_fields)
-                if using_schema is not None:
-                    related_instance.table = model_related.table_schema(using_schema)
-                item[related] = related_instance
+                if not child_item and getattr(foreign_key, "null", False):
+                    related_instance = model_related()
+                    if exclude_secrets:
+                        related_instance.__no_load_trigger_attrs__.update(
+                            model_related.meta.secret_fields
+                        )
+                    if using_schema is not None:
+                        related_instance.table = model_related.table_schema(using_schema)
+                    item[related] = related_instance
+                else:
+                    related_instance = model_related(**child_item)
+                    if exclude_secrets:
+                        related_instance.__no_load_trigger_attrs__.update(
+                            model_related.meta.secret_fields
+                        )
+                    if using_schema is not None:
+                        related_instance.table = model_related.table_schema(using_schema)
+                    item[related] = related_instance
 
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
@@ -136,12 +187,13 @@ class ModelRow(SaffierBaseModel):
 
             for column, value in row._mapping.items():
                 column_name = str(getattr(column, "key", column))
-                if column_name in secret_fields:
+                mapped_field = cls.meta.columns_to_field.get(column_name)
+                if mapped_field is None:
+                    continue
+                if mapped_field in secret_fields:
                     continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column_name not in mapping_fields:
-                    continue
-                if column_name not in cls.fields:
+                if mapped_field not in mapping_fields and column_name not in mapping_fields:
                     continue
                 if column_name not in item:
                     item[column_name] = value
@@ -169,12 +221,20 @@ class ModelRow(SaffierBaseModel):
         else:
             # Pull out the regular column values.
             for column in model_table.columns:
-                if column.key in secret_fields:
+                mapped_field = cls.meta.columns_to_field.get(column.key)
+                if mapped_field is None:
                     continue
-                # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column.key not in cls.fields:
+                if mapped_field in secret_fields:
                     continue
-                elif column.key not in item:
+                if mapped_field in item and (
+                    column.key == mapped_field
+                    or isinstance(
+                        cls.fields.get(mapped_field),
+                        (saffier_fields.ForeignKey, saffier_fields.OneToOneField),
+                    )
+                ):
+                    continue
+                if column.key not in item:
                     if column in row._mapping:
                         item[column.key] = row._mapping[column]
                     elif column.key in row._mapping:
@@ -368,9 +428,9 @@ class ModelRow(SaffierBaseModel):
 
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)
-                if isinstance(cls.fields.get(first_part), saffier_fields.ManyToManyField) or hasattr(
-                    model, first_part
-                ):
+                if isinstance(
+                    cls.fields.get(first_part), saffier_fields.ManyToManyField
+                ) or hasattr(model, first_part):
                     records = run_sync(
                         cls.__collect_prefetch_records(
                             model=model,
@@ -378,7 +438,7 @@ class ModelRow(SaffierBaseModel):
                             queryset=original_prefetch.queryset,
                         )
                     )
-                    setattr(model, related.to_attr, records)
+                    saffier_setattr(model, related.to_attr, records)
                     continue
 
                 model_cls = cls.meta.related_fields[first_part].related_to
@@ -401,13 +461,12 @@ class ModelRow(SaffierBaseModel):
 
             # Check for individual not nested querysets
             elif related.queryset is not None and not is_nested:
-                filter_by_pk = getattr(row, cls.pkname)
-                extra = {f"{related.related_name}__id": filter_by_pk}
+                extra = cls._build_related_pk_filter(related.related_name, row, cls)
                 related.queryset.extra = extra
 
                 # Execute the queryset
                 records = run_sync(cls.__run_query(queryset=related.queryset))
-                setattr(model, related.to_attr, records)
+                saffier_setattr(model, related.to_attr, records)
             elif isinstance(
                 cls.fields.get(related.related_name),
                 saffier_fields.ManyToManyField,
@@ -419,7 +478,7 @@ class ModelRow(SaffierBaseModel):
                         queryset=related.queryset,
                     )
                 )
-                setattr(model, related.to_attr, records)
+                saffier_setattr(model, related.to_attr, records)
             else:
                 model_cls = getattr(cls, related.related_name).related_from
                 records = cls.__process_nested_prefetch_related(
@@ -430,7 +489,7 @@ class ModelRow(SaffierBaseModel):
                     queryset=original_prefetch.queryset,
                 )
 
-                setattr(model, related.to_attr, records)
+                saffier_setattr(model, related.to_attr, records)
         return model
 
     @classmethod
@@ -460,15 +519,15 @@ class ModelRow(SaffierBaseModel):
 
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)
-                if isinstance(cls.fields.get(first_part), saffier_fields.ManyToManyField) or hasattr(
-                    model, first_part
-                ):
+                if isinstance(
+                    cls.fields.get(first_part), saffier_fields.ManyToManyField
+                ) or hasattr(model, first_part):
                     records = await cls.__collect_prefetch_records(
                         model=model,
                         related_name=related.related_name,
                         queryset=original_prefetch.queryset,
                     )
-                    setattr(model, related.to_attr, records)
+                    saffier_setattr(model, related.to_attr, records)
                     continue
 
                 model_cls = cls.meta.related_fields[first_part].related_to
@@ -486,11 +545,10 @@ class ModelRow(SaffierBaseModel):
                     is_nested=True,
                 )
             elif related.queryset is not None and not is_nested:
-                filter_by_pk = getattr(row, cls.pkname)
-                extra = {f"{related.related_name}__id": filter_by_pk}
+                extra = cls._build_related_pk_filter(related.related_name, row, cls)
                 related.queryset.extra = extra
                 records = await cls.__run_query(queryset=related.queryset)
-                setattr(model, related.to_attr, records)
+                saffier_setattr(model, related.to_attr, records)
             elif isinstance(
                 cls.fields.get(related.related_name),
                 saffier_fields.ManyToManyField,
@@ -500,7 +558,7 @@ class ModelRow(SaffierBaseModel):
                     related_name=related.related_name,
                     queryset=related.queryset,
                 )
-                setattr(model, related.to_attr, records)
+                saffier_setattr(model, related.to_attr, records)
             else:
                 records = await cls.__process_nested_prefetch_related_async(
                     row=row,
@@ -509,7 +567,7 @@ class ModelRow(SaffierBaseModel):
                     original_prefetch=original_prefetch,
                     queryset=original_prefetch.queryset,
                 )
-                setattr(model, related.to_attr, records)
+                saffier_setattr(model, related.to_attr, records)
         return model
 
     @classmethod
@@ -540,10 +598,7 @@ class ModelRow(SaffierBaseModel):
         # Build new filter
         query = "__".join(query_split)
 
-        # Extact foreign key value
-        filter_by_pk = getattr(row, parent_cls.pkname)
-
-        extra = {f"{query}__id": filter_by_pk}
+        extra = cls._build_related_pk_filter(query, row, parent_cls)
 
         records = run_sync(cls.__run_query(model_class, extra, queryset))
         return records
@@ -566,8 +621,7 @@ class ModelRow(SaffierBaseModel):
         query_split.insert(0, foreign_key_name)
 
         query = "__".join(query_split)
-        filter_by_pk = getattr(row, parent_cls.pkname)
-        extra = {f"{query}__id": filter_by_pk}
+        extra = cls._build_related_pk_filter(query, row, parent_cls)
 
         return await cls.__run_query(model_class, extra, queryset)
 

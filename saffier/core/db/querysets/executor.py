@@ -44,8 +44,7 @@ class QueryExecutor:
         self.parser = parser or ResultParser(queryset)
 
     async def iterate(self, fetch_all_at_once: bool = False) -> AsyncGenerator[Any, None]:
-        del fetch_all_at_once
-        async for item in self.queryset._execute_iterate():
+        async for item in self.queryset._execute_iterate(fetch_all_at_once=fetch_all_at_once):
             yield item
 
     async def get_one(self) -> tuple[Any, Any]:

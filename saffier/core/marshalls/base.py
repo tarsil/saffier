@@ -227,9 +227,9 @@ class BaseMarshall:
         return func(instance)
 
     def _handle_primary_key(self, instance: Model) -> None:
-        pk_name = instance.pkname
-        if pk_name in type(self).model_fields:
-            object.__setattr__(self, pk_name, getattr(instance, pk_name))
+        for pk_name in type(instance).pknames:
+            if pk_name in type(self).model_fields:
+                object.__setattr__(self, pk_name, getattr(instance, pk_name))
 
     @cached_property
     def valid_fields(self) -> dict[str, MarshallFieldBinding]:

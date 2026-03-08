@@ -113,7 +113,9 @@ class TenancyMixin:
             if schema is False:
                 queryset.table = self.model_class.table
             else:
-                queryset.table = self.model_class.table_schema(cast("str | None", queryset.using_schema))
+                queryset.table = self.model_class.table_schema(
+                    cast("str | None", queryset.using_schema)
+                )
 
         return queryset
 

@@ -24,7 +24,7 @@ class Schema(SaffierField):
         self.required = [
             key
             for key, field in fields.items()
-            if not (field.read_only or field.has_default())  # type: ignore
+            if not (field.read_only or field.null or field.has_default())  # type: ignore
         ]
 
     def check(self, value: Any) -> Any:

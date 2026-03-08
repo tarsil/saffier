@@ -1,4 +1,5 @@
 import functools
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
@@ -9,6 +10,9 @@ from saffier.exceptions import ObjectNotFound, RelationshipIncompatible, Relatio
 
 if TYPE_CHECKING:
     from saffier import Manager, Model, QuerySet, ReflectModel
+
+_sentinel = object()
+_undefined = object()
 
 
 class RelatedField:
@@ -45,9 +49,9 @@ class RelatedField:
             manager = self.related_from.meta.manager  # type: ignore[attr-defined]
         return cast("Manager", manager)
 
-    @functools.cached_property
+    @property
     def queryset(self) -> "QuerySet":
-        return cast("QuerySet", self.manager.get_queryset())
+        return self._base_queryset()
 
     @functools.cached_property
     def foreign_key(self) -> Any:
@@ -61,19 +65,31 @@ class RelatedField:
     def is_m2m(self) -> bool:
         return bool(getattr(self.related_from.meta, "is_multi", False))  # type: ignore[union-attr]
 
-    def scoped_queryset(self) -> "QuerySet":
-        field = self.get_foreign_key_field_name()
-        queryset = cast("QuerySet", self.queryset.filter(**{field: self.instance.pk}))  # type: ignore[arg-type]
+    def _base_queryset(
+        self,
+        *,
+        database: Any = _undefined,
+        schema: Any = _undefined,
+    ) -> "QuerySet":
+        queryset = cast("QuerySet", self.manager.get_queryset())
+        if database is not _undefined or schema is not _undefined:
+            kwargs: dict[str, Any] = {}
+            if database is not _undefined:
+                kwargs["database"] = database
+            if schema is not _undefined:
+                kwargs["schema"] = schema
+            queryset = cast("QuerySet", queryset.using(**kwargs))
+        return queryset
+
+    def _configure_queryset(self, queryset: "QuerySet") -> "QuerySet":
         queryset.embed_parent = self.embed_parent
 
         if self.embed_parent:
             embed_parent_field = self.embed_parent[0].split("__", 1)[0]
             embed_parent_model_field = self.related_from.fields.get(embed_parent_field)  # type: ignore[attr-defined]
-            if (
-                isinstance(
-                    embed_parent_model_field,
-                    (fields.ForeignKey, fields.OneToOneField, fields.ManyToManyField),
-                )
+            if isinstance(
+                embed_parent_model_field,
+                (fields.ForeignKey, fields.OneToOneField, fields.ManyToManyField),
             ):
                 queryset.embed_parent_filters = self.embed_parent
                 if embed_parent_field not in queryset._select_related:
@@ -87,6 +103,35 @@ class RelatedField:
         if related:
             queryset.m2m_related = related[0]
         return queryset
+
+    def scoped_queryset(self) -> "QuerySet":
+        field = self.get_foreign_key_field_name()
+        queryset = cast("QuerySet", self._base_queryset().filter(**{field: self.instance.pk}))  # type: ignore[arg-type]
+        return self._configure_queryset(queryset)
+
+    def using(
+        self,
+        _positional: Any = _sentinel,
+        *,
+        database: Any = _undefined,
+        schema: Any = _undefined,
+    ) -> "QuerySet":
+        if _positional is not _sentinel:
+            warnings.warn(
+                "Passing positional arguments to using is deprecated. Use schema= instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            schema = _positional
+
+        field = self.get_foreign_key_field_name()
+        queryset = cast(
+            "QuerySet",
+            self._base_queryset(database=database, schema=schema).filter(
+                **{field: self.instance.pk}
+            ),
+        )
+        return self._configure_queryset(queryset)
 
     def m2m_related(self) -> Any:
         """
@@ -208,7 +253,9 @@ class RelatedField:
                 owner_database = getattr(owner_registry, "database", None)
         target_database = getattr(self.foreign_key.owner, "database", None)
         if target_database is None:
-            target_registry = getattr(getattr(self.foreign_key.owner, "meta", None), "registry", None)
+            target_registry = getattr(
+                getattr(self.foreign_key.owner, "meta", None), "registry", None
+            )
             target_database = getattr(target_registry, "database", None)
         if owner_database is None or target_database is None:
             return False
@@ -295,9 +342,12 @@ class RelatedField:
                 self.get_foreign_key_field_name(): self.instance,
                 other_field: child,
             }
-            if getattr(self.foreign_key, "unique", False) and await self.related_from.query.filter(
-                **{self.get_foreign_key_field_name(): self.instance}
-            ).exists():
+            if (
+                getattr(self.foreign_key, "unique", False)
+                and await self.related_from.query.filter(
+                    **{self.get_foreign_key_field_name(): self.instance}
+                ).exists()
+            ):
                 return None
             if await self.related_from.query.filter(**payload).exists():
                 return None

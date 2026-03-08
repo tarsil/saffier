@@ -128,6 +128,39 @@ def test_admin_site_search_and_form_payload_errors():
         site.form_to_payload(_FakeFormData(editor_data=orjson.dumps([1, 2]).decode()))
 
 
+def test_admin_site_handles_composite_primary_keys():
+    model = type(
+        "CompositeEntry",
+        (),
+        {
+            "meta": SimpleNamespace(abstract=False),
+            "pkname": "id",
+            "pknames": ("id", "slug"),
+            "fields": {
+                "id": saffier.IntegerField(primary_key=True),
+                "slug": saffier.CharField(max_length=50, primary_key=True),
+            },
+        },
+    )
+    instance = type(
+        "CompositeInstance",
+        (),
+        {
+            "pkname": "id",
+            "pk": {"id": 1, "slug": "entry"},
+            "id": 1,
+            "slug": "entry",
+        },
+    )()
+
+    site = AdminSite(registry=_registry(models={"CompositeEntry": model}))
+    schema = site.get_model_schema("CompositeEntry")
+
+    assert schema["pk_names"] == ["id", "slug"]
+    encoded = site.create_object_pk(instance)
+    assert site.parse_object_pk(encoded) == {"id": 1, "slug": "entry"}
+
+
 def test_admin_site_payload_coercion_branches():
     readonly = saffier.CharField(max_length=50)
     readonly.validator.read_only = True

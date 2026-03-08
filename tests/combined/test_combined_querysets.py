@@ -241,9 +241,7 @@ async def test_only_and_defer_mixed_across_union():
 
 
 async def test_get_first_last_on_combined_are_stable():
-    combined = User.query.filter(name__in=["A", "B"]).union(
-        User.query.filter(name__in=["C", "D"])
-    )
+    combined = User.query.filter(name__in=["A", "B"]).union(User.query.filter(name__in=["C", "D"]))
 
     first_row = await combined.order_by("name").first()
     assert first_row is not None

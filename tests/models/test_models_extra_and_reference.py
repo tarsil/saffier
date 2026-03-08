@@ -136,7 +136,7 @@ async def test_counting_query():
 async def test_summing_query():
     total_query = sqlalchemy.select(sqlalchemy.func.sum(User.table.c.number)).scalar_subquery()
 
-    for profile in await Profile.query.extra_select(total_query.label("total_number")).reference_select(
-        {"total_number": "total_number"}
-    ):
+    for profile in await Profile.query.extra_select(
+        total_query.label("total_number")
+    ).reference_select({"total_number": "total_number"}):
         assert profile.total_number == 100

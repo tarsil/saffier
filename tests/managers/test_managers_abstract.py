@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 
 import saffier
@@ -25,7 +27,7 @@ class LanguageManager(Manager):
 
 
 class BaseModel(saffier.Model):
-    query = ObjectsManager()
+    query: ClassVar[Manager] = ObjectsManager()
 
     class Meta:
         abstract = True
@@ -36,10 +38,11 @@ class HubUser(BaseModel):
     name = saffier.CharField(max_length=100)
     language = saffier.CharField(max_length=200, null=True)
 
-    languages = LanguageManager()
+    languages: ClassVar[Manager] = LanguageManager()
 
     class Meta:
         registry = models
+        tablename = "manager_abstract_users"
 
 
 class HubProduct(BaseModel):
@@ -47,6 +50,10 @@ class HubProduct(BaseModel):
     rating = saffier.IntegerField(minimum=1, maximum=5)
     in_stock = saffier.BooleanField(default=False)
     is_active = saffier.BooleanField(default=False)
+
+    class Meta:
+        registry = models
+        tablename = "manager_abstract_products"
 
 
 @pytest.fixture(autouse=True, scope="function")

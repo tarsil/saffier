@@ -45,10 +45,9 @@ def _matches_model_instance(source: Any, model_class: type[Any]) -> bool:
     if source_meta is None or target_meta is None:
         return False
 
-    return (
-        getattr(source_meta, "registry", None) is getattr(target_meta, "registry", None)
-        and getattr(source_meta, "tablename", None) == getattr(target_meta, "tablename", None)
-    )
+    return getattr(source_meta, "registry", None) is getattr(
+        target_meta, "registry", None
+    ) and getattr(source_meta, "tablename", None) == getattr(target_meta, "tablename", None)
 
 
 class PermissionManager(Manager):

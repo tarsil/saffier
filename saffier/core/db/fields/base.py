@@ -12,6 +12,7 @@ import saffier
 from saffier.conf import settings
 from saffier.contrib.sqlalchemy.fields import IPAddress
 from saffier.core.db.constants import CASCADE, NEW_M2M_NAMING, RESTRICT, SET_NULL
+from saffier.core.db.context_vars import CURRENT_INSTANCE, EXPLICIT_SPECIFIED_VALUES
 from saffier.core.db.fields._internal import (
     URL,
     UUID,
@@ -69,12 +70,17 @@ class Field:
         self.unique = unique
         self.validator: SaffierField | type[SaffierField] = self.get_validator(**kwargs)
         self.comment = kwargs.get("comment")
+        self.column_name = kwargs.pop("column_name", None)
         self.owner = kwargs.pop("owner", None)
         self.registry = kwargs.pop("registry", None)
         self.name = kwargs.pop("name", "")
         self.inherit = kwargs.pop("inherit", True)
         self.no_copy = kwargs.pop("no_copy", False)
         self.exclude = kwargs.pop("exclude", False)
+        self.inject_default_on_partial_update = kwargs.get(
+            "inject_default_on_partial_update",
+            False,
+        )
         self.server_onupdate = kwargs.pop("server_onupdate", None)
         self.autoincrement = kwargs.pop("autoincrement", False)
         self.secret = kwargs.pop("secret", False)
@@ -85,18 +91,24 @@ class Field:
         """
         column_type = self.get_column_type()
         constraints = self.get_constraints()
+        column_kwargs = {
+            "primary_key": self.primary_key,
+            "nullable": self.null and not self.primary_key,
+            "index": self.index,
+            "unique": self.unique,
+            "default": self.default_value,
+            "comment": self.comment,
+            "server_default": self.server_default,
+        }
+        if self.autoincrement:
+            column_kwargs["autoincrement"] = True
 
         return sqlalchemy.Column(
-            name,
+            self.column_name or name,
             column_type,
             *constraints,
-            primary_key=self.primary_key,
-            nullable=self.null and not self.primary_key,
-            index=self.index,
-            unique=self.unique,
-            default=self.default_value,
-            comment=self.comment,
-            server_default=self.server_default,
+            key=name,
+            **column_kwargs,
         )
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
@@ -106,6 +118,19 @@ class Field:
         raise NotImplementedError()  # pragma: no cover
 
     def get_constraints(self) -> typing.Any:
+        return []
+
+    def get_columns(self, name: str) -> typing.Sequence[sqlalchemy.Column]:
+        return [self.get_column(name)]
+
+    def get_global_constraints(
+        self,
+        name: str,
+        columns: typing.Sequence[sqlalchemy.Column],
+        *,
+        schema: str | None = None,
+    ) -> typing.Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
+        del name, columns, schema
         return []
 
     def has_column(self) -> bool:
@@ -122,26 +147,39 @@ class Field:
     def expand_relationship(self, value: typing.Any) -> typing.Any:
         return value
 
+    def clean(
+        self, name: str, value: typing.Any, *, for_query: bool = False
+    ) -> dict[str, typing.Any]:
+        del for_query
+        if not self.has_column():
+            return {}
+        return {name: value}
+
     def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
         del name, kwargs
 
     def raise_for_non_default(self, default: typing.Any, server_default: typing.Any) -> typing.Any:
-        has_default: bool = True
-        has_server_default: bool = True
+        del default, server_default
 
-        if default is None or default is False:
-            has_default = False
-        if server_default is None or server_default is False:
-            has_server_default = False
+    def get_default_value(self) -> typing.Any:
+        return self.validator.get_default_value()
 
-        if (
-            not isinstance(self, (IntegerField, BigIntegerField, SmallIntegerField))
-            and not has_default
-            and not has_server_default
-        ):
-            raise ValueError(
-                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
-            )
+    def has_default(self) -> bool:
+        return self.validator.has_default()
+
+    def get_default_values(
+        self,
+        field_name: str,
+        cleaned_data: dict[str, typing.Any],
+    ) -> dict[str, typing.Any]:
+        if field_name in cleaned_data or not self.has_column():
+            return {}
+        return {field_name: self.get_default_value()}
+
+    def is_required(self) -> bool:
+        if self.primary_key and self.autoincrement:
+            return False
+        return not (self.null or self.server_default is not None or self.has_default())
 
     def get_is_null_clause(self, column: typing.Any) -> typing.Any:
         return column == None  # noqa: E711
@@ -206,6 +244,18 @@ class IntegerField(Field):
     Representation of an IntegerField
     """
 
+    def __init__(self, increment_on_save: int = 0, **kwargs: typing.Any) -> None:
+        self.increment_on_save = increment_on_save
+        if self.increment_on_save != 0:
+            if kwargs.get("autoincrement"):
+                raise FieldDefinitionError(
+                    "'autoincrement' is incompatible with 'increment_on_save'"
+                )
+            if kwargs.get("null"):
+                raise FieldDefinitionError("'null' is incompatible with 'increment_on_save'")
+            kwargs.setdefault("read_only", True)
+        super().__init__(**kwargs)
+
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Integer(**kwargs)
 
@@ -214,6 +264,36 @@ class IntegerField(Field):
 
     def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
         return sqlalchemy.or_(self.get_is_null_clause(column), column == 0)
+
+    async def pre_save_callback(
+        self,
+        value: typing.Any,
+        original_value: typing.Any,
+        is_update: bool,
+    ) -> dict[str, typing.Any]:
+        if self.increment_on_save == 0:
+            return {}
+
+        explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
+        if explicit_values is not None and self.name in explicit_values:
+            return {}
+
+        current_value = original_value if value is None else value
+        if not is_update:
+            if current_value is None:
+                return {self.name: self.get_default_value()}
+            return {self.name: current_value + self.increment_on_save}
+
+        if self.primary_key:
+            return {}
+
+        current_instance = CURRENT_INSTANCE.get()
+        table = getattr(current_instance, "table", None)
+        if table is None:
+            if current_value is None:
+                current_value = self.get_default_value()
+            return {self.name: current_value + self.increment_on_save}
+        return {self.name: table.columns[self.name] + self.increment_on_save}
 
 
 class SmallIntegerField(IntegerField):
@@ -376,6 +456,7 @@ class CompositeField(Field):
         *,
         inner_fields: typing.Any = (),
         prefix_embedded: str = "",
+        prefix_column_name: str = "",
         absorb_existing_fields: bool = False,
         model: typing.Any = None,
         **kwargs: typing.Any,
@@ -384,6 +465,7 @@ class CompositeField(Field):
         super().__init__(**kwargs)
         self.inner_fields = inner_fields
         self.prefix_embedded = prefix_embedded
+        self.prefix_column_name = prefix_column_name
         self.absorb_existing_fields = absorb_existing_fields
         self.model = model
 
@@ -450,6 +532,9 @@ class CompositeField(Field):
                 inner_field if getattr(inner_field, "no_copy", False) else copy.copy(inner_field)
             )
             field_copy.name = target_name
+            base_column_name = getattr(inner_field, "column_name", None) or public_name
+            if self.prefix_column_name:
+                field_copy.column_name = f"{self.prefix_column_name}{base_column_name}"
             embedded[target_name] = field_copy
         return embedded
 
@@ -563,6 +648,8 @@ class ForeignKey(Field):
         primary_key = bool(kwargs.pop("primary_key", False))
         index = bool(kwargs.pop("index", False))
         unique = bool(kwargs.pop("unique", False))
+        self.related_fields = tuple(kwargs.pop("related_fields", ()))
+        self._target_registry = kwargs.pop("target_registry", None)
         super().__init__(
             null=null,
             primary_key=primary_key,
@@ -586,15 +673,29 @@ class ForeignKey(Field):
             )
 
     @property
+    def target_registry(self) -> typing.Any:
+        if self._target_registry is not None:
+            return self._target_registry
+        owner_registry = getattr(getattr(self.owner, "meta", None), "registry", None)
+        if owner_registry is not None:
+            return owner_registry
+        return self.registry
+
+    @target_registry.setter
+    def target_registry(self, value: typing.Any) -> None:
+        self._target_registry = value
+
+    @property
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
                 try:
-                    self._target = self.registry.get_model(self.to)
+                    self._target = self.target_registry.get_model(self.to)
                 except LookupError:
-                    self._target = self.registry.models.get(self.to) or self.registry.reflected[
-                        self.to
-                    ]
+                    self._target = (
+                        self.target_registry.models.get(self.to)
+                        or self.target_registry.reflected[self.to]
+                    )
             else:
                 self._target = self.to
         return self._target
@@ -602,46 +703,276 @@ class ForeignKey(Field):
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return self.ForeignKeyValidator(**kwargs)
 
-    def get_column(self, name: str) -> sqlalchemy.Column:
+    @property
+    def related_columns(self) -> dict[str, sqlalchemy.Column | None]:
         target = self.target
-        to_field = target.fields[target.pkname]
+        columns: dict[str, sqlalchemy.Column | None] = {}
+        if self.related_fields:
+            for field_name in self.related_fields:
+                if field_name in target.meta.fields:
+                    for column in target.meta.field_to_columns[field_name]:
+                        columns[column.key] = column
+                else:
+                    columns[field_name] = None
+            return columns
+        keys = tuple(getattr(target, "pknames", ())) or tuple(getattr(target, "pkcolumns", ()))
+        if not keys:
+            keys = (getattr(target, "pkname", "id"),)
+        table = getattr(target, "_table", None)
+        for key in keys:
+            column = None
+            if table is not None:
+                column = getattr(table.c, key, None)
+            columns[key] = column
+        return columns
 
-        column_type = to_field.get_column_type()
+    def get_fk_name(self, name: str) -> str:
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+        return fk_name[:CHAR_LIMIT]
+
+    def get_fkindex_name(self, name: str) -> str:
+        fk_name = f"fkindex_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+        return fk_name[:CHAR_LIMIT]
+
+    def get_fk_field_name(self, name: str, fieldname: str) -> str:
+        if len(self.related_columns) == 1:
+            return name
+        return f"{name}_{fieldname}"
+
+    def get_fk_column_name(self, name: str, fieldname: str) -> str:
+        name = self.column_name or name
+        if len(self.related_columns) == 1:
+            return name
+        return f"{name}_{fieldname}"
+
+    def get_column_names(self, name: str) -> tuple[str, ...]:
+        return tuple(
+            self.get_fk_field_name(name, field_name) for field_name in self.related_columns
+        )
+
+    def from_fk_field_name(self, name: str, fieldname: str) -> str:
+        if len(self.related_columns) == 1:
+            return next(iter(self.related_columns.keys()))
+        return fieldname.removeprefix(f"{name}_")
+
+    def get_columns(self, name: str) -> typing.Sequence[sqlalchemy.Column]:
+        target = self.target
+        columns: list[sqlalchemy.Column] = []
+        for related_key, related_column in self.related_columns.items():
+            related_field = target.fields[related_key]
+            related_type = (
+                related_column.type
+                if related_column is not None
+                else related_field.get_column_type()
+            )
+            related_name = (
+                getattr(related_column, "name", None) or related_field.column_name or related_key
+            )
+            related_nullable = (
+                related_column.nullable if related_column is not None else related_field.null
+            )
+            columns.append(
+                sqlalchemy.Column(
+                    key=self.get_fk_field_name(name, related_key),
+                    name=self.get_fk_column_name(name, related_name),
+                    type_=related_type,
+                    nullable=self.null or related_nullable,
+                    primary_key=self.primary_key,
+                    autoincrement=False,
+                )
+            )
+        return columns
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        columns = tuple(self.get_columns(name))
+        if len(columns) != 1:
+            raise RuntimeError(
+                f"Foreign key '{name}' on '{self.owner.__name__}' maps to multiple database columns."
+            )
+        return columns[0]
+
+    def get_global_constraints(
+        self,
+        name: str,
+        columns: typing.Sequence[sqlalchemy.Column],
+        *,
+        schema: str | None = None,
+    ) -> typing.Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
         owner_registry = getattr(self.owner.meta, "registry", None)
+        target = self.target
         target_registry = getattr(target.meta, "registry", None)
         owner_database = getattr(self.owner, "database", None)
         target_database = getattr(target, "database", None)
         use_constraint = not (
             self.no_constraint
-            or (owner_registry not in (None, False) and target_registry not in (None, False) and owner_registry is not target_registry)
-            or (owner_database is not None and target_database is not None and owner_database is not target_database)
+            or (
+                owner_registry not in (None, False)
+                and target_registry not in (None, False)
+                and owner_registry is not target_registry
+            )
+            or (
+                owner_database is not None
+                and target_database is not None
+                and owner_database is not target_database
+            )
         )
-        constraints = []
+        constraints: list[sqlalchemy.Constraint | sqlalchemy.Index] = []
         if use_constraint:
+            table_name = target.meta.tablename
+            if schema is not None:
+                table_name = f"{schema}.{table_name}"
             constraints.append(
-                sqlalchemy.schema.ForeignKey(
-                    f"{target.meta.tablename}.{target.pkname}",
+                sqlalchemy.schema.ForeignKeyConstraint(
+                    columns,
+                    [
+                        f"{table_name}.{self.from_fk_field_name(name, column.key)}"
+                        for column in columns
+                    ],
                     ondelete=self.on_delete,
                     onupdate=self.on_update,
-                    name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                    f"_{target.pkname}_{name}",
+                    name=self.get_fk_name(name),
                 )
             )
-        return sqlalchemy.Column(
-            name,
-            column_type,
-            *constraints,
-            nullable=self.null,
-            index=self.index,
-            unique=self.unique,
-        )
+        if self.unique or self.index:
+            constraints.append(
+                sqlalchemy.Index(
+                    self.get_fkindex_name(name),
+                    *columns,
+                    unique=self.unique,
+                )
+            )
+        return constraints
+
+    def clean(
+        self, name: str, value: typing.Any, *, for_query: bool = False
+    ) -> dict[str, typing.Any]:
+        del for_query
+        cleaned: dict[str, typing.Any] = {}
+        related_keys = tuple(self.related_columns.keys())
+        column_names = self.get_column_names(name)
+
+        if value is None:
+            for column_name in column_names:
+                cleaned[column_name] = None
+            return cleaned
+
+        target = self.target
+        if isinstance(value, dict):
+            for related_key, column_name in zip(related_keys, column_names, strict=False):
+                if related_key in value:
+                    cleaned[column_name] = value[related_key]
+                elif column_name in value:
+                    cleaned[column_name] = value[column_name]
+            return cleaned
+
+        if isinstance(value, target):
+            for related_key, column_name in zip(related_keys, column_names, strict=False):
+                cleaned[column_name] = getattr(value, related_key, None)
+            return cleaned
+
+        if hasattr(value, "__db_model__"):
+            value_cls = value.__class__
+            if (
+                getattr(value_cls, "is_proxy_model", False)
+                and getattr(value_cls, "parent", None) is target
+            ):
+                for related_key, column_name in zip(related_keys, column_names, strict=False):
+                    cleaned[column_name] = getattr(value, related_key, None)
+                return cleaned
+
+        pk_value = getattr(value, "pk", None) if hasattr(value, "pk") else None
+        if isinstance(pk_value, dict):
+            return self.clean(name, pk_value)
+        if pk_value is not None and len(column_names) == 1:
+            cleaned[column_names[0]] = pk_value
+            return cleaned
+
+        if len(column_names) == 1:
+            cleaned[column_names[0]] = value
+            return cleaned
+
+        raise ValueError(f"Cannot handle composite foreign key value {value!r}.")
+
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        if name in kwargs:
+            return
+
+        column_names = self.get_column_names(name)
+        if len(column_names) <= 1:
+            return
+
+        payload: dict[str, typing.Any] = {}
+        for column_name in column_names:
+            if column_name in kwargs:
+                payload[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
+
+        if not payload:
+            return
+        if len(payload) != len(column_names):
+            raise ValueError("Cannot update the foreign key partially")
+        kwargs[name] = payload
+
+    async def pre_save_callback(
+        self,
+        value: typing.Any,
+        original_value: typing.Any,
+        is_update: bool,
+    ) -> dict[str, typing.Any]:
+        target = self.target
+        if value is None or (isinstance(value, dict) and not value):
+            value = original_value
+
+        if isinstance(value, target):
+            if (
+                getattr(value, "_saffier_save_in_progress", False)
+                or getattr(value, "pk", None) is not None
+            ):
+                return self.clean(self.name, value, for_query=False)
+            await value.save()
+            return self.clean(self.name, value, for_query=False)
+
+        if hasattr(value, "__db_model__"):
+            value_cls = value.__class__
+            if (
+                getattr(value_cls, "is_proxy_model", False)
+                and getattr(value_cls, "parent", None) is target
+            ):
+                if (
+                    getattr(value, "_saffier_save_in_progress", False)
+                    or getattr(value, "pk", None) is not None
+                ):
+                    return self.clean(self.name, value, for_query=False)
+                await value.save()
+                return self.clean(self.name, value, for_query=False)
+
+        if isinstance(value, dict):
+            return await self.pre_save_callback(
+                target(**value),
+                original_value=None,
+                is_update=is_update,
+            )
+
+        if hasattr(value, "pk") and getattr(value, "pk", None) is not None:
+            return self.clean(self.name, value, for_query=False)
+
+        if value is None:
+            return {}
+        return {self.name: value}
 
     def expand_relationship(self, value: typing.Any) -> typing.Any:
-        if value is None and self.null:
+        if value is None:
             return None
         target = self.target
+        related_columns = tuple(self.related_columns.keys())
         if isinstance(value, target):
-            if self.null and getattr(value, "pk", None) is None:
+            if (
+                self.null
+                and related_columns
+                and all(
+                    key in value.__dict__ and getattr(value, key) is None
+                    for key in related_columns
+                )
+            ):
                 return None
             return value
         if hasattr(value, "__db_model__"):
@@ -650,9 +981,23 @@ class ForeignKey(Field):
                 getattr(value_cls, "is_proxy_model", False)
                 and getattr(value_cls, "parent", None) is target
             ):
-                if self.null and getattr(value, "pk", None) is None:
+                if (
+                    self.null
+                    and related_columns
+                    and all(
+                        key in value.__dict__ and getattr(value, key) is None
+                        for key in related_columns
+                    )
+                ):
                     return None
                 return value
+        if isinstance(value, dict):
+            return target(**value)
+        if hasattr(value, "pk"):
+            pk_value = value.pk
+            if isinstance(pk_value, dict):
+                return target(pk=pk_value)
+            return target(pk=pk_value)
         return target(pk=value)
 
     def is_cross_db(self, owner_database: typing.Any | None = None) -> bool:
@@ -695,6 +1040,8 @@ class ManyToManyField(Field):
         through: type["Model"] | str | None = None,
         through_tablename: str | type[NEW_M2M_NAMING] | None = NEW_M2M_NAMING,
         embed_through: str | bool = False,
+        to_foreign_key: str = "",
+        from_foreign_key: str = "",
         **kwargs: typing.Any,
     ):
         if through_tablename is not None and (
@@ -718,8 +1065,8 @@ class ManyToManyField(Field):
         self.through_tablename = through_tablename
         self.embed_through = embed_through
         self.related_name = related_name
-        self.from_foreign_key = ""
-        self.to_foreign_key = ""
+        self.from_foreign_key = from_foreign_key
+        self.to_foreign_key = to_foreign_key
         self.reverse_name = ""
 
         if self.related_name not in (None, False):
@@ -732,7 +1079,9 @@ class ManyToManyField(Field):
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models.get(self.to) or self.registry.reflected[self.to]
+                self._target = (
+                    self.registry.models.get(self.to) or self.registry.reflected[self.to]
+                )
             else:
                 self._target = self.to
         return self._target
@@ -782,7 +1131,9 @@ class ManyToManyField(Field):
         if self.through:
             if isinstance(self.through, str):
                 registry = self.owner.meta.registry
-                self.through = registry.models.get(self.through) or registry.reflected[self.through]
+                self.through = (
+                    registry.models.get(self.through) or registry.reflected[self.through]
+                )
 
             if not self.from_foreign_key:
                 candidates = [
@@ -847,8 +1198,10 @@ class ManyToManyField(Field):
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__
-        self.from_foreign_key = owner_name.lower()
-        self.to_foreign_key = to_name.lower()
+        if not self.from_foreign_key:
+            self.from_foreign_key = owner_name.lower()
+        if not self.to_foreign_key:
+            self.to_foreign_key = to_name.lower()
         class_name = f"{owner_name}{self.name.capitalize()}Through"
         if self.through_tablename is None or self.through_tablename is NEW_M2M_NAMING:
             tablename = class_name.lower()
@@ -911,7 +1264,8 @@ class ManyToManyField(Field):
         self.add_model_to_register(self.through)
         tenant_models = getattr(self.registry, "tenant_models", None)
         if tenant_models is not None and (
-            getattr(self.owner.meta, "is_tenant", False) or getattr(self.to.meta, "is_tenant", False)
+            getattr(self.owner.meta, "is_tenant", False)
+            or getattr(self.to.meta, "is_tenant", False)
         ):
             tenant_models[self.through.__name__] = self.through
             if getattr(self.owner.meta, "register_default", None) is False:
@@ -1040,35 +1394,7 @@ class OneToOneField(ForeignKey):
         super().__init__(to, **kwargs)
 
     def get_column(self, name: str) -> sqlalchemy.Column:
-        target = self.target
-        to_field = target.fields[target.pkname]
-
-        column_type = to_field.get_column_type()
-        owner_registry = getattr(self.owner.meta, "registry", None)
-        target_registry = getattr(target.meta, "registry", None)
-        owner_database = getattr(self.owner, "database", None)
-        target_database = getattr(target, "database", None)
-        use_constraint = not (
-            self.no_constraint
-            or (owner_registry not in (None, False) and target_registry not in (None, False) and owner_registry is not target_registry)
-            or (owner_database is not None and target_database is not None and owner_database is not target_database)
-        )
-        constraints = []
-        if use_constraint:
-            constraints.append(
-                sqlalchemy.schema.ForeignKey(
-                    f"{target.meta.tablename}.{target.pkname}",
-                    ondelete=self.on_delete,
-                    onupdate=self.on_update,
-                )
-            )
-        return sqlalchemy.Column(
-            name,
-            column_type,
-            *constraints,
-            nullable=self.null,
-            unique=True,
-        )
+        return super().get_column(name)
 
 
 OneToOne = OneToOneField

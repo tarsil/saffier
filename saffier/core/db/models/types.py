@@ -12,8 +12,7 @@ if TYPE_CHECKING:
     from saffier.core.db.models.model import Model
 
 
-class DescriptiveMeta:
-    ...
+class DescriptiveMeta: ...
 
 
 @runtime_checkable

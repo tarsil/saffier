@@ -1,0 +1,117 @@
+import pytest
+
+import saffier
+from saffier.core.db.querysets import Prefetch
+from saffier.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
+
+pytestmark = pytest.mark.anyio
+
+database = Database(DATABASE_URL, full_isolation=False)
+models = saffier.Registry(database=database)
+
+
+class User(saffier.StrictModel):
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Post(saffier.StrictModel):
+    user = saffier.ForeignKey(User, related_name="posts")
+    comment = saffier.CharField(max_length=255)
+
+    class Meta:
+        registry = models
+
+
+class Article(saffier.StrictModel):
+    user = saffier.ForeignKey(User, related_name="articles")
+    content = saffier.CharField(max_length=255)
+
+    class Meta:
+        registry = models
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def create_test_database():
+    async with database:
+        await models.create_all()
+        yield
+    await models.drop_all()
+
+
+async def test_multiple_prefetch_model_calls_iterate_no_rollback():
+    with database.force_rollback(False):
+        user = await User.query.create(name="Saffier")
+
+        for i in range(5):
+            await Post.query.create(comment=f"Comment number {i}", user=user)
+
+        for i in range(50):
+            await Article.query.create(content=f"Comment number {i}", user=user)
+
+        ravyn = await User.query.create(name="Ravyn")
+
+        for i in range(15):
+            await Post.query.create(comment=f"Comment number {i}", user=ravyn)
+
+        for i in range(20):
+            await Article.query.create(content=f"Comment number {i}", user=ravyn)
+
+        users = [
+            user
+            async for user in User.query.prefetch_related(
+                Prefetch(related_name="posts", to_attr="to_posts"),
+                Prefetch(related_name="articles", to_attr="to_articles"),
+            )
+        ]
+
+        assert len(users) == 2
+
+        user1 = [value for value in users if value.pk == user.pk][0]
+        assert len(user1.to_posts) == 5
+        assert len(user1.to_articles) == 50
+
+        user2 = [value for value in users if value.pk == ravyn.pk][0]
+        assert len(user2.to_posts) == 15
+        assert len(user2.to_articles) == 20
+
+
+async def test_multiple_prefetch_model_calls_iterate_force_rollback():
+    with database.force_rollback():
+        user = await User.query.create(name="Saffier")
+
+        for i in range(5):
+            await Post.query.create(comment=f"Comment number {i}", user=user)
+
+        for i in range(50):
+            await Article.query.create(content=f"Comment number {i}", user=user)
+
+        ravyn = await User.query.create(name="Ravyn")
+
+        for i in range(15):
+            await Post.query.create(comment=f"Comment number {i}", user=ravyn)
+
+        for i in range(20):
+            await Article.query.create(content=f"Comment number {i}", user=ravyn)
+
+        with pytest.warns(UserWarning):
+            users = [
+                user
+                async for user in User.query.prefetch_related(
+                    Prefetch(related_name="posts", to_attr="to_posts"),
+                    Prefetch(related_name="articles", to_attr="to_articles"),
+                )
+            ]
+
+        assert len(users) == 2
+
+        user1 = [value for value in users if value.pk == user.pk][0]
+        assert len(user1.to_posts) == 5
+        assert len(user1.to_articles) == 50
+
+        user2 = [value for value in users if value.pk == ravyn.pk][0]
+        assert len(user2.to_posts) == 15
+        assert len(user2.to_articles) == 20

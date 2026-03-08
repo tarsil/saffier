@@ -1,12 +1,15 @@
+import contextlib
 import copy
 import inspect
-from collections import deque
+from collections import UserDict, deque
 from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Union,
     cast,
+    get_origin,
 )
 
 import sqlalchemy
@@ -25,6 +28,160 @@ from saffier.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
     from saffier.core.db.models.model import Model, ReflectModel
+
+
+_trigger_attributes_fields_MetaInfo: set[str] = {
+    "field_to_columns",
+    "field_to_column_names",
+    "columns_to_field",
+}
+
+_trigger_attributes_field_stats_MetaInfo: set[str] = {
+    "special_getter_fields",
+    "secret_fields",
+    "input_modifying_fields",
+}
+
+
+class Fields(UserDict, dict[str, Field]):
+    meta: "MetaInfo"
+
+    def __init__(self, meta: "MetaInfo", data: dict[str, Field] | None = None) -> None:
+        self.meta = meta
+        super().__init__(data or {})
+
+    def add_field_to_meta(self, name: str, field: Field) -> None:
+        if not self.meta._field_stats_are_initialized:
+            return
+        if getattr(field, "is_computed", False):
+            self.meta.special_getter_fields.add(name)
+        if getattr(field, "secret", False):
+            self.meta.secret_fields.add(name)
+        if hasattr(field, "modify_input"):
+            self.meta.input_modifying_fields.add(name)
+
+    def discard_field_from_meta(self, name: str) -> None:
+        if not self.meta._field_stats_are_initialized:
+            return
+        self.meta.special_getter_fields.discard(name)
+        self.meta.secret_fields.discard(name)
+        self.meta.input_modifying_fields.discard(name)
+
+    def __getitem__(self, name: str) -> Field:
+        return cast("Field", self.data[name])
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.data
+
+    def __setitem__(self, name: str, value: Field) -> None:
+        if name in self.data:
+            self.discard_field_from_meta(name)
+        self.data[name] = value
+        self.add_field_to_meta(name, value)
+        self.meta.invalidate(invalidate_stats=False)
+
+    def __delitem__(self, name: str) -> None:
+        if self.data.pop(name, None) is not None:
+            self.discard_field_from_meta(name)
+            self.meta.invalidate(invalidate_stats=False)
+
+
+class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
+    meta: "MetaInfo"
+
+    def __init__(self, meta: "MetaInfo") -> None:
+        self.meta = meta
+        super().__init__()
+
+    def __getitem__(self, name: str) -> Sequence[sqlalchemy.Column]:
+        if name in self.data:
+            return cast("Sequence[sqlalchemy.Column]", self.data[name])
+        field = self.meta.fields[name]
+        if not field.has_column():
+            result = self.data[name] = ()
+            return result
+        result = self.data[name] = field.get_columns(name)
+        return result
+
+    def __setitem__(self, name: str, value: Any) -> None:
+        raise Exception("Cannot set item here")
+
+    def __iter__(self) -> Any:
+        self.meta.columns_to_field.init()
+        return super().__iter__()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key: object) -> bool:
+        try:
+            self[cast("str", key)]
+            return True
+        except KeyError:
+            return False
+
+
+class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
+    def __getitem__(self, name: str) -> frozenset[str]:
+        if name in self.data:
+            return cast("frozenset[str]", self.data[name])
+        column_names = frozenset(column.key for column in self.meta.field_to_columns[name])
+        result = self.data[name] = column_names
+        return result
+
+
+class ColumnsToField(UserDict, dict[str, str]):
+    meta: "MetaInfo"
+    _init: bool
+
+    def __init__(self, meta: "MetaInfo") -> None:
+        self.meta = meta
+        self._init = False
+        super().__init__()
+
+    def init(self) -> None:
+        if self._init:
+            return
+        self._init = True
+        columns_to_field: dict[str, str] = {}
+        for field_name in self.meta.fields:
+            for column_name in self.meta.field_to_column_names[field_name]:
+                if column_name in columns_to_field:
+                    raise ValueError(
+                        f"column collision: {column_name} between field {field_name} and {columns_to_field[column_name]}"
+                    )
+                columns_to_field[column_name] = field_name
+        self.data.update(columns_to_field)
+
+    def __getitem__(self, name: str) -> str:
+        self.init()
+        return cast("str", super().__getitem__(name))
+
+    def __setitem__(self, name: str, value: Any) -> None:
+        raise Exception("Cannot set item here")
+
+    def __contains__(self, name: object) -> bool:
+        self.init()
+        return super().__contains__(name)
+
+    def __iter__(self) -> Any:
+        self.init()
+        return super().__iter__()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
 
 class MetaInfo:
@@ -56,19 +213,27 @@ class MetaInfo:
         "signals",
         "special_getter_fields",
         "secret_fields",
+        "input_modifying_fields",
+        "field_to_columns",
+        "field_to_column_names",
+        "columns_to_field",
+        "_fields_are_initialized",
+        "_field_stats_are_initialized",
         "_needs_special_serialization",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self._fields_are_initialized = False
+        self._field_stats_are_initialized = False
         self.pk: Field | None = getattr(meta, "pk", None)
         self.pk_attribute: Field | str = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
+        self.model: type[Model] | None = None
         fields = getattr(meta, "fields", None)
         if fields is None:
             fields = getattr(meta, "fields_mapping", {})
-        self.fields: dict[str, Field] = dict(fields or {})
-        self.fields_mapping: dict[str, Field] = self.fields
+        self.fields = dict(fields or {})
         self.registry: Registry | None = getattr(meta, "registry", None)
         self.tablename: str | None = getattr(meta, "tablename", None)
         self.table_prefix: str | None = getattr(meta, "table_prefix", None)
@@ -76,7 +241,6 @@ class MetaInfo:
         self.many_to_many_fields: set[str] = set(getattr(meta, "many_to_many_fields", set()))
         self.foreign_key_fields: dict[str, Any] = dict(getattr(meta, "foreign_key_fields", {}))
         self.one_to_one_fields: set[Any] = set(getattr(meta, "one_to_one_fields", set()))
-        self.model: type[Model] | None = None
         self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
@@ -89,13 +253,108 @@ class MetaInfo:
         self.related_fields: dict[str, Any] = getattr(meta, "related_fields", {})
         self.related_names_mapping: dict[str, Any] = getattr(meta, "related_names_mapping", {})
         self.signals: Broadcaster | None = getattr(meta, "signals", {})  # type: ignore
-        self.special_getter_fields: set[str] = set(
-            getattr(meta, "special_getter_fields", set()) or []
-        )
-        self.secret_fields: set[str] = set(getattr(meta, "secret_fields", set()) or [])
-        self._needs_special_serialization: bool | None = getattr(
-            meta, "_needs_special_serialization", None
-        )
+        if isinstance(meta, MetaInfo):
+            field_stats_initialized = object.__getattribute__(meta, "_field_stats_are_initialized")
+            self.special_getter_fields = set(
+                object.__getattribute__(meta, "special_getter_fields")
+                if field_stats_initialized
+                else ()
+            )
+            self.secret_fields = set(
+                object.__getattribute__(meta, "secret_fields") if field_stats_initialized else ()
+            )
+            self.input_modifying_fields = set(
+                object.__getattribute__(meta, "input_modifying_fields")
+                if field_stats_initialized
+                else ()
+            )
+            self._needs_special_serialization = object.__getattribute__(
+                meta, "_needs_special_serialization"
+            )
+        else:
+            self.special_getter_fields = set(getattr(meta, "special_getter_fields", set()) or [])
+            self.secret_fields = set(getattr(meta, "secret_fields", set()) or [])
+            self.input_modifying_fields = set(getattr(meta, "input_modifying_fields", set()) or [])
+            self._needs_special_serialization = getattr(meta, "_needs_special_serialization", None)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "fields_mapping":
+            name = "fields"
+        if name == "fields":
+            value = Fields(self, value)
+        super().__setattr__(name, value)
+        if name == "fields":
+            self.invalidate()
+
+    def __getattribute__(self, name: str) -> Any:
+        if name == "fields_mapping":
+            return super().__getattribute__("fields")
+        if name in _trigger_attributes_fields_MetaInfo and not super().__getattribute__(
+            "_fields_are_initialized"
+        ):
+            super().__getattribute__("init_fields_mapping")()
+        if name in _trigger_attributes_field_stats_MetaInfo and not super().__getattribute__(
+            "_field_stats_are_initialized"
+        ):
+            super().__getattribute__("init_field_stats")()
+        return super().__getattribute__(name)
+
+    def init_fields_mapping(self) -> None:
+        self.field_to_columns = FieldToColumns(self)
+        self.field_to_column_names = FieldToColumnNames(self)
+        self.columns_to_field = ColumnsToField(self)
+        self._fields_are_initialized = True
+
+    def init_field_stats(self) -> None:
+        self.special_getter_fields = {
+            field_name
+            for field_name, field in self.fields.items()
+            if getattr(field, "is_computed", False)
+        }
+        self.secret_fields = {
+            field_name
+            for field_name, field in self.fields.items()
+            if getattr(field, "secret", False)
+        }
+        self.input_modifying_fields = set(self.fields.keys())
+        self._field_stats_are_initialized = True
+
+    def invalidate(
+        self,
+        clear_class_attrs: bool = True,
+        invalidate_fields: bool = True,
+        invalidate_stats: bool = True,
+    ) -> None:
+        if invalidate_fields and self._fields_are_initialized:
+            for attr in ("field_to_columns", "field_to_column_names", "columns_to_field"):
+                with contextlib.suppress(AttributeError):
+                    delattr(self, attr)
+            self._fields_are_initialized = False
+        if invalidate_stats:
+            self.special_getter_fields = set()
+            self.secret_fields = set()
+            self.input_modifying_fields = set()
+            self._field_stats_are_initialized = False
+        if invalidate_fields or invalidate_stats:
+            self._needs_special_serialization = None
+        if self.model is None:
+            return
+        if clear_class_attrs:
+            for attr in ("_table", "_pknames", "_pkcolumns", "__proxy_model__"):
+                with contextlib.suppress(AttributeError):
+                    delattr(self.model, attr)
+            self.model._db_schemas = {}
+
+    def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
+        if not self._fields_are_initialized:
+            self.init_fields_mapping()
+        if not self._field_stats_are_initialized:
+            self.init_field_stats()
+        if init_column_mappers:
+            self.columns_to_field.init()
+        if init_class_attrs and self.model is not None:
+            for attr in ("table", "pknames", "pkcolumns", "proxy_model"):
+                getattr(self.model, attr)
 
     @property
     def needs_special_serialization(self) -> bool:
@@ -114,6 +373,13 @@ class MetaInfo:
                         break
             self._needs_special_serialization = needs_special_serialization
         return self._needs_special_serialization
+
+    def get_columns_for_name(self, name: str) -> Sequence[sqlalchemy.Column]:
+        if name in self.field_to_columns:
+            return self.field_to_columns[name]
+        if self.model is not None and name in self.model.table.columns:
+            return (self.model.table.columns[name],)
+        return ()
 
 
 def _is_sqlalchemy_compatibility_enabled(model_class: type) -> bool:
@@ -221,33 +487,39 @@ def _set_related_name_for_foreign_keys(
 
         foreign_key.related_name = default_related_name
 
-        def bind_related_name(target_model: type[Any]) -> None:
-            existing_related = getattr(target_model, default_related_name, None)
+        def bind_related_name(
+            target_model: type[Any],
+            *,
+            _default_related_name: str = default_related_name,
+            _foreign_key: Any = foreign_key,
+            _name: str = name,
+        ) -> None:
+            existing_related = getattr(target_model, _default_related_name, None)
             if existing_related is not None:
                 if (
                     isinstance(existing_related, RelatedField)
                     and existing_related.related_from is model_class
                 ):
                     existing_mapping = model_class.meta.related_names_mapping.get(
-                        default_related_name
+                        _default_related_name
                     )
-                    if existing_mapping not in (None, name):
+                    if existing_mapping not in (None, _name):
                         raise ForeignKeyBadConfigured(
-                            f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+                            f"Multiple related_name with the same value '{_default_related_name}' found to the same target. Related names must be different."
                         )
-                    model_class.meta.related_fields[default_related_name] = existing_related
-                    model_class.meta.related_names_mapping[default_related_name] = name
+                    model_class.meta.related_fields[_default_related_name] = existing_related
+                    model_class.meta.related_names_mapping[_default_related_name] = _name
                     return
                 if not isinstance(existing_related, RelatedField):
                     raise ForeignKeyBadConfigured(
-                        f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+                        f"Multiple related_name with the same value '{_default_related_name}' found to the same target. Related names must be different."
                     )
 
             related_field = RelatedField(
-                related_name=default_related_name,
+                related_name=_default_related_name,
                 related_to=target_model,
                 related_from=model_class,
-                embed_parent=getattr(foreign_key, "embed_parent", None),
+                embed_parent=getattr(_foreign_key, "embed_parent", None),
             )
 
             target_models = [target_model]
@@ -255,29 +527,29 @@ def _set_related_name_for_foreign_keys(
             if proxy_target is not None and proxy_target not in target_models:
                 target_models.append(proxy_target)
             for candidate in target_models:
-                setattr(candidate, default_related_name, related_field)
+                setattr(candidate, _default_related_name, related_field)
 
-            model_class.meta.related_fields[default_related_name] = related_field
+            model_class.meta.related_fields[_default_related_name] = related_field
             target_meta = cast("MetaInfo", target_model.meta)
-            target_meta.related_fields[default_related_name] = related_field
-            if default_related_name not in target_meta.fields:
+            target_meta.related_fields[_default_related_name] = related_field
+            if _default_related_name not in target_meta.fields:
                 placeholder = saffier_fields.PlaceholderField(
-                    name=default_related_name,
+                    name=_default_related_name,
                     no_copy=True,
                     inherit=False,
                 )
                 placeholder.owner = target_model
                 placeholder.registry = target_meta.registry
-                target_meta.fields[default_related_name] = placeholder
-                target_meta.fields_mapping[default_related_name] = placeholder
+                target_meta.fields[_default_related_name] = placeholder
+                target_meta.fields_mapping[_default_related_name] = placeholder
 
-            model_class.meta.related_names_mapping[default_related_name] = name
-            target_meta.related_names_mapping[default_related_name] = name
+            model_class.meta.related_names_mapping[_default_related_name] = _name
+            target_meta.related_names_mapping[_default_related_name] = _name
 
             if (
-                getattr(foreign_key, "no_constraint", False)
-                and getattr(foreign_key, "on_delete", None) == saffier.CASCADE
-            ) or getattr(foreign_key, "force_cascade_deletion_relation", False):
+                getattr(_foreign_key, "no_constraint", False)
+                and getattr(_foreign_key, "on_delete", None) == saffier.CASCADE
+            ) or getattr(_foreign_key, "force_cascade_deletion_relation", False):
                 target_model.__require_model_based_deletion__ = True
 
         registry = getattr(model_class.meta, "registry", None)
@@ -337,16 +609,30 @@ def _set_many_to_many_relation(
 
         m2m.to = target_model
 
-    if isinstance(m2m.through, str):
-        if registry is not None: # type: ignore
-            through_name = m2m.through
-            through_model = registry.models.get(through_name) or registry.reflected.get(through_name)
-            if through_model is None:
+    if isinstance(m2m.through, str) and registry is not None:  # type: ignore
+        through_name = m2m.through
+        through_model = registry.models.get(through_name) or registry.reflected.get(through_name)
+        if through_model is None:
+            setattr(
+                model_class,
+                relation_name,
+                Relation(
+                    through=through_name,
+                    to=m2m.to,
+                    owner=m2m.owner,
+                    from_foreign_key=m2m.from_foreign_key,
+                    to_foreign_key=m2m.to_foreign_key,
+                    embed_through=m2m.embed_through,
+                ),
+            )
+
+            def finalize_relation(resolved_through: type[Any]) -> None:
+                m2m.through = resolved_through
                 setattr(
                     model_class,
                     relation_name,
                     Relation(
-                        through=through_name,
+                        through=resolved_through,
                         to=m2m.to,
                         owner=m2m.owner,
                         from_foreign_key=m2m.from_foreign_key,
@@ -355,23 +641,9 @@ def _set_many_to_many_relation(
                     ),
                 )
 
-                def finalize_relation(resolved_through: type[Any]) -> None:
-                    m2m.through = resolved_through
-                    setattr(
-                        model_class,
-                        relation_name,
-                        Relation(
-                            through=resolved_through,
-                            to=m2m.to,
-                            owner=m2m.owner,
-                            from_foreign_key=m2m.from_foreign_key,
-                            to_foreign_key=m2m.to_foreign_key,
-                            embed_through=m2m.embed_through,
-                        ),
-                    )
-
-                registry.register_callback(through_name, finalize_relation, one_time=True)
-                return
+            registry.register_callback(through_name, finalize_relation, one_time=True)
+            return
+        m2m.through = through_model
 
     m2m.create_through_model()
     relation = Relation(
@@ -426,6 +698,9 @@ class BaseModelMeta(type):
         meta_class: Model.Meta = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Registry | None = None
+        declared_manager_names = {
+            key for key, value in attrs.items() if isinstance(value, Manager)
+        }
 
         def _to_composite_field(attr_name: str, value: Any) -> Field:
             inner_fields = value
@@ -536,12 +811,9 @@ class BaseModelMeta(type):
             is_pk_present = False
             for key, value in attrs.items():
                 if isinstance(value, Field) and value.primary_key:
-                    if is_pk_present:
-                        raise ImproperlyConfigured(
-                            f"Cannot create model {name} with multiple primary keys."
-                        )
+                    if not is_pk_present:
+                        pk_attribute = key
                     is_pk_present = True
-                    pk_attribute = key
 
             if (
                 not is_pk_present
@@ -616,6 +888,39 @@ class BaseModelMeta(type):
         new_class = cast("type[Model]", model_class(cls, name, bases, attrs))
         new_class._db_schemas = {}
 
+        manager_annotations = inspect.get_annotations(new_class, eval_str=True)
+        for manager_name in declared_manager_names:
+            manager_annotation = manager_annotations.get(manager_name)
+            if manager_annotation is ClassVar or get_origin(manager_annotation) is ClassVar:
+                continue
+            raise ImproperlyConfigured(
+                f"Managers must be ClassVar type annotated and '{manager_name}' is not or not correctly annotated."
+            )
+
+        plain_model_fields: dict[str, dict[str, Any]] = {}
+        for base in bases:
+            plain_model_fields.update(copy.deepcopy(getattr(base, "__plain_model_fields__", {})))
+
+        model_fields: dict[str, Any] = {**plain_model_fields, **fields}
+        for field_name, annotation in manager_annotations.items():
+            if field_name in fields or field_name.startswith("_"):
+                continue
+            if field_name in declared_manager_names:
+                continue
+            if get_origin(annotation) is ClassVar:
+                continue
+            plain_model_fields[field_name] = {
+                "annotation": annotation,
+                "default": getattr(new_class, field_name, None),
+            }
+            model_fields[field_name] = plain_model_fields[field_name]
+
+        new_class.__plain_model_fields__ = plain_model_fields
+        new_class.model_fields = model_fields
+
+        if not meta.abstract:
+            meta.init_field_stats()
+
         # Validate meta collection types before inheriting from bases.
         for attr_name in ("unique_together", "indexes", "constraints"):
             attr_value = getattr(meta, attr_name, None)
@@ -658,14 +963,6 @@ class BaseModelMeta(type):
                 raise ImproperlyConfigured(
                     "Multiple managers are not allowed in abstract classes."
                 )
-
-            if meta.unique_together:
-                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
-
-            if meta.indexes:
-                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
-            if meta.constraints:
-                raise ImproperlyConfigured("constraints cannot be in abstract classes.")
         else:
             meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
@@ -741,7 +1038,7 @@ class BaseModelMeta(type):
 
         for field_name, field in meta.fields.items():
             field.registry = registry
-            if field.primary_key:
+            if field.primary_key and field_name == meta.pk_attribute:
                 new_class.pkname = field_name
 
         new_class.__db_model__ = True

@@ -18,7 +18,7 @@ class BasePermission(saffier.Model):
         null=True,
     )
 
-    query = PermissionManager()
+    query: ClassVar[saffier.Manager] = PermissionManager()
 
     class Meta:
         abstract = True

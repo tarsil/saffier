@@ -252,7 +252,9 @@ class BaseSettings:
             ).items()
         )
 
-    def model_copy(self, *, update: dict[str, Any] | None = None, deep: bool = False) -> "BaseSettings":
+    def model_copy(
+        self, *, update: builtins.dict[str, Any] | None = None, deep: bool = False
+    ) -> BaseSettings:
         payload = self.dict()
         if update:
             payload.update(update)

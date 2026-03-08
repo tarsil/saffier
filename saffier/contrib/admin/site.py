@@ -114,11 +114,17 @@ class AdminSite:
         return {
             "model": model_name,
             "pk_name": model.pkname,
+            "pk_names": list(model.pknames),
             "fields": self.get_model_fields(model_name),
         }
 
     def create_object_pk(self, instance: saffier.Model) -> str:
-        pk_dict = {instance.pkname: getattr(instance, instance.pkname)}
+        pk_value = instance.pk
+        pk_dict = (
+            pk_value
+            if isinstance(pk_value, dict)
+            else {instance.pkname: getattr(instance, instance.pkname)}
+        )
         return urlsafe_b64encode(orjson.dumps(pk_dict, default=str)).decode()
 
     def parse_object_pk(self, encoded_pk: str) -> dict[str, Any]:
@@ -160,7 +166,11 @@ class AdminSite:
         order_by: str | None = None,
     ) -> Page:
         model = self.get_model(model_name)
-        queryset = model.query.order_by(order_by or model.pkname)
+        queryset = (
+            model.query.order_by(order_by)
+            if order_by is not None
+            else model.query.order_by(*model.pknames)
+        )
         clause = self._build_search_clause(model, search)
         if clause is not None:
             queryset = queryset.filter(clause)

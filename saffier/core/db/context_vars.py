@@ -1,11 +1,19 @@
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from saffier import Database, Model, QuerySet
 
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 SHEMA: ContextVar[str] = ContextVar("SHEMA", default=None)
+CURRENT_FIELD_CONTEXT: ContextVar[dict[str, Any]] = ContextVar("CURRENT_FIELD_CONTEXT")
+CURRENT_INSTANCE: ContextVar[Any | None] = ContextVar("CURRENT_INSTANCE", default=None)
+CURRENT_MODEL_INSTANCE: ContextVar[Any | None] = ContextVar("CURRENT_MODEL_INSTANCE", default=None)
+CURRENT_PHASE: ContextVar[str] = ContextVar("CURRENT_PHASE", default="")
+EXPLICIT_SPECIFIED_VALUES: ContextVar[set[str] | None] = ContextVar(
+    "EXPLICIT_SPECIFIED_VALUES",
+    default=None,
+)
 
 
 def get_tenant() -> str | None:

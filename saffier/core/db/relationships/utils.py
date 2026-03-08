@@ -22,6 +22,7 @@ def crawl_relationship(
     model_class: type[Model] | type[ReflectModel],
     path: str,
     *,
+    model_database: Any | None = None,
     traverse_last: bool = False,
 ) -> RelationshipCrawlResult:
     field_name = path
@@ -29,6 +30,7 @@ def crawl_relationship(
     forward_path = ""
     operator: str | None = "exact"
     field: Any = None
+    cross_db_remainder = ""
 
     while path:
         splitted = path.split("__", 1)
@@ -45,7 +47,12 @@ def crawl_relationship(
             ),
         ):
             path = splitted[1]
+            is_cross_db = getattr(field, "is_cross_db", None)
+            if callable(is_cross_db) and is_cross_db(model_database):
+                cross_db_remainder = path
+                break
             model_class = field.target
+            model_database = None
             reverse_part: str | Literal[False] = cast(
                 "str | Literal[False]",
                 getattr(field, "related_name", None)
@@ -53,9 +60,7 @@ def crawl_relationship(
                 else False,
             )
             if reverse_part and reverse_path is not False:
-                reverse_path = (
-                    f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part
-                )
+                reverse_path = f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part
             else:
                 reverse_path = False
             forward_path = f"{forward_path}__{field_name}" if forward_path else field_name
@@ -63,12 +68,14 @@ def crawl_relationship(
 
         if len(splitted) == 2 and isinstance(attr, RelatedField):
             path = splitted[1]
+            if attr.is_cross_db(model_database):
+                cross_db_remainder = path
+                break
             model_class = attr.related_from
+            model_database = None
             reverse_part = attr.get_foreign_key_field_name()
             if reverse_part and reverse_path is not False:
-                reverse_path = (
-                    f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part
-                )
+                reverse_path = f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part
             else:
                 reverse_path = False
             forward_path = f"{forward_path}__{field_name}" if forward_path else field_name
@@ -119,5 +126,5 @@ def crawl_relationship(
         operator=operator,
         forward_path=forward_path,
         reverse_path=reverse_path,
-        cross_db_remainder="",
+        cross_db_remainder=cross_db_remainder,
     )

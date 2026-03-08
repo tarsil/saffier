@@ -35,7 +35,9 @@ async def rollback_connections():
 
 
 async def test_model_defer():
-    saffier.run_sync(User.query.create(name="John", language="PT", description="A simple description"))
+    saffier.run_sync(
+        User.query.create(name="John", language="PT", description="A simple description")
+    )
     saffier.run_sync(
         User.query.create(name="Jane", language="EN", description="Another simple description")
     )

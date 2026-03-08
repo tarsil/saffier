@@ -8,7 +8,9 @@ from tests.settings import DATABASE_URL
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL, use_existing=False)
-models = saffier.Registry(database=saffier.Database(database, force_rollback=True), with_content_type=True)
+models = saffier.Registry(
+    database=saffier.Database(database, force_rollback=True), with_content_type=True
+)
 
 
 class User(saffier.StrictModel):

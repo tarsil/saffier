@@ -8,7 +8,10 @@ import saffier
 if TYPE_CHECKING:
     from saffier.core.db.models.model import Model
 
-_recent_models_var: ContextVar[list[str]] = ContextVar("_recent_admin_models", default=[])
+_recent_models_var: ContextVar[list[str] | None] = ContextVar(
+    "_recent_admin_models",
+    default=None,
+)
 
 
 class CallableDefaultJsonSchema:
@@ -65,13 +68,15 @@ def get_model_json_schema(
 
 
 def add_to_recent_models(model: type[Model]) -> None:
-    recent_models = [name for name in _recent_models_var.get()[:10] if name != model.__name__]
+    recent_models = [
+        name for name in (_recent_models_var.get() or [])[:10] if name != model.__name__
+    ]
     recent_models.insert(0, model.__name__)
     _recent_models_var.set(recent_models)
 
 
 def get_recent_models() -> list[str]:
-    return list(_recent_models_var.get())
+    return list(_recent_models_var.get() or ())
 
 
 __all__ = [

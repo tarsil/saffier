@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 
 import saffier
@@ -31,9 +33,9 @@ class RatingManager(Manager):
 
 
 class BaseModel(saffier.Model):
-    query = ObjectsManager()
-    languages = LanguageManager()
-    ratings = RatingManager()
+    query: ClassVar[Manager] = ObjectsManager()
+    languages: ClassVar[Manager] = LanguageManager()
+    ratings: ClassVar[Manager] = RatingManager()
 
     class Meta:
         registry = models
@@ -45,6 +47,7 @@ class User(BaseModel):
 
     class Meta:
         registry = models
+        tablename = "manager_inherited_users"
 
 
 class Product(BaseModel):
@@ -52,6 +55,10 @@ class Product(BaseModel):
     rating = saffier.IntegerField(minimum=1, maximum=5)
     in_stock = saffier.BooleanField(default=False)
     is_active = saffier.BooleanField(default=False)
+
+    class Meta:
+        registry = models
+        tablename = "manager_inherited_products"
 
 
 @pytest.fixture(autouse=True, scope="function")

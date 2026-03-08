@@ -40,7 +40,9 @@ def test_raise_error_on_update_null():
 def test_foreign_key_helper_methods_match_edgy_surface():
     owner_db = type("OwnerDB", (), {"url": "postgresql://owner"})()
     target_db = type("TargetDB", (), {"url": "postgresql://target"})()
-    target_registry = type("TargetRegistry", (), {"admin_models": {"Target"}, "database": target_db})()
+    target_registry = type(
+        "TargetRegistry", (), {"admin_models": {"Target"}, "database": target_db}
+    )()
     owner_registry = type("OwnerRegistry", (), {"admin_models": set(), "database": owner_db})()
 
     owner = type(
@@ -103,7 +105,9 @@ def test_related_field_helper_methods_match_edgy_surface():
         (),
         {
             "__name__": "Source",
-            "meta": type("Meta", (), {"fields": {"owner": foreign_key}, "registry": source_registry})(),
+            "meta": type(
+                "Meta", (), {"fields": {"owner": foreign_key}, "registry": source_registry}
+            )(),
             "fields": {"owner": foreign_key},
         },
     )

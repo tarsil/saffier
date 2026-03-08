@@ -111,7 +111,9 @@ async def test_embed_parent():
     assert profile_queried.website == "https://saffier.com"
     await profile_queried.parent.load()
     assert profile_queried.parent.name == "saffier"
-    assert profile_queried.pk == (await person.profile_holder.filter(parent__name="saffier").get()).pk
+    assert (
+        profile_queried.pk == (await person.profile_holder.filter(parent__name="saffier").get()).pk
+    )
 
     address_queried = await profile.profileholder.get()
     assert address_queried.street == "Rainbowstreet 123"

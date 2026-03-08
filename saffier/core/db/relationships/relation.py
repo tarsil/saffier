@@ -42,13 +42,8 @@ class Relation(ManyRelationProtocol):
 
         # Relationship parameters
         self.owner_name = from_foreign_key or self.owner.__name__.lower()  # type: ignore[union-attr]
-        self.to_name = (
-            to_foreign_key
-            or (
-                self.to.lower()
-                if isinstance(self.to, str)
-                else self.to.__name__.lower()  # type: ignore[union-attr]
-            )
+        self.to_name = to_foreign_key or (
+            self.to.lower() if isinstance(self.to, str) else self.to.__name__.lower()  # type: ignore[union-attr]
         )
         self._relation_params = {
             self.owner_name: None,
@@ -76,10 +71,14 @@ class Relation(ManyRelationProtocol):
         if isinstance(self.through, str):
             registry = self.owner.meta.registry if self.owner is not None else None  # type: ignore[union-attr]
             if registry is None:
-                raise RelationshipNotFound(detail=f"Could not resolve through model '{self.through}'.")
+                raise RelationshipNotFound(
+                    detail=f"Could not resolve through model '{self.through}'."
+                )
             resolved = registry.models.get(self.through) or registry.reflected.get(self.through)
             if resolved is None:
-                raise RelationshipNotFound(detail=f"Could not resolve through model '{self.through}'.")
+                raise RelationshipNotFound(
+                    detail=f"Could not resolve through model '{self.through}'."
+                )
             self.through = resolved
         return self.through  # type: ignore[return-value]
 
@@ -128,9 +127,21 @@ class Relation(ManyRelationProtocol):
             await self.add(self.refs.pop(0))
 
     def _build_relation_params(self, child: Any) -> dict[str, Any]:
+        owner_value = self.instance
+        if hasattr(owner_value, "pk"):
+            owner_pk = getattr(owner_value, "pk", None)
+            if owner_pk is not None:
+                owner_value = owner_pk
+
+        child_value = child
+        if hasattr(child_value, "pk"):
+            child_pk = getattr(child_value, "pk", None)
+            if child_pk is not None:
+                child_value = child_pk
+
         return {
-            self.owner_name: self.instance,
-            self.to_name: child,
+            self.owner_name: owner_value,
+            self.to_name: child_value,
         }
 
     def _bind_embedded_through(self, child: Any, through_instance: Any) -> Any:
@@ -197,9 +208,7 @@ class Relation(ManyRelationProtocol):
         """
         target = self.resolved_to
         if not isinstance(child, (target, dict)):
-            raise RelationshipIncompatible(
-                f"The child is not from the type '{target.__name__}'."
-            )
+            raise RelationshipIncompatible(f"The child is not from the type '{target.__name__}'.")
 
         if isinstance(child, dict):
             child = target(**child)
@@ -207,9 +216,10 @@ class Relation(ManyRelationProtocol):
 
         through = self.resolved_through
         params = self._build_relation_params(child)
-        if getattr(self.target_foreign_key, "unique", False) and await through.query.filter(
-            **{self.to_name: child}
-        ).exists():
+        if (
+            getattr(self.target_foreign_key, "unique", False)
+            and await through.query.filter(**{self.to_name: child}).exists()
+        ):
             return None
         if await through.query.filter(**params).exists():
             return None
@@ -242,9 +252,7 @@ class Relation(ManyRelationProtocol):
                 raise RelationshipNotFound(detail="No child specified.")
 
         if not isinstance(child, target):
-            raise RelationshipIncompatible(
-                f"The child is not from the type '{target.__name__}'."
-            )
+            raise RelationshipIncompatible(f"The child is not from the type '{target.__name__}'.")
 
         row_count = await self.resolved_through.query.filter(
             **self._build_relation_params(child)

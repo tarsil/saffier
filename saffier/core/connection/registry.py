@@ -2,9 +2,9 @@ import asyncio
 import contextlib
 import copy
 import logging
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from functools import cached_property
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import sqlalchemy
 from sqlalchemy import Engine
@@ -233,6 +233,8 @@ class Registry:
         from saffier.core.utils.models import create_saffier_model
 
         definitions: dict[str, Any] = {}
+        manager_annotations: dict[str, Any] = {}
+        existing_annotations = dict(getattr(model_class, "__annotations__", {}))
         for field_name, field in model_class.fields.items():
             field_copy = copy.copy(field)
             if hasattr(field_copy, "_target"):
@@ -263,6 +265,16 @@ class Registry:
             manager = getattr(model_class, manager_name, None)
             if isinstance(manager, Manager):
                 definitions[manager_name] = copy.copy(manager)
+                manager_annotations[manager_name] = existing_annotations.get(
+                    manager_name,
+                    ClassVar[Any],
+                )
+
+        if manager_annotations:
+            definitions["__annotations__"] = {
+                **existing_annotations,
+                **manager_annotations,
+            }
 
         meta = type(
             "Meta",
@@ -373,6 +385,10 @@ class Registry:
                 content_type_model.meta.tablename = "contenttypes"
             content_type_model = content_type_model.add_to_registry(self, name="ContentType")
 
+        registered_content_type = self.models.get("ContentType")
+        if registered_content_type is not None:
+            content_type_model = registered_content_type
+
         self.content_type = content_type_model
         self._attach_content_type_to_registered_models()
 
@@ -435,10 +451,13 @@ class Registry:
                     field.to = self.content_type
                     if hasattr(field, "_target"):
                         delattr(field, "_target")
-                auto_related_name = f"{model_class.__name__.lower()}s_set"
+                auto_related_names = {
+                    model_class.__name__.lower(),
+                    f"{model_class.__name__.lower()}s_set",
+                }
                 desired_related_name = (
                     f"reverse_{model_class.__name__.lower()}"
-                    if field.related_name in (None, auto_related_name)
+                    if field.related_name in auto_related_names or field.related_name is None
                     else field.related_name
                 )
 
@@ -496,6 +515,7 @@ class Registry:
         )
         # ContentType is managed by registry pre-save hooks.
         field.validator.read_only = True
+        field.name = "content_type"
         field.owner = model_class
         field.registry = self
         model_class.fields["content_type"] = field
@@ -610,6 +630,19 @@ class Registry:
                 continue
         return self._metadata_by_name
 
+    @metadata_by_name.setter
+    def metadata_by_name(
+        self, value: MetaDataDict | dict[str | None, sqlalchemy.MetaData]
+    ) -> None:
+        metadata_dict = MetaDataDict(self)
+        for key, metadata in value.items():
+            metadata_dict[key] = metadata
+        if None not in metadata_dict:
+            metadata_dict[None] = self._make_metadata()
+        self._metadata_by_name = metadata_dict
+        self._metadata = metadata_dict[None]
+        self._metadata_by_url.process()
+
     @property
     def metadata_by_url(self) -> MetaDataByUrlDict:
         return self._metadata_by_url
@@ -635,22 +668,29 @@ class Registry:
     def sync_engine(self) -> Engine:
         return self.engine.sync_engine
 
-    async def create_all(self) -> None:
+    async def create_all(
+        self,
+        refresh_metadata: bool = True,
+        databases: Sequence[str | None] = (None,),
+    ) -> None:
         self._attach_content_type_to_registered_models()
-        if self.db_schema:
-            await self.schema.create_schema(self.db_schema, True)
-        for name, target in self._iter_databases():
-            async with Database(target, force_rollback=False) as database:  # noqa: SIM117
-                async with database.transaction():
-                    await database.create_all(self.metadata_by_name[name])
+        if refresh_metadata:
+            await self.arefresh_metadata(multi_schema=True)
+        await self.schema.create_schema(
+            self.db_schema,
+            if_not_exists=True,
+            init_models=True,
+            update_cache=bool(self.db_schema),
+            databases=databases,
+        )
 
-    async def drop_all(self) -> None:
-        if self.db_schema:
-            await self.schema.drop_schema(self.db_schema, True, True)
-        for name, target in self._iter_databases():
-            async with Database(target, force_rollback=False) as database:  # noqa: SIM117
-                async with database.transaction():
-                    await database.drop_all(self.metadata_by_name[name])
+    async def drop_all(self, databases: Sequence[str | None] = (None,)) -> None:
+        await self.schema.drop_schema(
+            self.db_schema,
+            cascade=True,
+            if_exists=True,
+            databases=databases,
+        )
 
     def _iter_databases(self) -> list[tuple[str | None, Database]]:
         databases: list[tuple[str | None, Database]] = [(None, self.database)]
@@ -673,7 +713,15 @@ class Registry:
         ):
             return self.content_type
         if model_name in self.models:
-            return self.models[model_name]
+            model = self.models[model_name]
+            if getattr(model, "is_proxy_model", False):
+                parent = getattr(model, "parent", None)
+                if (
+                    parent is not None
+                    and getattr(getattr(parent, "meta", None), "registry", None) is self
+                ):
+                    return parent
+            return model
         if include_reflected and model_name in self.reflected:
             return self.reflected[model_name]
         if include_pattern and model_name in self.pattern_models:
@@ -694,7 +742,9 @@ class Registry:
         *,
         one_time: bool = False,
     ) -> None:
-        model_name = model_reference if isinstance(model_reference, str) else model_reference.__name__
+        model_name = (
+            model_reference if isinstance(model_reference, str) else model_reference.__name__
+        )
         callbacks = self._model_callbacks.setdefault(model_name, [])
         callbacks.append((callback, one_time))
 
@@ -724,6 +774,26 @@ class Registry:
             self._model_callbacks[model_class.__name__] = remaining
         else:
             self._model_callbacks.pop(model_class.__name__, None)
+
+    def init_models(
+        self, *, init_column_mappers: bool = True, init_class_attrs: bool = True
+    ) -> None:
+        for model_class in self.models.values():
+            model_class.meta.full_init(
+                init_column_mappers=init_column_mappers,
+                init_class_attrs=init_class_attrs,
+            )
+        for model_class in self.reflected.values():
+            model_class.meta.full_init(
+                init_column_mappers=init_column_mappers,
+                init_class_attrs=init_class_attrs,
+            )
+
+    def invalidate_models(self, *, clear_class_attrs: bool = True) -> None:
+        for model_class in self.models.values():
+            model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
+        for model_class in self.reflected.values():
+            model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
 
     def get_tablenames(self) -> set[str]:
         tables = set()

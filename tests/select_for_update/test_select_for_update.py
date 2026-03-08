@@ -161,7 +161,9 @@ async def test_select_for_update_multiple_filters_chain():
     user = await User.query.create(name="B", language="Y")
 
     async with txn():
-        rows = await User.query.filter(language="Y").filter(id=user.id).select_for_update().limit(1)
+        rows = (
+            await User.query.filter(language="Y").filter(id=user.id).select_for_update().limit(1)
+        )
     assert [model.id for model in rows] == [user.id]
 
 
