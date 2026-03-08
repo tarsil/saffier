@@ -14,6 +14,7 @@ signal emission, and serialization through declared fields.
 * `delete()` emits signals and runs relation cleanup
 * `load()` refreshes the current instance from the database
 * `model_dump()` serializes declared fields instead of raw `__dict__`
+* optional engine helpers project the model into an external adapter without changing ORM semantics
 
 ## Typical lifecycle
 
@@ -45,6 +46,9 @@ validation and rejection of undeclared public attributes.
 
 Use [`ReflectModel`](./reflect-model.md) if the table already exists and should
 be reflected from the database instead of generated from field declarations.
+
+Use [Model Engines](../engines.md) when you want an optional engine-backed
+projection such as Pydantic on top of the normal Saffier model.
 
 ::: saffier.Model
     options:

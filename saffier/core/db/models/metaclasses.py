@@ -279,15 +279,18 @@ class MetaInfo:
         "field_to_columns",
         "field_to_column_names",
         "columns_to_field",
+        "model_engine",
         "_fields_are_initialized",
         "_field_stats_are_initialized",
         "_needs_special_serialization",
+        "_engine_generation",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._fields_are_initialized = False
         self._field_stats_are_initialized = False
+        self._engine_generation = getattr(meta, "_engine_generation", 0)
         self.pk: Field | None = getattr(meta, "pk", None)
         self.pk_attribute: Field | str = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
@@ -308,6 +311,7 @@ class MetaInfo:
         self.indexes: Any = getattr(meta, "indexes", None)
         self.constraints: Any = getattr(meta, "constraints", None)
         self.reflect: bool = getattr(meta, "reflect", False)
+        self.model_engine: Any = getattr(meta, "model_engine", None)
         self.managers: list[str] = list(getattr(meta, "managers", []) or [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
@@ -419,6 +423,7 @@ class MetaInfo:
             self._field_stats_are_initialized = False
         if invalidate_fields or invalidate_stats:
             self._needs_special_serialization = None
+            self._engine_generation += 1
         if self.model is None:
             return
         if clear_class_attrs:
@@ -1165,6 +1170,7 @@ class BaseModelMeta(type):
             "str | None",
             get_model_meta_attr("table_prefix", bases, meta_class),
         )
+        meta.model_engine = get_model_meta_attr("model_engine", bases, meta_class)
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if meta.abstract:

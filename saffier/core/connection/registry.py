@@ -123,6 +123,7 @@ class Registry:
         database: Database | str,
         *,
         with_content_type: bool | type[Any] = False,
+        model_engine: Any | None = None,
         **kwargs: Any,
     ) -> None:
         self.db_schema = kwargs.get("schema")
@@ -136,6 +137,7 @@ class Registry:
         self.reflected: dict[str, Any] = {}
         self.pattern_models: dict[str, Any] = {}
         self.content_type: Any | None = None
+        self.model_engine = model_engine
         self.extra: dict[str, Database] = {
             name: value if isinstance(value, Database) else Database(value)
             for name, value in extra.items()
@@ -384,6 +386,7 @@ class Registry:
                 "constraints": list(getattr(model_class.meta, "constraints", []) or []),
                 "reflect": getattr(model_class.meta, "reflect", False),
                 "abstract": getattr(model_class.meta, "abstract", False),
+                "model_engine": getattr(model_class.meta, "model_engine", None),
             },
         )
 
@@ -412,6 +415,7 @@ class Registry:
             schema=self.db_schema,
             extra=self.extra,
             automigrate_config=self._automigrate_config,
+            model_engine=self.model_engine,
         )
         pending_m2m_patches: list[tuple[str, str, str]] = []
 

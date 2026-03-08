@@ -50,8 +50,9 @@ are done into a more common and familiar interface.
 ## Before continuing
 
 Saffier is a Python-native ORM focused on query ergonomics, model expressiveness, and predictable async behavior.
-If your project also needs dedicated data validation, you can integrate Saffier with the validation
-library of your choice.
+If your project also needs dedicated data validation or alternate model
+representations, you can integrate Saffier with the engine layer of your
+choice.
 
 ## Why this ORM
 
@@ -111,6 +112,7 @@ specific queries and querysets at ease.
 * **Permissions contrib** - Reusable permission model and permission manager helpers.
 * **Admin subsystem** - Python-native admin site and optional ASGI admin app.
 * **Python-native marshalls** - DTO/serializer layer with custom fields, context, schema output, and save support.
+* **Model engines** - Optional adapter layer for Pydantic today and future engines such as msgspec or attrs.
 * **Standalone file storage API** - `saffier.files` now exposes file objects, storage backends, and safe filesystem handling.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you

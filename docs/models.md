@@ -129,6 +129,33 @@ This means:
 * secret-filtered querysets keep masked attributes out of `model_dump()` until you
   explicitly reload them with `load()` or `load_recursive()`.
 
+## Model engines
+
+Saffier models can also expose an optional engine-backed representation.
+
+This does not replace the model itself. It adds an adapter layer on top of the
+already-valid Saffier model behavior.
+
+You can configure it:
+
+* per registry with `Registry(model_engine="pydantic")`
+* per model with `Meta.model_engine = "pydantic"`
+* per model opt-out with `Meta.model_engine = False`
+
+When enabled, the model gains opt-in helpers such as:
+
+* `to_engine_model()`
+* `engine_dump()`
+* `engine_dump_json()`
+* `engine_validate()`
+* `from_engine()`
+* `engine_json_schema()`
+
+The normal ORM lifecycle stays the same. Querysets, relations, save/load, and
+`model_dump()` are still owned by Saffier.
+
+See [Model Engines](./engines.md) for the full design and usage guide.
+
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 
@@ -231,6 +258,9 @@ database table.
 * **indexes** - The extra custom indexes you want to add to the model
 
 * **constraints** - Extra SQLAlchemy table constraints to attach to the generated table.
+
+* **model_engine** - Optional engine adapter for this model. Use a registered
+engine name such as `"pydantic"` or `False` to opt out of a registry default.
 
 ### Registry
 

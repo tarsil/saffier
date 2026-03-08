@@ -80,6 +80,7 @@ from .core.extras import SaffierExtra
 from .core.marshalls import ConfigMarshall, Marshall, MarshallField, MarshallMethodField
 from .core.signals import Signal
 from .core.utils.sync import run_sync
+from .engines import ModelEngine, PydanticModelEngine, get_model_engine, register_model_engine
 from .exceptions import (
     DatabaseNotConnectedWarning,
     FieldDefinitionError,
@@ -201,6 +202,7 @@ __all__ = [
     "MarshallMethodField",
     "RedirectManager",
     "Migrate",
+    "ModelEngine",
     "Model",
     "ModelRef",
     "MultipleObjectsReturned",
@@ -209,6 +211,7 @@ __all__ = [
     "OneToOneField",
     "PasswordField",
     "PGArrayField",
+    "PydanticModelEngine",
     "PlaceholderField",
     "RefForeignKey",
     "SmallIntegerField",
@@ -231,8 +234,10 @@ __all__ = [
     "URLField",
     "UUIDField",
     "configure_settings",
+    "get_model_engine",
     "settings",
     "override_settings",
+    "register_model_engine",
     "reload_settings",
     "fields",
     "marshalls",
