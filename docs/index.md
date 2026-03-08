@@ -14,7 +14,7 @@
   </a>
 
 <a href="https://pypi.org/project/saffier" target="_blank">
-    <img src="https://img.shields.io/pypi/v/saffier?color=%2334D058&label=pypi%20package" alt="Package version">
+    <img src="https://img.shields.io/pypi/v/saffier?color=2334D058&label=pypi%20package" alt="Package version">
 </a>
 
 <a href="https://pypi.org/project/saffier" target="_blank">
