@@ -21,7 +21,10 @@ defaults.update(
 
 
 def welcome_message(app: Any) -> None:
-    """Displays the welcome message for the user"""
+    """Render the interactive-shell banner for the current application.
+
+    The banner includes the Saffier version, current time, and app name.
+    """
     now = datetime.datetime.now().strftime("%b %d %Y, %H:%M:%S")
     saffier_info_date = f"Saffier {saffier.__version__} (interactive shell, {now})"
     info = "Interactive shell that imports the application models and some python defaults."
@@ -36,8 +39,14 @@ def welcome_message(app: Any) -> None:
 
 
 def import_objects(app: Any, registry: Registry) -> dict[Any, Any]:
-    """
-    Imports all the needed objects needed for the shell.
+    """Collect default objects and discovered models for the shell namespace.
+
+    Args:
+        app: Active application object.
+        registry: Active registry whose models should be imported.
+
+    Returns:
+        dict[Any, Any]: Shell locals mapping.
     """
     imported_objects = {}
     import_statement = "from {module_path} import {model}"

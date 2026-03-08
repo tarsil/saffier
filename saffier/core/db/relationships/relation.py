@@ -1,3 +1,5 @@
+"""Many-to-many relation descriptors used by `ManyToManyField`."""
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -11,9 +13,11 @@ if TYPE_CHECKING:
 
 
 class Relation(ManyRelationProtocol):
-    """
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
+    """Descriptor that manages many-to-many collections through a junction model.
+
+    The descriptor is installed on the owning model for each `ManyToManyField`.
+    It exposes queryset-style access to the through model while presenting a
+    collection-like API in terms of the related target model.
     """
 
     def __init__(
@@ -56,6 +60,14 @@ class Relation(ManyRelationProtocol):
 
     @property
     def resolved_to(self) -> type["Model"] | type["ReflectModel"]:
+        """Resolve and cache the target model class.
+
+        Returns:
+            type[Model] | type[ReflectModel]: Concrete related target model.
+
+        Raises:
+            RelationshipNotFound: If the target model cannot be resolved.
+        """
         if isinstance(self.to, str):
             registry = self.owner.meta.registry if self.owner is not None else None  # type: ignore[union-attr]
             if registry is None:
@@ -68,6 +80,14 @@ class Relation(ManyRelationProtocol):
 
     @property
     def resolved_through(self) -> type["Model"] | type["ReflectModel"]:
+        """Resolve and cache the through model class.
+
+        Returns:
+            type[Model] | type[ReflectModel]: Concrete through model.
+
+        Raises:
+            RelationshipNotFound: If the through model cannot be resolved.
+        """
         if isinstance(self.through, str):
             registry = self.owner.meta.registry if self.owner is not None else None  # type: ignore[union-attr]
             if registry is None:
@@ -83,6 +103,14 @@ class Relation(ManyRelationProtocol):
         return self.through  # type: ignore[return-value]
 
     def _relation_queryset(self) -> Any:
+        """Create the through-model queryset scoped to the current owner.
+
+        Schema overrides from the owner instance are preserved so many-to-many
+        access works correctly in tenant-aware or schema-bound flows.
+
+        Returns:
+            Any: Queryset targeting the through model.
+        """
         through = self.resolved_through
         manager = getattr(through, "query_related", None)
         if manager is None:
@@ -114,6 +142,15 @@ class Relation(ManyRelationProtocol):
         return queryset
 
     def stage(self, *children: Any) -> None:
+        """Queue related children to be persisted after the parent is saved.
+
+        Args:
+            *children: Related instances or dictionaries accepted by the target
+                model.
+
+        Raises:
+            RelationshipIncompatible: If a child has the wrong type.
+        """
         target = self.resolved_to
         for child in children:
             if not isinstance(child, (target, dict)):
@@ -123,6 +160,11 @@ class Relation(ManyRelationProtocol):
             self.refs.append(child)
 
     async def save_related(self) -> None:
+        """Persist all children previously queued through `stage()`.
+
+        The staged children are flushed in FIFO order by repeatedly delegating to
+        `add()`.
+        """
         while self.refs:
             await self.add(self.refs.pop(0))
 
@@ -199,12 +241,14 @@ class Relation(ManyRelationProtocol):
         return results
 
     async def add(self, child: type["Model"] | dict[str, Any]) -> Any:
-        """
-        Adds a child to the model as a list
+        """Attach one child object to the relation if the through row does not yet exist.
 
-        . Validates the type of the child being added to the relationship and raises error for
-        if the type is wrong.
-        . Checks if the middle table already contains the record being added. Raises error if yes.
+        Args:
+            child: Related model instance or a dictionary used to create one.
+
+        Returns:
+            Any: The related child, possibly annotated with the through instance
+            when `embed_through` is enabled.
         """
         target = self.resolved_to
         if not isinstance(child, (target, dict)):
@@ -236,10 +280,16 @@ class Relation(ManyRelationProtocol):
             await self.remove(child)
 
     async def remove(self, child: type["Model"] | None = None) -> None:
-        """Removes a child from the list of many to many.
+        """Remove one child from the relation, resolving unique reverse links automatically.
 
-        . Validates if there is a relationship between the entities.
-        . Removes the field if there is
+        Args:
+            child: Related child to remove. May be omitted for unique reverse
+                relations where only one child can exist.
+
+        Raises:
+            RelationshipNotFound: If no matching through row exists.
+            RelationshipIncompatible: If `child` is not an instance of the
+                relation target model.
         """
         target = self.resolved_to
         if child is None:

@@ -1,48 +1,75 @@
 # Managers
 
-The managers are a great tool that **Saffier** offers. Heavily inspired by Django, the managers
-allow you to build unique tailored queries ready to be used by your models.
+Managers are the bridge between model classes and querysets.
 
-**Saffier** by default uses the the manager called `query` which it makes it simple to understand.
-Managers are class- and instance-aware: accessing a manager on a model class returns the
-class-bound manager, while accessing it on a model instance returns a shallow copied manager bound
-to that instance. Instance-bound managers are cached per instance, so later class-manager changes
-only affect managers materialized after that change.
+If a model is the description of a table, a manager is the entry point that
+decides which queryset object to hand back for that model and in which context
+that queryset should run.
 
-Let us see an example.
+## Default behavior
 
-```python hl_lines="23 25"
+Every concrete model gets a default `query` manager.
+
+Managers in Saffier are descriptors, so they behave differently depending on
+where you access them:
+
+* on the model class, they are class-bound
+* on a model instance, they are shallow-copied and instance-bound
+
+That instance binding matters when schema selection or database selection comes
+from the current model instance.
+
+```python
 {!> ../docs_src/models/managers/simple.py !}
 ```
 
-When querying the `User` table, the `query` (manager) is the default and **should** be always
-presented when doing it so.
+## When to create a custom manager
 
-### Custom manager
+Create a custom manager when you want:
 
-It is also possible to have your own custom managers and to do it so, you **should inherit**
-the **Manager** class and override the `get_queryset()`.
+* a reusable default filter such as “only active rows”
+* project-specific query helpers kept close to the model
+* a specialized queryset class for one family of models
 
-For those familiar with Django managers, the principle is exactly the same. 😀
+The usual pattern is to subclass `saffier.Manager` and override
+`get_queryset()`.
 
-Let us now create new manager and use it with our previous example.
-
-```python hl_lines="24 40 43 46 53"
+```python
 {!> ../docs_src/models/managers/custom.py !}
 ```
 
-These managers can be as complex as you like with as many filters as you desire. What you need is
-simply override the `get_queryset()` and add it to your models.
+In real projects this is useful for things like:
 
-### Override the default manager
+* hiding soft-deleted rows by default
+* adding tenant scoping rules
+* exposing common helper methods such as `published()` or `for_account()`
 
-Overriding the default manager is also possible by creating the custom manager and overriding
-the `query` manager.
+## Practical pattern: multiple managers on the same model
 
-```python hl_lines="24 37 40 43 46"
+It is often better to keep `query` unfiltered and add an extra filtered manager
+instead of replacing the default manager immediately.
+
+```python
+class User(saffier.Model):
+    query: ClassVar[saffier.Manager] = saffier.Manager()
+    active: ClassVar[ActiveUsersManager] = ActiveUsersManager()
+```
+
+That gives you both:
+
+* `await User.query.all()` for the full table
+* `await User.active.all()` for the opinionated subset
+
+## Overriding the default manager
+
+Overriding `query` is supported, but it changes the semantics of every normal
+query entry point for that model.
+
+```python
 {!> ../docs_src/models/managers/override.py !}
 ```
 
 !!! Warning
-    Be careful when overriding the default manager as you might not get all the results from the
-    `.all()` if you don't filter properly.
+    If you override `query` with a filtered manager, `all()`, `get()`, `count()`,
+    and related helpers all inherit that filter. Keep an unfiltered manager
+    available somewhere if your application still needs raw access.

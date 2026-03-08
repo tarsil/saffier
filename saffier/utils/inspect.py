@@ -1,8 +1,8 @@
 import inspect
 import logging
 import sys
-from collections.abc import Callable
-from typing import Any, NoReturn
+from collections.abc import Callable, Generator
+from typing import Any
 
 import sqlalchemy
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -40,8 +40,17 @@ DB_MODULE = "saffier"
 
 
 def func_accepts_kwargs(func: Callable) -> bool:
-    """
-    Checks if a function accepts **kwargs.
+    """Return whether a callable accepts arbitrary keyword arguments.
+
+    Signal receivers and other extensibility hooks in Saffier commonly require
+    `**kwargs` support so new payload values can be introduced without breaking
+    existing call sites.
+
+    Args:
+        func (Callable): Callable object to inspect.
+
+    Returns:
+        bool: `True` when `func` defines a `**kwargs` parameter.
     """
     return any(
         param
@@ -51,28 +60,40 @@ def func_accepts_kwargs(func: Callable) -> bool:
 
 
 class InspectDB:
-    """
-    Class that builds the inspection of a database.
+    """Reflect an existing database and emit Saffier model definitions.
+
+    The inspector is the engine behind the `saffier inspectdb` command. It
+    reflects database metadata, translates SQLAlchemy types into Saffier fields,
+    and prints a starter module built from `ReflectModel` classes.
     """
 
     def __init__(self, database: str, schema: str | None) -> None:
-        """
-        Creates an instance of an InspectDB and triggers the proccess.
+        """Store the database URL and schema targeted for reflection.
+
+        Args:
+            database (str): Database URL passed to `Database`.
+            schema (str | None): Optional schema name restricting reflection to
+                one namespace.
         """
         self._database = database
         self._schema = schema
 
     @property
     def database(self) -> Database:
+        """Build a `Database` instance for the configured URL."""
         return Database(self._database)
 
     @property
     def schema(self) -> str | None:
+        """Return the schema requested for reflection, if any."""
         return self._schema
 
     def inspect(self) -> None:
-        """
-        Starts the InspectDB and passes all the configurations.
+        """Run the full reflection workflow and stream generated code to stdout.
+
+        The generated output is intentionally starter code: it mirrors the
+        current database structure using `ReflectModel` definitions so users can
+        review, edit, and integrate the result into their applications.
         """
         registry = Registry(database=self.database)
         metadata = execsync(self._collect_metadata)(registry=registry)
@@ -84,6 +105,15 @@ class InspectDB:
             sys.stdout.writelines(line)  # type: ignore
 
     async def _collect_metadata(self, registry: Registry) -> sqlalchemy.MetaData:
+        """Connect to the database, reflect metadata, and disconnect cleanly.
+
+        Args:
+            registry (Registry): Temporary registry bound to the target
+                database.
+
+        Returns:
+            sqlalchemy.MetaData: Reflected metadata object.
+        """
         await registry.database.connect()
         try:
             engine: AsyncEngine = registry.engine
@@ -99,9 +129,14 @@ class InspectDB:
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData
     ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-        """
-        Generates the tables from the reflection and maps them into the
-        `reflected` dictionary of the `Registry`.
+        """Transform reflected metadata into code-generation payloads.
+
+        Args:
+            metadata: Reflected SQLAlchemy metadata.
+
+        Returns:
+            tuple[list[dict[str, Any]], dict[str, str]]: Table descriptors and a
+            lookup from table name to generated class name.
         """
         tables_dict = dict(metadata.tables.items())
         tables = []
@@ -127,8 +162,15 @@ class InspectDB:
     def get_foreign_keys(
         self, table_or_column: sqlalchemy.Table | sqlalchemy.Column
     ) -> list[dict[str, Any]]:
-        """
-        Extracts all the information needed of the foreign keys.
+        """Extract normalized foreign-key metadata for reflection output.
+
+        Args:
+            table_or_column (sqlalchemy.Table | sqlalchemy.Column): Reflected
+                table or column exposing `.foreign_keys`.
+
+        Returns:
+            list[dict[str, Any]]: Foreign-key descriptors used later when
+            emitting field declarations.
         """
         details: list[dict[str, Any]] = []
 
@@ -144,10 +186,19 @@ class InspectDB:
 
         return details
 
-    def get_field_type(self, column: sqlalchemy.Column, is_fk: bool = False) -> Any:
-        """
-        Gets the field type. If the field is a foreign key, this is evaluated,
-        outside of the scope.
+    def get_field_type(
+        self, column: sqlalchemy.Column, is_fk: bool = False
+    ) -> tuple[str, dict[str, Any]]:
+        """Translate one reflected SQLAlchemy column into a Saffier field.
+
+        Args:
+            column (sqlalchemy.Column): Reflected column to inspect.
+            is_fk (bool): Whether the column is being rendered as a relationship
+                field instead of a scalar field.
+
+        Returns:
+            tuple[str, dict[str, Any]]: Field class name and keyword arguments to
+            include in the generated model code.
         """
         if is_fk:
             return "ForeignKey" if not column.unique else "OneToOne", {}
@@ -184,9 +235,19 @@ class InspectDB:
 
     def get_meta(
         self, table: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
-    ) -> NoReturn:
-        """
-        Produces the Meta class.
+    ) -> list[str]:
+        """Generate the `Meta` inner-class body for one reflected model.
+
+        Args:
+            table (dict[str, Any]): Reflected table descriptor assembled by
+                `generate_table_information`.
+            unique_constraints (set[str]): Column names already rendered as
+                per-field unique constraints.
+            _indexes (set[str]): Column names already rendered as per-field
+                indexes.
+
+        Returns:
+            list[str]: Source lines composing the generated `Meta` class.
         """
         unique_together: list[saffier.UniqueConstraint] = []
         unique_indexes: list[saffier.Index] = []
@@ -232,9 +293,10 @@ class InspectDB:
     async def reflect(
         self, *, engine: sqlalchemy.Engine, metadata: sqlalchemy.MetaData
     ) -> sqlalchemy.MetaData:
-        """
-        Connects to the database and reflects all the information about the
-        schema bringing all the data available.
+        """Reflect database metadata through an async SQLAlchemy engine.
+
+        Returns:
+            sqlalchemy.MetaData: Reflected metadata object.
         """
 
         async with engine.connect() as connection:
@@ -242,9 +304,13 @@ class InspectDB:
             await connection.run_sync(metadata.reflect)
         return metadata
 
-    def write_output(self, tables: list[Any], connection_string: str) -> NoReturn:
-        """
-        Writes to stdout.
+    def write_output(self, tables: list[Any], connection_string: str) -> Generator[str]:
+        """Yield the generated Python source for reflected models.
+
+        Args:
+            tables: Table descriptors produced by reflection.
+            connection_string: Database connection string used in the generated
+                file.
         """
         yield f"# This is an auto-generated Saffier model module. Saffier version `{saffier.__version__}`.\n"
         yield "#   * Rearrange models' order.\n"

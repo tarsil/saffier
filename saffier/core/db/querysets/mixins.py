@@ -24,9 +24,10 @@ SaffierModel = _SaffierModel | ReflectSaffierModel
 
 
 class QuerySetPropsMixin:
-    """
-    Properties used by the Queryset are placed in isolation
-    for clean access and maintainance.
+    """Property helpers shared by queryset implementations.
+
+    The mixin keeps common accessors such as database, table, and primary-key
+    metadata in one place so queryset subclasses stay focused on query logic.
     """
 
     @property
@@ -75,8 +76,10 @@ class QuerySetPropsMixin:
 
 
 class TenancyMixin:
-    """
-    Mixin used for querying a possible multi tenancy application
+    """Mixin that adds schema and database rebinding helpers to querysets.
+
+    It powers `.using()` for multi-database and multi-schema applications,
+    including tenant-aware schema selection.
     """
 
     def using(

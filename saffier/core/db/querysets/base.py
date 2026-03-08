@@ -1,3 +1,5 @@
+"""Core queryset implementation used by Saffier managers."""
+
 import copy
 import warnings
 from collections.abc import AsyncIterator, Generator, Sequence
@@ -33,6 +35,14 @@ if TYPE_CHECKING:  # pragma: no cover
 class BaseQuerySet(
     TenancyMixin, QuerySetPropsMixin, PrefetchMixin, DateParser, AwaitableQuery[SaffierModel]
 ):
+    """Internal queryset implementation shared by concrete queryset classes.
+
+    `BaseQuerySet` stores the immutable query state used to build SQLAlchemy
+    expressions: filters, joins, eager-loading directives, ordering, limits,
+    projection hints, and result caches. Public queryset methods mostly clone
+    and mutate this state rather than executing immediately.
+    """
+
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -134,7 +144,16 @@ class BaseQuerySet(
         expression: Any,
         tables_and_models: dict[str, tuple[Any, Any]],
     ) -> Any:
-        """Builds the order by expression"""
+        """Apply ordering expressions to a SQLAlchemy selectable.
+
+        Args:
+            order_by: Raw order-by field paths.
+            expression: Selectable being modified.
+            tables_and_models: Join map used to resolve relationship paths.
+
+        Returns:
+            Any: Updated selectable.
+        """
         order_by = [self._prepare_order_by(value, tables_and_models) for value in order_by]
         expression = expression.order_by(*order_by)
         return expression
@@ -145,13 +164,26 @@ class BaseQuerySet(
         expression: Any,
         tables_and_models: dict[str, tuple[Any, Any]],
     ) -> Any:
-        """Builds the group by expression"""
+        """Apply group-by expressions to a SQLAlchemy selectable.
+
+        Args:
+            group_by: Raw group-by field paths.
+            expression: Selectable being modified.
+            tables_and_models: Join map used to resolve relationship paths.
+
+        Returns:
+            Any: Updated selectable.
+        """
         group_by = [self._prepare_group_by(value, tables_and_models) for value in group_by]
         expression = expression.group_by(*group_by)
         return expression
 
     def _build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
-        """Builds the filter clauses expression"""
+        """Apply AND-combined filter clauses to a selectable.
+
+        Returns:
+            Any: Updated selectable.
+        """
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
         else:
@@ -160,7 +192,11 @@ class BaseQuerySet(
         return expression
 
     def _build_or_clauses_expression(self, or_clauses: Any, expression: Any) -> Any:
-        """Builds the filter clauses expression"""
+        """Apply OR-combined clauses to a selectable.
+
+        Returns:
+            Any: Updated selectable.
+        """
         clause = or_clauses[0] if len(or_clauses) == 1 else sqlalchemy.sql.or_(*or_clauses)
         expression = expression.where(clause)
         return expression
@@ -171,7 +207,11 @@ class BaseQuerySet(
         expression: Any,
         tables_and_models: dict[str, tuple[Any, Any]],
     ) -> Any:
-        """Filters selects only specific fields"""
+        """Apply `DISTINCT` or `DISTINCT ON` semantics to a selectable.
+
+        Returns:
+            Any: Updated selectable.
+        """
         if not distinct_on:
             expression = expression.distinct()
         else:
@@ -608,8 +648,17 @@ class BaseQuerySet(
     def _secret_recursive_names(
         self, model_class: Any, columns: list[str] | None = None
     ) -> list[str]:
-        """
-        Recursively gets the names of the fields excluding the secrets.
+        """Collect non-secret field names across a model graph.
+
+        Foreign-key targets are traversed recursively so secret filtering can be
+        applied consistently to nested serialization shapes.
+
+        Args:
+            model_class: Model whose fields should be inspected.
+            columns: Internal accumulator used during recursion.
+
+        Returns:
+            list[str]: Distinct field names that are not marked as secret.
         """
         if columns is None:
             columns = []
@@ -630,8 +679,16 @@ class BaseQuerySet(
         return columns
 
     def _build_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]:
-        """
-        Builds the query select based on the given parameters and filters.
+        """Build the main select statement together with its join map.
+
+        The method resolves every relationship path needed by filtering,
+        ordering, grouping, or explicit `select_related()`, applies `WHERE`,
+        `ORDER BY`, `GROUP BY`, `DISTINCT`, pagination, and row-locking options,
+        then caches the resulting expression for reuse.
+
+        Returns:
+            tuple[Any, dict[str, tuple[Any, Any]]]: SQLAlchemy select expression
+            plus the table/model map used to hydrate rows.
         """
         if self._cached_select_with_tables is not None:
             return self._cached_select_with_tables
@@ -959,8 +1016,13 @@ class BaseQuerySet(
 
 
 class QuerySet(BaseQuerySet, QuerySetProtocol):
-    """
-    QuerySet object used for query retrieving.
+    """Public queryset API exposed through Saffier managers.
+
+    QuerySets are lazy, chainable builders. Every call such as `filter()`,
+    `select_related()`, or `order_by()` returns a cloned queryset with updated
+    query state, and execution only happens when the queryset is awaited,
+    iterated, or one of the terminal methods such as `all()` or `get()` is
+    called.
     """
 
     def __get__(self, instance: Any, owner: Any) -> "QuerySet":
@@ -992,8 +1054,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             yield value
 
     def _set_query_expression(self, expression: Any) -> None:
-        """
-        Sets the value of the sql property to the expression used.
+        """Store the current SQL expression on the queryset and model class.
+
+        Args:
+            expression: SQLAlchemy expression representing the current query.
         """
         self.sql = expression
         self.model_class.raw_query = self.sql
@@ -1005,8 +1069,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         or_: bool = False,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Filters or excludes a given clause for a specific QuerySet.
+        """Shared implementation for `filter()`, `exclude()`, and boolean variants.
+
+        Args:
+            clause: Optional explicit `Q` object or SQLAlchemy clause.
+            exclude: Whether the resulting predicate should be negated.
+            or_: Whether the predicate belongs to the OR clause bucket.
+            **kwargs: Lookup kwargs using Saffier's double-underscore syntax.
+
+        Returns:
+            QuerySet: Cloned queryset containing the new predicate state.
         """
         queryset: QuerySet = self._clone()
 
@@ -1038,8 +1110,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         or_: bool = False,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Filters the QuerySet by the given kwargs and clause.
+        """Return a cloned queryset filtered by lookup kwargs and optional `Q` clause.
+
+        Args:
+            clause: Optional explicit `Q` object or SQL clause.
+            or_: Whether the lookup should be appended to the OR-clause bucket.
+            **kwargs: Field lookups using Saffier's double-underscore syntax.
+
+        Returns:
+            QuerySet: Cloned queryset carrying the additional filters.
         """
         return self._filter_or_exclude(clause=clause, or_=or_, **kwargs)
 
@@ -1048,8 +1127,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Filters the QuerySet by the OR operand.
+        """Append filters to the queryset OR-clause bucket.
+
+        Args:
+            clause: Optional explicit `Q` object or SQL clause.
+            **kwargs: Field lookups using Saffier's double-underscore syntax.
+
+        Returns:
+            QuerySet: Cloned queryset with OR predicates applied.
         """
         queryset: QuerySet = self._clone()
         queryset = self.filter(clause=clause, or_=True, **kwargs)
@@ -1060,8 +1145,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Local OR alias matching the Saffier queryset style.
+        """Compatibility alias for `or_()` using Saffier's historical name.
+
+        Returns:
+            QuerySet: Cloned queryset with OR predicates applied.
         """
         queryset: QuerySet = self._clone()
         queryset = self.filter(clause=clause, or_=True, **kwargs)
@@ -1072,8 +1159,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Filters the QuerySet by the AND operand.
+        """Compatibility alias for `filter()` used in explicit boolean flows.
+
+        Returns:
+            QuerySet: Cloned queryset with AND predicates applied.
         """
         queryset: QuerySet = self._clone()
         queryset = self.filter(clause=clause, **kwargs)
@@ -1084,8 +1173,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Filters the QuerySet by the NOT operand.
+        """Compatibility alias for `exclude()`.
+
+        Returns:
+            QuerySet: Cloned queryset with negated predicates applied.
         """
         queryset: QuerySet = self._clone()
         queryset = queryset.exclude(clause=clause, **kwargs)
@@ -1097,8 +1188,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         or_: bool = False,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Exactly the same as the filter but for the exclude.
+        """Return a queryset excluding rows matched by the supplied predicates.
+
+        Args:
+            clause: Optional explicit `Q` object or SQLAlchemy clause.
+            or_: Whether excluded lookups should be appended to the OR-clause
+                bucket.
+            **kwargs: Lookup kwargs using Saffier's double-underscore syntax.
+
+        Returns:
+            QuerySet: Cloned queryset carrying the exclusion.
         """
         queryset: QuerySet = self._clone()
         queryset = self._filter_or_exclude(clause=clause, exclude=True, or_=or_, **kwargs)
@@ -1110,8 +1209,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Any = None,
         **kwargs: Any,
     ) -> "QuerySet":
-        """
-        Excludes any field that contains the `secret=True` declared from being leaked.
+        """Hide secret fields from hydrated model results.
+
+        Args:
+            enabled: Whether secret filtering should be enabled.
+            clause: Optional initial filter clause to apply at the same time.
+            **kwargs: Optional lookup kwargs to apply.
+
+        Returns:
+            QuerySet: Cloned queryset configured to omit secret fields on
+            hydration.
         """
         queryset: QuerySet = self._clone()
         queryset._exclude_secrets = enabled
@@ -1119,8 +1226,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def lookup(self, term: Any) -> "QuerySet":
-        """
-        Broader way of searching for a given term
+        """Search all text-like fields using a broad case-insensitive match.
+
+        Args:
+            term: Search term to wrap in `%...%`.
+
+        Returns:
+            QuerySet: Cloned queryset with appended search clauses.
         """
         queryset: QuerySet = self._clone()
         if not term:
@@ -1144,16 +1256,27 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def order_by(self, *order_by: str) -> "QuerySet":
-        """
-        Returns a QuerySet ordered by the given fields.
+        """Return a queryset ordered by the supplied field paths.
+
+        Args:
+            *order_by: Field names or relationship paths, optionally prefixed
+                with `-` for descending order.
+
+        Returns:
+            QuerySet: Cloned queryset with ordering applied.
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
         return queryset
 
     def reverse(self) -> "QuerySet":
-        """
-        Reverses the established order of the QuerySet.
+        """Reverse the current ordering direction.
+
+        When the queryset has no explicit ordering, primary-key ordering is
+        added first so the reversal remains deterministic.
+
+        Returns:
+            QuerySet: Cloned queryset with reversed ordering.
         """
         queryset: QuerySet = self._clone()
         if not queryset._order_by:
@@ -1172,24 +1295,33 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def batch_size(self, batch_size: int | None = None) -> "QuerySet":
-        """
-        Sets the chunk size for async queryset iteration.
+        """Set the batch size used by async iteration.
+
+        Returns:
+            QuerySet: Cloned queryset with updated iteration chunk size.
         """
         queryset: QuerySet = self._clone()
         queryset._batch_size = batch_size
         return queryset
 
     def extra_select(self, *extra: Any) -> "QuerySet":
-        """
-        Adds extra SQLAlchemy expressions to the SELECT list.
+        """Add raw SQLAlchemy expressions to the `SELECT` list.
+
+        Returns:
+            QuerySet: Cloned queryset with extra select expressions.
         """
         queryset: QuerySet = self._clone()
         queryset._extra_select.extend(extra)
         return queryset
 
     def reference_select(self, references: dict[str, Any]) -> "QuerySet":
-        """
-        Adds named reference selections to the SELECT list.
+        """Map extra selected expressions back onto model attributes.
+
+        Args:
+            references: Mapping from attribute name to selected SQL label.
+
+        Returns:
+            QuerySet: Cloned queryset with reference mapping configured.
         """
         queryset: QuerySet = self._clone()
         queryset._reference_select.update(references)
@@ -1202,8 +1334,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         next_item_attr: str = "",
         previous_item_attr: str = "",
     ) -> Any:
-        """
-        Returns a numbered paginator bound to the queryset.
+        """Return a numbered paginator bound to the current queryset.
+
+        Returns:
+            Any: Numbered paginator instance.
         """
         from saffier.contrib.pagination import NumberedPaginator
 
@@ -1221,8 +1355,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         next_item_attr: str = "",
         previous_item_attr: str = "",
     ) -> Any:
-        """
-        Returns a cursor paginator bound to the queryset.
+        """Return a cursor paginator bound to the current queryset.
+
+        Returns:
+            Any: Cursor paginator instance.
         """
         from saffier.contrib.pagination import CursorPaginator
 
@@ -1234,32 +1370,45 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         )
 
     def limit(self, limit_count: int) -> "QuerySet":
-        """
-        Returns a QuerySet limited by.
+        """Return a queryset with a SQL `LIMIT` applied.
+
+        Returns:
+            QuerySet: Cloned queryset with limit applied.
         """
         queryset: QuerySet = self._clone()
         queryset.limit_count = limit_count
         return queryset
 
     def offset(self, offset: int) -> "QuerySet":
-        """
-        Returns a Queryset limited by the offset.
+        """Return a queryset with a SQL `OFFSET` applied.
+
+        Returns:
+            QuerySet: Cloned queryset with offset applied.
         """
         queryset: QuerySet = self._clone()
         queryset._offset = offset
         return queryset
 
     def group_by(self, *group_by: str) -> "QuerySet":
-        """
-        Returns the values grouped by the given fields.
+        """Return a queryset grouped by the supplied field paths.
+
+        Returns:
+            QuerySet: Cloned queryset with grouping applied.
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
         return queryset
 
     def distinct(self, first: bool | str = True, *distinct_on: str) -> "QuerySet":
-        """
-        Returns a queryset with distinct results.
+        """Return a queryset with `DISTINCT` or `DISTINCT ON` semantics applied.
+
+        Args:
+            first: `True` for plain `DISTINCT`, `False` to clear distinct state,
+                or the first field path for `DISTINCT ON`.
+            *distinct_on: Additional field paths for `DISTINCT ON`.
+
+        Returns:
+            QuerySet: Cloned queryset with distinct configuration applied.
         """
         queryset: QuerySet = self._clone()
         if first is False:
@@ -1271,9 +1420,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def only(self, *fields: Sequence[str]) -> "QuerySet":
-        """
-        Returns a list of models with the selected only fields and always the primary
-        key.
+        """Load only the given fields plus the primary-key columns.
+
+        Primary-key columns are always retained so Saffier can still identify
+        and cache hydrated model instances correctly.
         """
         only_fields = list(fields)
         for pkcolumn in reversed(tuple(self.model_class.pkcolumns)):
@@ -1285,22 +1435,24 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def defer(self, *fields: Sequence[str]) -> "QuerySet":
-        """
-        Returns a list of models with the selected only fields and always the primary
-        key.
+        """Defer loading of the given fields until attribute access time.
+
+        Deferred attributes trigger lazy loading when accessed on a hydrated
+        model instance.
         """
         queryset: QuerySet = self._clone()
         queryset._defer = fields
         return queryset
 
     def select_related(self, related: Any) -> "QuerySet":
-        """
-        Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
-        related-object data when it executes its query.
+        """Eager-load foreign-key relationships in the same SQL query.
 
-        This is a performance booster which results in a single more complex query but means
+        Args:
+            related: One relation path or an iterable of relation paths.
 
-        later use of foreign-key relationships won’t require database queries.
+        Returns:
+            QuerySet: Cloned queryset configured to join and hydrate the related
+            objects.
         """
         queryset: QuerySet = self._clone()
         if not isinstance(related, (list, tuple)):
@@ -1319,8 +1471,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         flatten: bool = False,
         **kwargs: Any,
     ) -> list[Any]:
-        """
-        Returns the results in a python dictionary format.
+        """Return queryset results as dictionaries or tuples.
+
+        Args:
+            fields: Optional field whitelist.
+            exclude: Optional field blacklist.
+            exclude_none: Whether `None` values should be omitted.
+            flatten: When tuple output is requested, flatten a single selected
+                field into a list of scalar values.
+            **kwargs: Internal compatibility flags.
+
+        Returns:
+            list[Any]: Serialized rows.
         """
         fields = fields or []
         queryset: QuerySet = self._clone()
@@ -1358,8 +1520,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         exclude_none: bool = False,
         flat: bool = False,
     ) -> list[Any]:
-        """
-        Returns the results in a python dictionary format.
+        """Return queryset results as tuples or flattened scalar values.
+
+        Args:
+            fields: Fields to include in the output.
+            exclude: Fields to exclude from the output.
+            exclude_none: Whether `None` values should be omitted.
+            flat: Whether to flatten the result to a single scalar column.
+
+        Returns:
+            list[Any]: Tuple rows or flattened values.
         """
         fields = fields or []
         if flat and len(fields) > 1:
@@ -1382,8 +1552,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         )
 
     async def exists(self, **kwargs: Any) -> bool:
-        """
-        Returns a boolean indicating if a record exists or not.
+        """Return whether at least one row matches the queryset.
+
+        Args:
+            **kwargs: Optional extra lookup kwargs to apply before evaluation.
+
+        Returns:
+            bool: `True` when the queryset matches at least one row.
         """
         if kwargs:
             cached = self._cache.get(self.model_class, kwargs)
@@ -1402,8 +1577,17 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return cast("bool", _exists)
 
     async def count(self, **kwargs: Any) -> int:
-        """
-        Returns an indicating the total records.
+        """Return the number of rows matched by the queryset.
+
+        The implementation falls back to distinct primary-key counting when the
+        query shape could otherwise duplicate rows, such as joins introduced by
+        related filtering or ordering.
+
+        Args:
+            **kwargs: Optional extra lookup kwargs to apply before counting.
+
+        Returns:
+            int: Number of matched rows.
         """
         if not kwargs and self._cache_count is not None:
             return self._cache_count
@@ -1440,8 +1624,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return cast("int", _count)
 
     async def get_or_none(self, **kwargs: Any) -> SaffierModel | None:
-        """
-        Fetch one object matching the parameters or returns None.
+        """Fetch one row or return `None` instead of raising.
+
+        Returns:
+            SaffierModel | None: Matching model instance or `None`.
         """
         try:
             return await self.get(**kwargs)
@@ -1449,8 +1635,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return None
 
     async def _all(self, **kwargs: Any) -> list[SaffierModel]:
-        """
-        Returns the queryset records based on specific filters
+        """Execute the queryset and hydrate the full result list.
+
+        Args:
+            **kwargs: Optional lookup kwargs applied before evaluation.
+
+        Returns:
+            list[SaffierModel]: Hydrated result set.
         """
         if kwargs:
             queryset = self.filter(**kwargs)
@@ -1505,8 +1696,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return results
 
     def all(self, clear_cache: bool = False, **kwargs: Any) -> "QuerySet":
-        """
-        Returns the queryset records based on specific filters
+        """Return a clone ready for full evaluation.
+
+        Args:
+            clear_cache: Whether result caches should be cleared on the current
+                queryset.
+            **kwargs: Deferred lookup kwargs applied during evaluation.
+
+        Returns:
+            QuerySet: Queryset ready for evaluation.
         """
         if clear_cache:
             self._clear_cache(keep_cached_selected=not self._has_dynamic_clauses)
@@ -1516,8 +1714,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     async def get(self, **kwargs: Any) -> SaffierModel:
-        """
-        Returns a single record based on the given kwargs.
+        """Return exactly one row matched by the queryset or lookup kwargs.
+
+        Raises:
+            ObjectNotFound: If no row matches.
+            MultipleObjectsReturned: If more than one row matches.
         """
         if kwargs:
             cached = self._cache.get(self.model_class, kwargs)
@@ -1566,8 +1767,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return result
 
     async def first(self, **kwargs: Any) -> SaffierModel | None:
-        """
-        Returns the first record of a given queryset.
+        """Return the first row for the queryset.
+
+        Returns:
+            SaffierModel | None: First matching model instance or `None`.
         """
         if not kwargs:
             if self._cache_count == 0:
@@ -1609,8 +1812,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return result
 
     async def last(self, **kwargs: Any) -> SaffierModel | None:
-        """
-        Returns the last record of a given queryset.
+        """Return the last row for the queryset.
+
+        Returns:
+            SaffierModel | None: Last matching model instance or `None`.
         """
         if not kwargs:
             if self._cache_count == 0:
@@ -1678,8 +1883,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await instance._persist_model_references(set(payload))
 
     async def create(self, *model_refs: Any, **kwargs: Any) -> SaffierModel:
-        """
-        Creates a record in a specific table.
+        """Create one model instance and persist any staged many-to-many values.
+
+        Args:
+            *model_refs: Positional `ModelRef` objects consumed by
+                `RefForeignKey` fields.
+            **kwargs: Field payload used to construct the instance.
+
+        Returns:
+            SaffierModel: The newly created model instance.
         """
         queryset: QuerySet = self._clone()
         check_db_connection(queryset.database)
@@ -1726,8 +1938,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return instance
 
     async def bulk_create(self, objs: list[dict]) -> None:
-        """
-        Bulk creates records in a table
+        """Insert multiple rows in one bulk operation.
+
+        Args:
+            objs: List of logical field payloads to validate and insert.
         """
         queryset: QuerySet = self._clone()
         new_objs = []
@@ -1871,6 +2085,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return row_count
 
     async def delete(self, use_models: bool = False) -> int:
+        """Delete rows matched by the queryset and emit delete signals.
+
+        Args:
+            use_models: Whether deletion should materialize model instances to
+                honor model-based cleanup logic.
+
+        Returns:
+            int: Number of deleted rows.
+        """
         queryset: QuerySet = self._clone()
         if getattr(queryset.model_class, "__require_model_based_deletion__", False):
             use_models = True
@@ -1894,8 +2117,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return row_count
 
     async def update(self, **kwargs: Any) -> None:
-        """
-        Updates a record in a specific table with the given kwargs.
+        """Update rows matched by the queryset with the provided field values.
+
+        Args:
+            **kwargs: Logical field payload to normalize, validate, and persist.
         """
         queryset: QuerySet = self._clone()
         normalized_kwargs = queryset.model_class.normalize_field_kwargs(kwargs)
@@ -1953,8 +2178,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         defaults: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> tuple[SaffierModel, bool]:
-        """
-        Creates a record in a specific table or updates if already exists.
+        """Fetch one row or create it when missing.
+
+        Args:
+            *model_refs: Positional `ModelRef` objects for reference fields.
+            defaults: Extra values applied only during creation.
+            **kwargs: Lookup payload and creation payload.
+
+        Returns:
+            tuple[SaffierModel, bool]: Instance and a flag indicating whether it
+            was created.
         """
         queryset: QuerySet = self._clone()
         defaults = defaults or {}
@@ -2023,8 +2256,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         defaults: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> tuple[SaffierModel, bool]:
-        """
-        Updates a record in a specific table or creates a new one.
+        """Fetch one row and update it, or create it when missing.
+
+        Returns:
+            tuple[SaffierModel, bool]: Instance and a flag indicating whether it
+            was created.
         """
         queryset: QuerySet = self._clone()
         defaults = defaults or {}
@@ -2045,8 +2281,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return instance, True
 
     async def contains(self, instance: SaffierModel) -> bool:
-        """Returns true if the QuerySet contains the provided object.
-        False if otherwise.
+        """Return whether the queryset contains the provided persisted object.
+
+        Args:
+            instance: Persisted model instance to test.
+
+        Returns:
+            bool: `True` if a row with the same primary key matches the queryset.
         """
         queryset: QuerySet = self._clone()
         if getattr(instance, "pk", None) is None:
@@ -2075,38 +2316,45 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return CombinedQuerySet(left=self, right=other, op=op_name)
 
     def union(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
-        """
-        Returns the SQL UNION of this queryset and another queryset.
+        """Combine two querysets using SQL `UNION`.
+
+        Returns:
+            CombinedQuerySet: Combined queryset wrapper.
         """
         return self._combine(other, "union", all_=all)
 
     def union_all(self, other: "QuerySet") -> "CombinedQuerySet":
-        """
-        Shortcut for UNION ALL.
+        """Combine two querysets using SQL `UNION ALL`.
+
+        Unlike `union()`, duplicate rows are preserved.
         """
         return self._combine(other, "union", all_=True)
 
     def intersect(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
-        """
-        Returns the SQL INTERSECT of this queryset and another queryset.
+        """Combine two querysets using SQL `INTERSECT`.
+
+        Only rows present in both querysets are returned.
         """
         return self._combine(other, "intersect", all_=all)
 
     def intersect_all(self, other: "QuerySet") -> "CombinedQuerySet":
-        """
-        Shortcut for INTERSECT ALL.
+        """Combine two querysets using SQL `INTERSECT ALL`.
+
+        Duplicate row counts from both sides are preserved where supported.
         """
         return self._combine(other, "intersect", all_=True)
 
     def except_(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
-        """
-        Returns the SQL EXCEPT of this queryset and another queryset.
+        """Combine two querysets using SQL `EXCEPT`.
+
+        Rows produced by `other` are removed from the left-hand queryset.
         """
         return self._combine(other, "except", all_=all)
 
     def except_all(self, other: "QuerySet") -> "CombinedQuerySet":
-        """
-        Shortcut for EXCEPT ALL.
+        """Combine two querysets using SQL `EXCEPT ALL`.
+
+        Duplicate row counts are considered where the backend supports it.
         """
         return self._combine(other, "except", all_=True)
 
@@ -2119,8 +2367,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         key_share: bool = False,
         of: Sequence[type["Model"]] | None = None,
     ) -> "QuerySet":
-        """
-        Request row-level locks via SELECT ... FOR UPDATE semantics.
+        """Request row-level locks via `SELECT ... FOR UPDATE`.
+
+        Returns:
+            QuerySet: Cloned queryset configured with lock options.
         """
         queryset: QuerySet = self._clone()
         payload: dict[str, Any] = {
@@ -2135,14 +2385,25 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Any:
-        """
-        Returns a database transaction context manager bound to this QuerySet database.
+        """Return a transaction context manager bound to the queryset database.
+
+        This is a convenience pass-through to the underlying database object.
         """
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
     def _embed_parent_in_result(self, result: SaffierModel) -> SaffierModel:
-        """
-        Returns the embedded parent target when the queryset was created from a relation.
+        """Return the embedded parent target for relation-originated querysets.
+
+        When a reverse relation requested embedded-parent behavior, the hydrated
+        result is traversed down to the related object that should be exposed to
+        the caller. The through or child object can optionally be attached back
+        onto that exposed parent.
+
+        Args:
+            result: Hydrated result produced from the base queryset.
+
+        Returns:
+            SaffierModel: Exposed result object.
         """
         if not self.embed_parent:
             return result
@@ -2159,14 +2420,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return cast("SaffierModel", new_result)
 
     async def as_select_with_tables(self) -> tuple[Any, dict[str, tuple[Any, Any]]]:
-        """
-        Returns the SQLAlchemy select expression together with the table mapping.
+        """Return the SQLAlchemy select expression together with the table map.
+
+        Returns:
+            tuple[Any, dict[str, tuple[Any, Any]]]: Select expression and join
+            table/model mapping.
         """
         return self._build_select_with_tables()
 
     async def as_select(self) -> Any:
-        """
-        Returns the SQLAlchemy select expression for the queryset.
+        """Return only the SQLAlchemy select expression for the queryset.
+
+        Returns:
+            Any: SQLAlchemy select expression.
         """
         return (await self.as_select_with_tables())[0]
 
@@ -2248,8 +2514,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
 
 class CombinedQuerySet(QuerySet):
-    """
-    QuerySet representing a SQL set operation between two querysets.
+    """QuerySet representing a SQL set operation between two querysets.
+
+    Combined querysets power `union()`, `intersect()`, and `except_()`. They
+    intentionally reject query operations that cannot be applied safely after a
+    set operation, such as adding new filters or eager-loading directives.
     """
 
     def __init__(

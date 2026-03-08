@@ -19,13 +19,18 @@ if TYPE_CHECKING:
 
 
 class DateParser:
-    """
-    Utils used by the Registry
+    """Shared helpers for dynamic model payload normalization.
+
+    The mixin is used by runtime model-generation paths that need to update
+    timestamp fields automatically and serialize non-primitive Python values
+    before they are handed to lower-level query builders.
     """
 
     def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
-        """
-        Updates the auto fields
+        """Refresh `auto_now` date and datetime fields inside a payload.
+
+        Returns:
+            Any: Updated payload dictionary.
         """
         for k, v in fields.items():
             if isinstance(v, (DateField, DateTimeField)) and v.auto_now:
@@ -33,6 +38,17 @@ class DateParser:
         return values
 
     def _resolve_value(self, value: typing.Any) -> typing.Any:
+        """Normalize one value for storage or query generation.
+
+        Dictionaries are JSON-encoded, enums are converted to their member
+        names, and every other value is returned unchanged.
+
+        Args:
+            value (typing.Any): Raw value supplied by model or queryset code.
+
+        Returns:
+            typing.Any: Normalized value suitable for downstream processing.
+        """
         if isinstance(value, dict):
             return dumps(
                 value,
@@ -52,8 +68,11 @@ def create_saffier_model(
     __bases__: tuple[type["Model"]] | None = None,
     __proxy__: bool = False,
 ) -> type["Model"]:
-    """
-    Generates a dynamic `saffier.Model` using the provided metadata and definitions.
+    """Generate a dynamic Saffier model class.
+
+    This helper is used by registry copying, reflection, proxy-model generation,
+    and other runtime features that need to synthesize model classes from a
+    field-definition payload.
     """
 
     if not __bases__:
@@ -78,11 +97,19 @@ def create_saffier_model(
 
 
 def generify_model_fields(model: type["Model"]) -> dict[Any, Any]:
-    """
-    Makes all fields generic when a partial model is generated or used.
-    This also removes any metadata for the field such as validations making
-    it a clean slate to be used internally to process dynamic data and removing
-    the constraints of the original model fields.
+    """Relax one model's field definitions for dynamic partial-model use.
+
+    Proxy and partial-model generation paths need field objects that accept
+    missing values and arbitrary payload shapes. This helper mutates the copied
+    field definitions so every field becomes nullable and annotation-free before
+    the temporary model class is assembled.
+
+    Args:
+        model (type[Model]): Model whose field definitions should be loosened.
+
+    Returns:
+        dict[Any, Any]: Mutated field mapping ready for temporary model
+        generation.
     """
     fields = {}
 

@@ -18,7 +18,7 @@ attribute to `True` and when you want to safely expose the data via query, call 
 
 Let us see an example.
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/queries/secrets/model.py !}
 ```
 

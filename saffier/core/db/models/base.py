@@ -1,3 +1,5 @@
+"""Base model classes shared by concrete and reflected Saffier models."""
+
 import copy
 import functools
 from collections.abc import Sequence
@@ -47,9 +49,13 @@ _MODEL_COPY_EXCLUDED_ATTRS = {
 
 
 class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
-    """
-    All the operations performed by the model added to
-    a common mixin.
+    """Common model behavior shared by concrete and reflected models.
+
+    The base model contains the ORM logic that is independent from the actual
+    insert/update/delete implementation. It normalizes constructor payloads,
+    tracks identifying fields, supports schema-aware table selection, stages
+    reverse relation writes, persists model references, and exposes the cloning
+    helpers used by registry-copy and proxy-model generation.
     """
 
     is_proxy_model: ClassVar[bool] = False
@@ -83,6 +89,18 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def resolve_model_ref_field_name(cls, ref_type: type[Any]) -> str:
+        """Return the `RefForeignKey` field that accepts `ref_type` references.
+
+        Args:
+            ref_type: Concrete `ModelRef` subclass being supplied positionally.
+
+        Returns:
+            str: Name of the field that can store references of this type.
+
+        Raises:
+            ModelReferenceError: If no `RefForeignKey` on the model accepts the
+                provided reference type.
+        """
         for field_name, field in cls.fields.items():
             model_ref = getattr(field, "model_ref", None)
             if model_ref is not None and issubclass(ref_type, model_ref):
@@ -100,6 +118,25 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         model_refs: Sequence[Any],
         kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Merge positional `ModelRef` objects into a keyword payload.
+
+        Saffier reserves positional constructor arguments for model reference
+        objects so callers can write `Article(tag_ref, author_ref, title="...")`
+        and still end up with a normal keyword payload keyed by the owning
+        `RefForeignKey` fields.
+
+        Args:
+            model_refs: Positional constructor arguments.
+            kwargs: Existing keyword payload.
+
+        Returns:
+            dict[str, Any]: Normalized keyword payload including merged model
+            references.
+
+        Raises:
+            TypeError: If any positional argument is not a model reference
+                instance.
+        """
         payload = dict(kwargs or {})
         if not model_refs:
             return payload
@@ -125,8 +162,22 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         model_refs: Sequence[Any],
         kwargs: dict[str, Any],
     ) -> Any:
-        """
-        Loops and setup the kwargs of the model
+        """Normalize constructor input and assign values onto the instance.
+
+        Positional `ModelRef` arguments are merged into the keyword payload,
+        composite or virtual inputs are expanded through field hooks, and each
+        resulting value is assigned using normal model attribute semantics so
+        relation-aware setters still run.
+
+        Args:
+            model_refs: Positional model-reference objects.
+            kwargs: Raw keyword payload supplied to the constructor.
+
+        Returns:
+            Any: Normalized payload after assignment.
+
+        Raises:
+            ValueError: If the payload contains unknown public attributes.
         """
         kwargs = self.__class__.merge_model_refs(model_refs, kwargs)
         kwargs = self.__class__.normalize_field_kwargs(kwargs)
@@ -194,12 +245,29 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def normalize_field_kwargs(cls, kwargs: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Normalize constructor or persistence payloads through field hooks.
+
+        Every field may rewrite or expand incoming values before validation. This
+        is how composite fields, foreign keys, and other virtual helpers expose a
+        convenient high-level API while still producing a concrete payload.
+
+        Args:
+            kwargs: Input payload keyed by logical field name.
+
+        Returns:
+            dict[str, Any]: Normalized payload.
+        """
         payload = dict(kwargs or {})
         for field_name, field in cls.fields.items():
             field.modify_input(field_name, payload)
         return payload
 
     async def _persist_model_references(self, field_names: set[str] | None = None) -> None:
+        """Persist staged `RefForeignKey` values after a successful save.
+
+        Args:
+            field_names: Optional subset of reference fields to persist.
+        """
         for field_name, field in self.fields.items():
             if not getattr(field, "is_model_reference", False):
                 continue
@@ -210,6 +278,11 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             await field.persist_references(self, self.__dict__[field_name])
 
     async def _persist_related_fields(self, field_names: set[str] | None = None) -> None:
+        """Persist staged reverse-relation values after the model is saved.
+
+        Args:
+            field_names: Optional subset of reverse relation names to flush.
+        """
         for field_name in self.meta.related_fields:
             if field_names is not None and field_name not in field_names:
                 continue
@@ -237,6 +310,12 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @property
     def pk(self) -> Any:
+        """Return the model primary key in scalar or mapping form.
+
+        Single-column primary keys are returned as the raw value. Composite
+        primary keys are returned as a mapping from logical field name to value,
+        unless every component is `None`, in which case `None` is returned.
+        """
         values = self._pk_values()
         if len(values) == 1:
             return next(iter(values.values()))
@@ -327,8 +406,10 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @property
     def can_load(self) -> bool:
-        """
-        Indicates whether this instance has enough identifying data to be reloaded.
+        """Return whether the instance can be reloaded from the database.
+
+        The instance must belong to a concrete registered model and expose all
+        identifying database fields.
         """
         return bool(
             self.meta.registry
@@ -340,8 +421,11 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         )
 
     def create_model_key(self) -> tuple[Any, ...]:
-        """
-        Creates a stable key for recursion guards while walking model graphs.
+        """Create a stable identity tuple for recursion guards.
+
+        Returns:
+            tuple[Any, ...]: Tuple containing the model class and identifying
+            values.
         """
         return (
             self.__class__,
@@ -357,6 +441,16 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         table: sqlalchemy.Table | None = None,
         fields: Sequence[str] | None = None,
     ) -> list[Any]:
+        """Build equality clauses that uniquely identify the current instance.
+
+        Args:
+            table: Optional table object to target instead of the active instance
+                table.
+            fields: Optional subset of identifying fields to include.
+
+        Returns:
+            list[Any]: SQLAlchemy boolean expressions suitable for `WHERE`.
+        """
         active_table = table or self.table
         clauses = []
         for field_name in tuple(fields or self.identifying_db_fields):
@@ -377,9 +471,22 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def get_active_class_schema(cls) -> str | None:
+        """Return the schema pinned directly on the model class.
+
+        Returns:
+            str | None: Class-level schema override, if present.
+        """
         return cast("str | None", getattr(cls, "__using_schema__", None))
 
     def get_active_instance_schema(self) -> str | None:
+        """Return the schema currently active for this instance.
+
+        Instance-level overrides win over cached table schema, which in turn wins
+        over the class-level override.
+
+        Returns:
+            str | None: Active schema for this instance.
+        """
         explicit = self.__dict__.get("__using_schema__", None)
         if explicit is not None:
             return cast("str | None", explicit)
@@ -394,8 +501,17 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         only_needed_nest: bool = False,
         _seen: set[tuple[Any, ...]] | None = None,
     ) -> None:
-        """
-        Recursively loads this instance and its foreign-key relations.
+        """Load the instance and recurse through already-linked FK relations.
+
+        The method is careful to avoid infinite loops by tracking visited model
+        identities while traversing the object graph.
+
+        Args:
+            only_needed: Whether to skip reloading when DB-backed fields are
+                already populated.
+            only_needed_nest: Whether nested relations should stop after the
+                current object was already fully loaded.
+            _seen: Internal recursion guard keyed by model identity.
         """
         model_key = self.create_model_key()
         if _seen is None:
@@ -422,8 +538,10 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                 )
 
     def get_instance_name(self) -> str:
-        """
-        Returns the name of the class in lowercase.
+        """Return the lowercase class name used by relation helpers.
+
+        Returns:
+            str: Lowercase model class name.
         """
         return self.__class__.__name__.lower()
 
@@ -434,6 +552,20 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         registry: "saffier.Registry | None" = None,
         unlink_same_registry: bool = True,
     ) -> dict[str, Any]:
+        """Copy fields and managers for dynamic model cloning.
+
+        Relation fields may be rewritten as string references when the target
+        registry is still under construction so copied models do not retain live
+        references back into the source registry.
+
+        Args:
+            registry: Optional destination registry receiving the copy.
+            unlink_same_registry: Whether relations inside the same source
+                registry should be rewritten as string references.
+
+        Returns:
+            dict[str, Any]: Definitions suitable for dynamic model creation.
+        """
         from saffier.core.db.fields.base import ForeignKey, ManyToManyField
 
         definitions: dict[str, Any] = {}
@@ -498,6 +630,25 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         unlink_same_registry: bool = True,
         on_conflict: str = "error",
     ) -> type["Model"]:
+        """Create a detached copy of the model class with copied field state.
+
+        The copy is used by migration preparation, proxy generation, and tests
+        that need to attach the same logical model definition to another
+        registry. Field instances are copied so later mutations on the copied
+        model do not leak back into the original model definition.
+
+        Args:
+            registry: Optional registry to immediately attach the copied model
+                to.
+            name: Optional replacement class name.
+            unlink_same_registry: Whether same-registry relations should be
+                rewritten as string references during the copy.
+            on_conflict: Conflict strategy used if `registry` already contains a
+                model with the target name.
+
+        Returns:
+            type[Model]: The detached or newly attached copied model class.
+        """
         existing_annotations = dict(getattr(cls, "__annotations__", {}))
         definitions = {
             key: value
@@ -568,6 +719,26 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         database: bool | Any | str = "keep",
         on_conflict: str = "error",
     ) -> type["Model"]:
+        """Attach a copied model class to another registry.
+
+        This is the internal implementation behind `add_to_registry()`. It
+        resolves naming conflicts, rebinds fields and managers to the target
+        registry, rebuilds relation descriptors, and regenerates the proxy model
+        so the attached class behaves like a first-class registered model.
+
+        Args:
+            registry: Target registry.
+            name: Optional replacement model name.
+            database: Database binding strategy or explicit database object.
+            on_conflict: Conflict strategy for duplicate model names.
+
+        Returns:
+            type[Model]: The attached model class.
+
+        Raises:
+            ImproperlyConfigured: If a conflicting model already exists and the
+                conflict strategy is `"error"`.
+        """
         if getattr(cls.meta, "registry", None) not in (None, False, registry):
             return cls.copy_saffier_model(
                 registry=registry,
@@ -645,6 +816,17 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         *,
         on_conflict: str = "error",
     ) -> type["Model"]:
+        """Attach the model to another registry, copying if required.
+
+        Args:
+            registry: Destination registry.
+            name: Optional replacement model name.
+            database: Database rebinding strategy.
+            on_conflict: Conflict strategy for duplicate model names.
+
+        Returns:
+            type[Model]: Registered model class.
+        """
         return cls.real_add_to_registry(
             registry=registry,
             name=name,
@@ -654,9 +836,14 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def generate_proxy_model(cls) -> type["Model"]:
-        """
-        Generates a proxy model for each model. This proxy model is a simple
-        shallow copy of the original model being generated.
+        """Generate the lightweight proxy model used for SQLAlchemy-style access.
+
+        Proxy models mirror the field layout of the concrete model but stay
+        detached from registry registration. They exist so class-level field
+        access can emulate SQLAlchemy's declarative attribute style.
+
+        Returns:
+            type[Model]: Proxy model class for `cls`.
         """
         existing_proxy = cls.__dict__.get("__proxy_model__")
         if existing_proxy:
@@ -677,10 +864,18 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def build(cls, schema: str | None = None) -> sqlalchemy.Table:
-        """
-        Performs the operation of building the core SQLAlchemy Table object.
-        Builds the constrainst, indexes, columns and metadata based on the
-        provided Meta class object.
+        """Build the SQLAlchemy table for the model in the requested schema.
+
+        Table generation expands multi-column fields, applies field-level global
+        constraints, attaches `Meta`-declared indexes and constraints, and keeps
+        schema-specific tables isolated from the shared registry metadata.
+
+        Args:
+            schema: Schema name to build against. `None` uses the registry
+                default behavior.
+
+        Returns:
+            sqlalchemy.Table: Built or cached SQLAlchemy table for the model.
         """
         tablename = cls.meta.tablename
         registry = cls.meta.registry
@@ -774,8 +969,13 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def _get_indexes(cls, index: Index) -> sqlalchemy.Index | None:
-        """
-        Creates the index based on the Index fields
+        """Build a SQLAlchemy index from a Saffier `Index` declaration.
+
+        Args:
+            index: Declared Saffier index definition.
+
+        Returns:
+            sqlalchemy.Index | None: SQLAlchemy index object.
         """
         expanded = cls._expand_constraint_field_names(index.fields or ())
         return sqlalchemy.Index(index.name, *expanded)  # type: ignore
@@ -792,15 +992,23 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return tuple(expanded)
 
     def update_from_dict(self, dict_values: dict[str, Any]) -> Self:
-        """Updates the current model object with the new fields"""
+        """Assign values from a dictionary using normal attribute semantics.
+
+        Returns:
+            Self: The current instance for fluent usage.
+        """
         for key, value in dict_values.items():
             setattr(self, key, value)
         return self
 
     def extract_db_fields(self, only: Sequence[str] | None = None) -> dict[str, Any]:
-        """
-        Extacts all the db fields and excludes the related_names since those
-        are simply relations.
+        """Collect persisted field values from the current instance.
+
+        Args:
+            only: Optional subset of logical field names to include.
+
+        Returns:
+            dict[str, Any]: Payload containing only database-backed fields.
         """
         if only is not None:
             allowed = set(only)
@@ -826,6 +1034,25 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         model_instance: Any | None = None,
         evaluate_values: bool = False,
     ) -> dict[str, Any]:
+        """Convert logical field payloads into database column payloads.
+
+        The method runs field-specific normalization, expands multi-column
+        fields such as composite foreign keys, injects defaults when allowed,
+        and returns the final column-value mapping used by insert/update
+        expressions.
+
+        Args:
+            extracted_values: Logical field payload keyed by Saffier field name.
+            is_update: Whether the payload is for an update operation.
+            is_partial: Whether the update payload omits untouched fields.
+            phase: Context label exposed to field hooks through context vars.
+            instance: Instance currently being persisted.
+            model_instance: Original model instance used by nested helpers.
+            evaluate_values: Whether callable payload values should be executed.
+
+        Returns:
+            dict[str, Any]: Database-ready payload keyed by SQL column name.
+        """
         validated: dict[str, Any] = {}
         token = CURRENT_PHASE.set(phase)
         token2 = CURRENT_INSTANCE.set(instance)
@@ -952,14 +1179,26 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
 
 class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
-    """
-    Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
-    call.
+    """Base class for database-reflected models.
+
+    Reflected models reuse nearly all runtime behavior from `SaffierBaseModel`,
+    but their table definition comes from an existing database rather than from
+    declared Saffier fields. Reflection currently relies on the synchronous
+    SQLAlchemy engine because async reflection support is intentionally kept out
+    of the model layer.
     """
 
     @classmethod
     @functools.lru_cache
     def get_engine(cls, url: str) -> Engine:
+        """Return a cached synchronous engine for reflection work.
+
+        Args:
+            url: Database URL used for reflection.
+
+        Returns:
+            Engine: Synchronous SQLAlchemy engine.
+        """
         return sqlalchemy.create_engine(url)
 
     @property
@@ -972,8 +1211,18 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
 
     @classmethod
     def build(cls, schema: str | None = None) -> sqlalchemy.Table:
-        """
-        The inspect is done in an async manner and reflects the objects from the database.
+        """Return a reflected SQLAlchemy table for the requested schema.
+
+        The reflected-model variant reuses the same schema-specific metadata
+        caching strategy as concrete models, but populates tables by reflecting
+        existing database objects instead of constructing them from field
+        declarations.
+
+        Args:
+            schema: Schema name to reflect against.
+
+        Returns:
+            sqlalchemy.Table: Reflected table object.
         """
         registry = cls.meta.registry
         database = getattr(cls, "database", None)
@@ -1008,6 +1257,18 @@ class SaffierBaseReflectModel(SaffierBaseModel, metaclass=BaseModelReflectMeta):
 
     @classmethod
     def reflect(cls, tablename: str, metadata: sqlalchemy.MetaData) -> sqlalchemy.Table:
+        """Reflect one database table into the supplied metadata.
+
+        Args:
+            tablename: Database table name to reflect.
+            metadata: Metadata container receiving the reflected table.
+
+        Returns:
+            sqlalchemy.Table: Reflected SQLAlchemy table.
+
+        Raises:
+            ImproperlyConfigured: If the table cannot be reflected.
+        """
         try:
             database = getattr(cls, "database", None)
             autoload_with = (

@@ -1,3 +1,9 @@
+"""Metaclasses and metadata containers for Saffier ORM models.
+
+This module is responsible for turning model class declarations into runtime
+metadata, SQLAlchemy tables, reverse relations, and manager wiring.
+"""
+
 import contextlib
 import copy
 import inspect
@@ -44,6 +50,14 @@ _trigger_attributes_field_stats_MetaInfo: set[str] = {
 
 
 class Fields(UserDict, dict[str, Field]):
+    """Mutable field mapping that invalidates `MetaInfo` caches on change.
+
+    `MetaInfo.fields` is not a plain dictionary because mutating the model field
+    map has downstream effects on column mappings, serializer state, and cached
+    tables. This wrapper updates lightweight field statistics immediately and
+    invalidates the heavier caches so they are rebuilt on demand.
+    """
+
     meta: "MetaInfo"
 
     def __init__(self, meta: "MetaInfo", data: dict[str, Field] | None = None) -> None:
@@ -93,6 +107,13 @@ class Fields(UserDict, dict[str, Field]):
 
 
 class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
+    """Lazy mapping from Saffier field names to SQLAlchemy columns.
+
+    Some fields expand into multiple physical columns, while virtual fields have
+    none at all. This mapping defers column materialization until first access so
+    model initialization stays cheap.
+    """
+
     meta: "MetaInfo"
 
     def __init__(self, meta: "MetaInfo") -> None:
@@ -131,6 +152,12 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
 
 
 class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
+    """Lazy mapping from logical field names to physical SQL column names.
+
+    The mapping is derived from `field_to_columns` and keeps only string column
+    identifiers, which is useful for serializer and payload normalization code.
+    """
+
     def __getitem__(self, name: str) -> frozenset[str]:
         if name in self.data:
             return cast("frozenset[str]", self.data[name])
@@ -140,6 +167,13 @@ class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
 
 
 class ColumnsToField(UserDict, dict[str, str]):
+    """Reverse lookup from SQL column names to logical Saffier field names.
+
+    The mapping is initialized lazily and raises on column collisions so Saffier
+    can reliably rehydrate query rows and database payloads back into model
+    fields.
+    """
+
     meta: "MetaInfo"
     _init: bool
 
@@ -185,6 +219,34 @@ class ColumnsToField(UserDict, dict[str, str]):
 
 
 class MetaInfo:
+    """Runtime metadata container attached to every Saffier model class.
+
+    Saffier keeps most of the expensive model bookkeeping outside the class
+    dictionary itself and stores it in `MetaInfo`. That includes resolved field
+    mappings, reverse relation descriptors, manager registrations, registry
+    pointers, and lazily populated caches that translate between logical field
+    names and physical SQLAlchemy columns.
+
+    The container is intentionally mutable. Model construction, relation
+    binding, registry copying, and dynamic schema invalidation all update the
+    same `MetaInfo` instance over the lifetime of a model class.
+
+    Attributes:
+        fields (Fields):
+            Mapping of declared Saffier field names to field instances.
+        registry (Registry | None):
+            Registry that owns the model, or `None` for detached/abstract
+            models.
+        foreign_key_fields (dict[str, Field]):
+            Foreign-key-like fields that require reverse relation wiring.
+        related_fields (dict[str, Any]):
+            Reverse relation descriptors registered on related models.
+        field_to_columns (FieldToColumns):
+            Lazy mapping from logical field names to SQLAlchemy columns.
+        columns_to_field (ColumnsToField):
+            Reverse mapping from column names back to logical field names.
+    """
+
     __slots__ = (
         "abstract",
         "fields",
@@ -300,12 +362,24 @@ class MetaInfo:
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
+        """Initialize the lazy field and column lookup containers.
+
+        The method is triggered on first access to any of the mapping helpers and
+        prepares the objects that translate between logical field names and
+        SQLAlchemy columns.
+        """
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
         self._fields_are_initialized = True
 
     def init_field_stats(self) -> None:
+        """Compute cached field statistics used by serialization and validation.
+
+        The derived sets track computed fields, secret fields, and fields that
+        may modify incoming payloads. They are rebuilt whenever the field mapping
+        changes.
+        """
         self.special_getter_fields = {
             field_name
             for field_name, field in self.fields.items()
@@ -325,6 +399,14 @@ class MetaInfo:
         invalidate_fields: bool = True,
         invalidate_stats: bool = True,
     ) -> None:
+        """Invalidate cached metadata derived from the current field map.
+
+        Args:
+            clear_class_attrs: Whether model-level caches such as tables, PK
+                metadata, and proxy models should also be cleared.
+            invalidate_fields: Whether to clear field-to-column mapping caches.
+            invalidate_stats: Whether to clear serializer/input statistics.
+        """
         if invalidate_fields and self._fields_are_initialized:
             for attr in ("field_to_columns", "field_to_column_names", "columns_to_field"):
                 with contextlib.suppress(AttributeError):
@@ -346,6 +428,13 @@ class MetaInfo:
             self.model._db_schemas = {}
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
+        """Eagerly initialize all lazily computed metadata structures.
+
+        Args:
+            init_column_mappers: Whether to initialize reverse column lookups.
+            init_class_attrs: Whether to warm class-level table and proxy-model
+                caches.
+        """
         if not self._fields_are_initialized:
             self.init_fields_mapping()
         if not self._field_stats_are_initialized:
@@ -358,6 +447,15 @@ class MetaInfo:
 
     @property
     def needs_special_serialization(self) -> bool:
+        """Return whether model dumps need custom serialization logic.
+
+        Serialization becomes "special" when a model exposes computed fields or
+        nested relations whose targets themselves require special handling. The
+        result is cached until metadata invalidation occurs.
+
+        Returns:
+            bool: `True` when default flat field dumping is not sufficient.
+        """
         if self._needs_special_serialization is None:
             needs_special_serialization = any(
                 not self.fields[field_name].exclude for field_name in self.special_getter_fields
@@ -383,6 +481,17 @@ class MetaInfo:
 
 
 def _is_sqlalchemy_compatibility_enabled(model_class: type) -> bool:
+    """Check whether SQLAlchemy-style class attribute access is enabled.
+
+    Saffier can expose proxy-model attribute lookup compatible with SQLAlchemy's
+    declarative style. The flag is inherited, so the full MRO is inspected.
+
+    Args:
+        model_class: Model class being inspected.
+
+    Returns:
+        bool: `True` when compatibility mode is enabled for the class.
+    """
     for base in type.__getattribute__(model_class, "__mro__"):
         if base.__dict__.get("__saffier_sqlalchemy_compatibility__", False):
             return True
@@ -390,11 +499,21 @@ def _is_sqlalchemy_compatibility_enabled(model_class: type) -> bool:
 
 
 def _check_model_inherited_registry(bases: tuple[type, ...]) -> Registry:
-    """
-    When a registry is missing from the Meta class, it should look up for the bases
-    and obtain the first found registry.
+    """Resolve a missing registry by inheriting the first registry from the bases.
 
-    If not found, then a ImproperlyConfigured exception is raised.
+    Concrete models may omit `Meta.registry` when inheriting from another
+    concrete Saffier model. This helper mirrors that inheritance behavior by
+    scanning the base classes in method-resolution order until it finds a model
+    metadata object with an attached registry.
+
+    Args:
+        bases: Base classes declared for the model being constructed.
+
+    Returns:
+        Registry: The first registry inherited from the model bases.
+
+    Raises:
+        ImproperlyConfigured: If no base model contributes a registry.
     """
     found_registry: Registry | None = None
 
@@ -419,8 +538,19 @@ def get_model_meta_attr(
     bases: tuple[type, ...],
     meta_class: object | MetaInfo | None = None,
 ) -> Any | None:
-    """
-    Returns a meta attribute either from the direct Meta class or from parent model metas.
+    """Return a `Meta` attribute from the class itself or the nearest parent model.
+
+    This is used while constructing a model class to support inheritance for
+    values such as `table_prefix` without hard-coding every inheritable option
+    into the metaclass.
+
+    Args:
+        attr: Name of the `Meta` attribute to resolve.
+        bases: Candidate parent classes to inspect.
+        meta_class: Explicit `Meta` object declared on the class being built.
+
+    Returns:
+        Any | None: The first non-`None` value found.
     """
     if meta_class is not None:
         direct_attr = getattr(meta_class, attr, None)
@@ -442,8 +572,18 @@ def _check_manager_for_bases(
     attrs: Any,
     meta: MetaInfo | None = None,
 ) -> None:
-    """
-    When an abstract class is declared, we must treat the manager's value coming from the top.
+    """Copy inheritable managers from a base class into the new model namespace.
+
+    Manager descriptors live on the class body, so normal Python attribute
+    inheritance is not enough when Saffier rebuilds a model namespace during
+    metaclass construction. This helper copies manager instances while
+    respecting `inherit=False` and the special handling for the default
+    `query` manager.
+
+    Args:
+        base: Base class currently being inspected.
+        attrs: Namespace under construction for the new model.
+        meta: Optional metadata object for `base`, used to check abstractness.
     """
     for key, value in inspect.getmembers(base):
         if not isinstance(value, Manager):
@@ -467,10 +607,23 @@ def _set_related_name_for_foreign_keys(
     foreign_keys: dict[str, saffier_fields.OneToOneField | saffier_fields.ForeignKey],
     model_class: Union["Model", "ReflectModel"],
 ) -> set[str]:
-    """
-    Sets the related name for the foreign keys.
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
+    """Resolve and bind reverse relation descriptors for foreign-key-like fields.
+
+    The helper is responsible for generating implicit `related_name` values,
+    installing `RelatedField` descriptors on target models, creating placeholder
+    fields for reverse lookups, and deferring the work until a string target can
+    be resolved from the registry.
+
+    Args:
+        foreign_keys: Mapping of local field names to foreign-key-like fields.
+        model_class: Model class declaring those fields.
+
+    Returns:
+        set[str]: The reverse relation names attached during processing.
+
+    Raises:
+        ForeignKeyBadConfigured: If multiple relations would claim the same
+            reverse name on the same target model.
     """
     related_names: set[str] = set()
     for name, foreign_key in foreign_keys.items():
@@ -580,6 +733,17 @@ def _set_many_to_many_relation(
     model_class: Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
+    """Attach the runtime `Relation` descriptor for a many-to-many field.
+
+    Many-to-many fields are virtual from the model's perspective. Their query
+    behavior is exposed through a `Relation` descriptor that knows about the
+    target model, the through model, and any deferred string-based references.
+
+    Args:
+        m2m: Field being wired.
+        model_class: Model class declaring the field.
+        field: Attribute name used on `model_class`.
+    """
     registry = cast("Registry | None", getattr(model_class.meta, "registry", None))
     relation_name = settings.many_to_many_relation.format(key=field)
 
@@ -658,8 +822,13 @@ def _set_many_to_many_relation(
 
 
 def _register_model_signals(model_class: type["Model"]) -> None:
-    """
-    Registers the signals in the model's Broadcaster and sets the defaults.
+    """Attach the default model lifecycle signals to a class.
+
+    Every concrete model receives a fresh `Broadcaster` instance with the
+    standard pre/post save, update, and delete signals.
+
+    Args:
+        model_class: Model class receiving the broadcaster.
     """
     signals = Broadcaster()
     signals.pre_save = Signal()
@@ -672,12 +841,30 @@ def _register_model_signals(model_class: type["Model"]) -> None:
 
 
 def _copy_field(field: Field) -> Field:
+    """Copy a field declaration unless it explicitly opts out.
+
+    Args:
+        field: Field instance declared on a model.
+
+    Returns:
+        Field: Either the original field or a shallow copy, depending on the
+        field's `no_copy` flag.
+    """
     if getattr(field, "no_copy", False):
         return field
     return copy.copy(field)
 
 
 class BaseModelMeta(type):
+    """Metaclass that turns field declarations into runtime Saffier models.
+
+    `BaseModelMeta` performs almost all of Saffier's ORM construction work. It
+    copies inheritable fields and managers, expands composite fields, injects a
+    default primary key when appropriate, validates `Meta` options, registers
+    the model with its registry, wires reverse relations, and finally generates
+    the proxy model used for SQLAlchemy-compatible attribute access.
+    """
+
     __slots__ = ()
 
     def __new__(
@@ -688,6 +875,33 @@ class BaseModelMeta(type):
         meta_info_class: type[MetaInfo] = MetaInfo,
         register_content_type: bool = True,
     ) -> Any:
+        """Build a Saffier model class from field declarations and inherited metadata.
+
+        The method walks the full inheritance tree, clones fields so model
+        definitions do not accidentally share mutable field state, validates the
+        effective `Meta` configuration, assigns registries and managers, and
+        wires relation descriptors. For concrete models it also creates the
+        proxy model and optionally participates in the registry content type
+        integration.
+
+        Args:
+            name: Name of the model class being created.
+            bases: Base classes declared by the model.
+            attrs: Class namespace collected from the class body.
+            meta_info_class: Metadata container type used for `meta`.
+            register_content_type: Whether registry content-type integration
+                should run for the new model.
+
+        Returns:
+            Any: The newly created model class.
+
+        Raises:
+            ImproperlyConfigured: If the model definition is structurally
+                invalid, such as missing a usable registry or using an invalid
+                manager annotation.
+            ValueError: If unsupported `Meta` values or field combinations are
+                declared.
+        """
         allow_concrete_without_registry = bool(attrs.pop("__skip_registry__", False))
         fields: dict[str, Field] = {}
         one_to_one_fields: set[saffier_fields.OneToOneField] = set()
@@ -1093,8 +1307,11 @@ class BaseModelMeta(type):
         return new_class
 
     def get_db_schema(cls) -> str | None:
-        """
-        Returns a db_schema from the model registry, if available.
+        """Return the default registry schema associated with the model.
+
+        Returns:
+            str | None: Registry-level default schema, or `None` when the model
+            is detached from a registry.
         """
         meta = getattr(cls, "meta", None)
         if meta is None or getattr(meta, "registry", None) is None:
@@ -1102,23 +1319,26 @@ class BaseModelMeta(type):
         return cast("str | None", meta.registry.db_schema)
 
     def get_db_shema(cls) -> str | None:
-        """
-        Returns a db_schema from registry if any is passed.
+        """Backward-compatible misspelled alias for `get_db_schema()`.
+
+        Returns:
+            str | None: Same value returned by `get_db_schema()`.
         """
         return cls.get_db_schema()
 
     @property
     def table(cls) -> Any:
-        """
-        Making sure the tables on inheritance state, creates the new
-        one properly.
+        """Return the model table for the active default schema.
 
-        Making sure the following scenarios are met:
+        Proxy models delegate to their parent model, while concrete models lazily
+        build and cache the SQLAlchemy table for the registry default schema.
 
-        1. If there is a context_db_schema, it will return for those, which means, the `using`
-        if being utilised.
-        2. If a db_schema in the `registry` is passed, then it will use that as a default.
-        3. If none is passed, defaults to the shared schema of the database connected.
+        Returns:
+            Any: SQLAlchemy table object bound to the default schema.
+
+        Raises:
+            AttributeError: If the model has no registry or an invalid proxy
+                parent.
         """
         if getattr(cls, "is_proxy_model", False):
             parent = getattr(cls, "parent", None)
@@ -1167,12 +1387,21 @@ class BaseModelMeta(type):
         metadata: sqlalchemy.MetaData | None = None,
         update_cache: bool = False,
     ) -> Any:
-        """
-        Making sure the tables on inheritance state, creates the new
-        one properly.
+        """Return the model table bound to a specific schema.
 
-        The use of context vars instead of using the lru_cache comes from
-        a warning from `ruff` where lru can lead to memory leaks.
+        Saffier caches one SQLAlchemy `Table` per schema so tenant-specific or
+        manually selected schemas do not mutate the shared registry metadata. If
+        the requested schema matches the registry default schema, the shared
+        table cache is used. Otherwise a per-schema table is built and cached in
+        `_db_schemas`.
+
+        Args:
+            schema: Schema name to bind the table to.
+            metadata: Accepted for compatibility with related APIs but ignored.
+            update_cache: When `True`, force rebuilding the cached table.
+
+        Returns:
+            Any: The SQLAlchemy table object for the requested schema.
         """
         del metadata  # metadata is accepted for API parity with Edgy.
         if getattr(cls, "is_proxy_model", False):
@@ -1206,6 +1435,11 @@ class BaseModelMeta(type):
 
     @property
     def pknames(cls) -> Sequence[str]:
+        """Return the logical field names that compose the primary key.
+
+        Returns:
+            Sequence[str]: One or more Saffier field names forming the PK.
+        """
         cached = cls.__dict__.get("_pknames")
         if cached is None:
             names = tuple(
@@ -1220,6 +1454,11 @@ class BaseModelMeta(type):
 
     @property
     def pkcolumns(cls) -> Sequence[str]:
+        """Return the physical column names that compose the primary key.
+
+        Returns:
+            Sequence[str]: Database column names used by the model primary key.
+        """
         cached = cls.__dict__.get("_pkcolumns")
         if cached is None:
             try:
@@ -1233,8 +1472,10 @@ class BaseModelMeta(type):
 
     @property
     def signals(cls) -> "Broadcaster":
-        """
-        Returns the signals of a class
+        """Return the lifecycle signal broadcaster attached to the model class.
+
+        Returns:
+            Broadcaster: Signal broadcaster configured for the model.
         """
         return cast("Broadcaster", cls.meta.signals)
 
@@ -1243,8 +1484,10 @@ class BaseModelMeta(type):
 
     @property
     def proxy_model(cls) -> Any:
-        """
-        Returns the proxy_model from the Model when called using the cache.
+        """Return the lazily generated proxy model for SQLAlchemy-style access.
+
+        Returns:
+            Any: Proxy model class corresponding to the concrete model.
         """
         if getattr(cls, "is_proxy_model", False):
             return cls
@@ -1260,6 +1503,14 @@ class BaseModelMeta(type):
 
 
 class BaseModelReflectMeta(BaseModelMeta):
+    """Variant of `BaseModelMeta` that registers models as reflected models.
+
+    Reflected models go through the same field and manager setup as concrete
+    models, but they are removed from the registry's `models` mapping and stored
+    in `registry.reflected` instead so migration and reflection code can treat
+    them differently.
+    """
+
     def __new__(
         cls,
         name: str,
@@ -1290,7 +1541,18 @@ class BaseModelReflectMeta(BaseModelMeta):
         return new_model
 
 
-class ModelMeta(metaclass=BaseModelMeta): ...
+class ModelMeta(metaclass=BaseModelMeta):
+    """Marker metaclass used by standard concrete Saffier models.
+
+    The class exists so user models can inherit a stable metaclass symbol while
+    the real implementation lives in `BaseModelMeta`.
+    """
 
 
-class ReflectMeta(metaclass=BaseModelReflectMeta): ...
+class ReflectMeta(metaclass=BaseModelReflectMeta):
+    """Marker metaclass used by reflected Saffier models.
+
+    This mirrors `ModelMeta` but routes construction through
+    `BaseModelReflectMeta`, which stores models in the registry's reflected-model
+    mapping.
+    """

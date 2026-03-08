@@ -85,7 +85,12 @@ def saffier_callback(
         ),
     ] = None,
 ) -> None:
-    """Perform database migration directives."""
+    """Resolve the target application and initialize CLI migration context.
+
+    The callback loads settings, performs app discovery from `--app`, active
+    instances, or auto-discovery paths, then stores the resolved environment so
+    subcommands can operate on the correct registry.
+    """
     app_value = typing.cast("str | None", app)
     path_value = typing.cast("str | None", path)
 

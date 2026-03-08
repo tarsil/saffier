@@ -57,7 +57,11 @@ def shell(
 
 
 async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) -> None:
-    """Executes the database shell connection"""
+    """Run the interactive shell within the app and registry context.
+
+    Lifespan startup and shutdown hooks are honored when available so the shell
+    sees the same initialized state as the running application.
+    """
     if lifespan is None:
         nest_asyncio.apply()
         if kernel == ShellOption.IPYTHON:

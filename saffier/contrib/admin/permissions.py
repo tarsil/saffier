@@ -6,8 +6,10 @@ from typing import Any
 
 
 class BasicAuthMiddleware:
-    """
-    Minimal ASGI middleware for HTTP Basic auth.
+    """Minimal ASGI middleware implementing HTTP Basic auth for the admin app.
+
+    The middleware protects only HTTP requests and returns a standard `401`
+    challenge when credentials are missing or invalid.
     """
 
     def __init__(self, app: Any, *, username: str = "admin", password: str) -> None:

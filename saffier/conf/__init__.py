@@ -125,8 +125,10 @@ def with_settings(
 
 
 class override_settings:
-    """
-    Temporary settings override usable as a sync/async context manager and decorator.
+    """Temporary settings override for tests and scoped execution blocks.
+
+    The helper can be used as a synchronous or asynchronous context manager and
+    also as a decorator for functions or coroutines.
     """
 
     def __init__(

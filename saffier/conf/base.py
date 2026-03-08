@@ -40,8 +40,11 @@ def _is_classvar_annotation(annotation: Any) -> bool:
 
 
 def safe_get_type_hints(cls: type) -> dict[str, Any]:
-    """
-    Collect type hints across the full MRO while tolerating partially resolvable annotations.
+    """Collect type hints across the full MRO.
+
+    The helper falls back gracefully when some annotations cannot be fully
+    resolved, which is important for settings classes that may reference optional
+    imports or forward declarations.
     """
     type_hints: dict[str, Any] = {}
 
@@ -63,8 +66,11 @@ def safe_get_type_hints(cls: type) -> dict[str, Any]:
 
 
 class BaseSettings:
-    """
-    Python-native settings base with environment casting and inheritance support.
+    """Python-native settings base with environment casting and inheritance.
+
+    Settings values are resolved from explicit constructor kwargs first, then
+    from uppercased environment variables, and finally from class-level default
+    values.
     """
 
     __type_hints__: builtins.dict[str, Any]
@@ -94,8 +100,9 @@ class BaseSettings:
         self.post_init()
 
     def post_init(self) -> None:
-        """
-        Hook for subclasses that need to finalize settings after initialization.
+        """Hook for subclasses that need to finalize settings after initialization.
+
+        Subclasses override this when derived settings depend on resolved values.
         """
 
     def _clone_default_value(self, key: str) -> Any:

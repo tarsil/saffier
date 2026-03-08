@@ -84,7 +84,7 @@ Pretty cool, right?
 
 Nothing like an example to see it in action.
 
-```python title="tests.py" hl_lines="14"
+```python title="tests.py"
 {!> ../docs_src/testclient/tests.py !}
 ```
 

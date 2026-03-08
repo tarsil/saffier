@@ -1,40 +1,80 @@
 # Models
 
-Have you ever wondered how time consuming and sometimes how hard is to declare a simple table
-with SQLAlchemy where sometimes it can also be combersome?
+Models are the center of the Saffier ORM API.
 
-What about the Django interface type for tables? Cleaner right? Well, **Saffier** although is on
-the top of SQLAlchemy core, it provides a Django like experience when it comes to create models.
+They define table structure, own field declarations, expose managers, and give
+you the persistence lifecycle you use throughout the rest of the framework.
 
-Do you already have a database with tables and views you would simply would like to reflect them
-back instead of the opposite? [Check the reflection section](./reflection.md) for more details.
+Saffier deliberately keeps the declaration style close to Django while still
+building on top of SQLAlchemy Core underneath. That means the model layer is
+compact to read but still maps to explicit SQLAlchemy tables and expressions.
+
+If you already have an existing database and want to reflect tables instead of
+declaring them, see [reflection](./reflection.md).
 
 ## What is a model
 
-A model in Saffier is a python class with attributes that represents a database table.
+A model in Saffier is a Python class whose declared fields describe a database
+table and whose instances represent rows from that table.
 
-In other words, it is what represents your SQL table in your codebase.
+In practice, a model gives you three things at the same time:
+
+* a schema declaration
+* a query entry point through managers
+* a persistence API on each instance
 
 ## Declaring models
 
-When declaring models by simply inheriting from `saffier.Model` object and define the attributes
-using the saffier [Fields](./fields.md).
+Declare models by inheriting from `saffier.Model`, adding field attributes, and
+declaring a `Meta` class.
 
-For each model defined you also need to set **one** mandatory field, the `registry` which is also
-an instance of `Registry` from Saffier.
-
-There are more parameters you can use and pass into the model such as [tablename](#metaclass) and
-a few more but more on this in this document.
-
-Since **Saffier** took inspiration from the interface of Django, that also means that a [Meta](#the-meta-class)
-class should be declared.
+For each concrete model, `Meta.registry` is mandatory unless the model inherits
+it from another concrete Saffier model.
 
 ```python
 {!> ../docs_src/models/declaring_models.py !}
 ```
 
-Although this looks very simple, in fact **Saffier** is doing a lot of work for you behind the
-scenes.
+## A realistic model definition
+
+The following pattern is a more representative application model than a bare
+two-field example:
+
+```python
+class Team(saffier.Model):
+    id = saffier.IntegerField(primary_key=True, autoincrement=True)
+    name = saffier.CharField(max_length=120, unique=True)
+    is_active = saffier.BooleanField(default=True)
+
+    class Meta:
+        registry = models
+
+
+class User(saffier.Model):
+    id = saffier.IntegerField(primary_key=True, autoincrement=True)
+    email = saffier.EmailField(max_length=255, unique=True)
+    display_name = saffier.CharField(max_length=120)
+    team = saffier.ForeignKey(
+        Team,
+        on_delete=saffier.RESTRICT,
+        related_name="members",
+        null=True,
+    )
+    created_at = saffier.DateTimeField(auto_now_add=True)
+    updated_at = saffier.DateTimeField(auto_now=True)
+
+    class Meta:
+        registry = models
+        tablename = "users"
+```
+
+That single declaration gives you:
+
+* table generation metadata
+* validators for each field
+* the default `query` manager
+* reverse access via `team.members`
+* model instance methods such as `save()`, `update()`, `delete()`, and `load()`
 
 ## StrictModel
 
@@ -117,7 +157,7 @@ are applied to any [field](./fields.md) available in **Saffier**.
 
 ##### Declaring a model primary key different from ID
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/models/declaring_models_pk_no_id.py !}
 ```
 
@@ -132,7 +172,7 @@ When declaring an `id`, unless the field type is [IntegerField](./fields.md#inte
 [BigIntegerField](./fields.md#bigintegerfield), you should always declare a `default` or a
 `ValueError` is raised.
 
-```python hl_lines="9"
+```python
 {!> ../docs_src/models/pk_no_default.py !}
 ```
 
@@ -148,7 +188,7 @@ When it comes to primary keys, it is actually very simple and clean.
 This is for an explicit `primary_key` that you don't want to be the default, for example, a
 [UUIDField](./fields.md#uuidfield).
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/models/pk_with_default.py !}
 ```
 
@@ -205,7 +245,7 @@ approaches.
 
 #### In a nutshell
 
-```python hl_lines="5 13"
+```python
 {!> ../docs_src/models/registry/nutshell.py !}
 ```
 
@@ -216,7 +256,7 @@ then used in the `Meta` of the model.
 
 Yes, you can also use the model inheritance to help you out with your models and avoid repetition.
 
-```python hl_lines="5 14"
+```python
 {!> ../docs_src/models/registry/inheritance_no_repeat.py !}
 ```
 
@@ -232,7 +272,7 @@ What if your class is abstract? Can you inherit the registry anyway?
 
 Of course! That doesn't change anything with the registry.
 
-```python hl_lines="5 14"
+```python
 {!> ../docs_src/models/registry/inheritance_abstract.py !}
 ```
 
@@ -252,14 +292,14 @@ the python class name `User` and it will become `users` in your SQL Database.
 
 #### Model with a table name
 
-```python hl_lines="13"
+```python
 {!> ../docs_src/models/tablename/model_with_tablename.py !}
 ```
 
 Here the `tablename` is being explicitly declared as `users`. Although it matches with a
 puralisation of the python class name, this could also be something else.
 
-```python hl_lines="13"
+```python
 {!> ../docs_src/models/tablename/model_diff_tn.py !}
 ```
 
@@ -312,7 +352,7 @@ In this document we already mentioned abstract models and how to use them but le
 examples to be even clear.
 
 
-```python hl_lines="10"
+```python
 {!> ../docs_src/models/abstract/simple.py !}
 ```
 
@@ -326,7 +366,7 @@ case for these to be use in the first place.
 
 Let us see a more complex example and how to use it.
 
-```python hl_lines="10"
+```python
 {!> ../docs_src/models/abstract/common.py !}
 ```
 
@@ -388,7 +428,7 @@ declaring this simple **unique**. Via [saffier field](./fields.md) directly or v
 
 ##### Within the saffier field
 
-```python hl_lines="10"
+```python
 {!> ../docs_src/models/unique_together/simple.py !}
 ```
 
@@ -396,7 +436,7 @@ In the field you can declare directly `unique` and that is about it.
 
 ##### With unique_together
 
-```python hl_lines="15"
+```python
 {!> ../docs_src/models/unique_together/simple2.py !}
 ```
 
@@ -420,7 +460,7 @@ to one database field only.
 
 ##### When you need more than one field, independently, to be unique
 
-```python hl_lines="15"
+```python
 {!> ../docs_src/models/unique_together/complex_independent.py !}
 ```
 
@@ -434,7 +474,7 @@ For this we used a **list of strings**.
 
 ##### When you need more than one field, together, to be unique
 
-```python hl_lines="15"
+```python
 {!> ../docs_src/models/unique_together/complex_together.py !}
 ```
 
@@ -445,7 +485,7 @@ For this we used a **list of tuple of strings**.
 
 ##### When you need more than combined key, to be unique
 
-```python hl_lines="17-21"
+```python
 {!> ../docs_src/models/unique_together/complex_combined.py !}
 ```
 
@@ -458,7 +498,7 @@ For this we used a **list of tuples of strings**.
 
 There are also cases when you want to mix it all up and this is also possible.
 
-```python hl_lines="17-22"
+```python
 {!> ../docs_src/models/unique_together/complex_mixed.py !}
 ```
 
@@ -475,13 +515,13 @@ For this we used a **list of tuples of strings as well as strings**.
 This is another clean way of adding the unique together constrainst. This can be used also with
 the other ways of adding unique together shown in the above examples.
 
-```python hl_lines="2 17-22"
+```python
 {!> ../docs_src/models/unique_together/constraints/complex.py !}
 ```
 
 **Or mixing both**
 
-```python hl_lines="2 17-22"
+```python
 {!> ../docs_src/models/unique_together/constraints/mixing.py !}
 ```
 
@@ -518,19 +558,19 @@ The simplest and cleanest way of declaring an index with **Saffier**. You declar
 the model field.
 
 
-```python hl_lines="10"
+```python
 {!> ../docs_src/models/indexes/simple.py !}
 ```
 
 #### With indexes in the meta
 
-```python hl_lines="15"
+```python
 {!> ../docs_src/models/indexes/simple2.py !}
 ```
 
 #### With complex indexes in the meta
 
-```python hl_lines="16-19"
+```python
 {!> ../docs_src/models/indexes/complex_together.py !}
 ```
 

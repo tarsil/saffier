@@ -47,7 +47,7 @@ from generated through models.
 Imagine you have a model `Team` that has a [ForeignKey][foreign_keys] to another model
 `Organisation`.
 
-```python title="models.py" hl_lines="16"
+```python title="models.py"
 {!> ../docs_src/queries/related_name/example.py !}
 ```
 
@@ -62,7 +62,7 @@ Let us create three models:
 * Team
 * Member
 
-```python title="models.py" hl_lines="16 24-27"
+```python title="models.py"
 {!> ../docs_src/queries/related_name/models.py !}
 ```
 
@@ -138,7 +138,7 @@ Ok, lets now add two more models to our example.
 
 We should now have something like this:
 
-```python title="models.py" hl_lines="38-40 47"
+```python title="models.py"
 {!> ../docs_src/queries/related_name/new_models.py !}
 ```
 
@@ -154,7 +154,7 @@ And the corresponding **related names**:
 
 Let us also add some data into the database.
 
-```python hl_lines="16-17"
+```python
 {!> ../docs_src/queries/related_name/new_data.py !}
 ```
 

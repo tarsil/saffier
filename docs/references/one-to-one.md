@@ -1,23 +1,29 @@
-# **`OneToOne`** class
+# `OneToOneField`
 
-`OneToOneField` supports `embed_parent=("path", "attr")` for reverse relation querysets.
-When a reverse queryset is loaded through that relation, Saffier returns the embedded parent
-object at `path` and attaches the intermediate model on `attr`.
+`OneToOneField` is the unique variant of `ForeignKey`.
 
-When `related_name` is omitted, the reverse accessor is singular. A model declared as
-`profile = saffier.OneToOneField(Profile, ...)` is available as `profile.person`, not
-`profile.persons_set`, and the reverse accessor supports `add()`, `create()`, and `remove()`.
+It behaves like a foreign key at declaration and query time, but the generated
+relation columns are unique and the reverse accessor is singular by default.
+
+## Practical example
 
 ```python
 class Profile(saffier.Model):
-    user = saffier.OneToOneField(User, related_name="profile")
-    profile = saffier.OneToOneField(
-        "SuperProfile",
-        related_name="profile",
-        embed_parent=("user", "normal_profile"),
-    )
+    id = saffier.IntegerField(primary_key=True, autoincrement=True)
+    user = saffier.OneToOneField("User", on_delete=saffier.CASCADE)
+
+    class Meta:
+        registry = models
 ```
 
+## Reverse behavior
+
+When `related_name` is omitted, Saffier generates a singular reverse accessor
+from the declaring model name. That means a `Profile.user` relation typically
+becomes `user.profile`, not `user.profiles_set`.
+
+For reverse one-to-one relations, `remove()` can omit the child object because
+at most one related row can exist.
 
 ::: saffier.OneToOneField
     options:

@@ -1,9 +1,18 @@
+"""Exception types exposed by Saffier."""
+
 import typing
 
 from saffier.core.utils.base import BaseError
 
 
 class SaffierException(Exception):
+    """Base exception for Saffier runtime failures.
+
+    Args:
+        *args: Positional message fragments appended to the error text.
+        detail: Optional structured detail used by higher-level callers.
+    """
+
     def __init__(
         self,
         *args: typing.Any,
@@ -21,61 +30,80 @@ class SaffierException(Exception):
         return "".join(self.args).strip()
 
 
-class ObjectNotFound(SaffierException): ...
+class ObjectNotFound(SaffierException):
+    """Raised when a query expecting one row cannot find a match."""
 
 
 DoesNotFound = ObjectNotFound
 
 
-class MultipleObjectsReturned(SaffierException): ...
+class MultipleObjectsReturned(SaffierException):
+    """Raised when a query expecting one row matches multiple rows."""
 
 
-class ValidationError(BaseError): ...
+class ValidationError(BaseError):
+    """Raised when field or schema validation fails."""
 
 
-class ImproperlyConfigured(SaffierException): ...
+class ImproperlyConfigured(SaffierException):
+    """Raised when Saffier configuration is inconsistent or incomplete."""
 
 
-class FieldDefinitionError(SaffierException): ...
+class FieldDefinitionError(SaffierException):
+    """Raised when a field declaration uses incompatible options."""
 
 
-class ForeignKeyBadConfigured(SaffierException): ...
+class ForeignKeyBadConfigured(SaffierException):
+    """Raised when reverse relation wiring detects a conflicting foreign key."""
 
 
-class RelationshipIncompatible(SaffierException): ...
+class RelationshipIncompatible(SaffierException):
+    """Raised when relation helpers receive an object of the wrong model type."""
 
 
-class DuplicateRecordError(SaffierException): ...
+class DuplicateRecordError(SaffierException):
+    """Raised when a create path detects a row that already exists."""
 
 
-class RelationshipNotFound(SaffierException): ...
+class RelationshipNotFound(SaffierException):
+    """Raised when a requested relationship row or model cannot be resolved."""
 
 
-class QuerySetError(SaffierException): ...
+class QuerySetError(SaffierException):
+    """Raised when queryset construction or execution cannot proceed."""
 
 
-class ModelReferenceError(SaffierException): ...
+class ModelReferenceError(SaffierException):
+    """Raised when `RefForeignKey` references cannot be matched or persisted."""
 
 
-class SchemaError(SaffierException): ...
+class SchemaError(SaffierException):
+    """Raised for schema-management failures."""
 
 
-class SignalError(SaffierException): ...
+class SignalError(SaffierException):
+    """Raised when signal registration or dispatch is invalid."""
 
 
-class CommandEnvironmentError(SaffierException): ...
+class CommandEnvironmentError(SaffierException):
+    """Raised when CLI discovery cannot determine the application environment."""
 
 
-class MarshallFieldDefinitionError(FieldDefinitionError): ...
+class MarshallFieldDefinitionError(FieldDefinitionError):
+    """Raised when marshall field definitions are inconsistent."""
 
 
-class DatabaseNotConnectedWarning(UserWarning): ...
+class DatabaseNotConnectedWarning(UserWarning):
+    """Warning emitted when database-dependent code runs without a live connection."""
 
 
-class SuspiciousFileOperation(SaffierException): ...
+class SuspiciousFileOperation(SaffierException):
+    """Raised when a storage operation escapes an allowed path boundary."""
 
 
-class FileOperationError(SaffierException): ...
+class FileOperationError(SaffierException):
+    """Raised when storage backends fail to complete a file operation."""
 
 
-class InvalidStorageError(ImproperlyConfigured): ...
+class InvalidStorageError(ImproperlyConfigured):
+    """Raised when a configured storage backend cannot be loaded."""

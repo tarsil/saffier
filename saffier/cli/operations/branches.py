@@ -11,5 +11,8 @@ from saffier.cli.state import get_migration_app
 
 @command
 def branches(verbose: VerboseOption, directory: DirectoryOption) -> None:
-    """Show current branch points"""
+    """Show current migration branch points.
+
+    This is a thin CLI wrapper around the shared Alembic integration helper.
+    """
     _branches(get_migration_app(), directory, verbose)

@@ -49,7 +49,7 @@ the relation from either side.
 
 Let us see how it looks by using the following example.
 
-```python hl_lines="17"
+```python
 {!> ../docs_src/queries/manytomany/example.py !}
 ```
 
@@ -57,7 +57,7 @@ Let us see how it looks by using the following example.
 
 You can now add teams to organisations, something like this.
 
-```python hl_lines="6-7"
+```python
 blue_team = await Team.query.create(name="Blue Team")
 green_team = await Team.query.create(name="Green Team")
 organisation = await Organisation.query.create(ident="Acme Ltd")
@@ -88,7 +88,7 @@ await organisation.teams.remove_many(blue_team, red_team)
 
 You can now remove teams from organisations, something like this.
 
-```python hl_lines="12-13"
+```python
 blue_team = await Team.query.create(name="Blue Team")
 green_team = await Team.query.create(name="Green Team")
 red_team = await Team.query.create(name="Red Team")
@@ -174,7 +174,7 @@ team = await organisation.teams.filter(membership__team__name="Blue Team").get()
 
 ##### Example with related name
 
-```python hl_lines="17"
+```python
 {!> ../docs_src/queries/manytomany/example.py !}
 ```
 
@@ -185,7 +185,7 @@ team = await organisation.teams.filter(membership__team__name="Blue Team").get()
 
 You can now query normally, something like this.
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/queries/manytomany/query_example.py !}
 ```
 

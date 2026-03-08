@@ -19,7 +19,14 @@ SaffierModel = _SaffierModel | ReflectSaffierModel
 
 @runtime_checkable
 class QuerySetProtocol(Protocol):
-    """Defines the what needs to be implemented when using the ManyRelationProtocol"""
+    """Structural contract for queryset-like objects consumed by Saffier.
+
+    The protocol is intentionally broad because relation managers, helper
+    classes, and extension points only need duck-typed access to a queryset
+    surface. Implementations are expected to support cloning, filtering,
+    execution, pagination, and bulk mutation methods compatible with the core
+    `QuerySet` class.
+    """
 
     def filter(self, **kwargs: Any) -> "QuerySet": ...
 

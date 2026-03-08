@@ -1,16 +1,41 @@
 # Queries
 
-Making queries is a must when using an ORM and being able to make complex queries is even better
-when allowed.
+Querying is where Saffier's Django-like API meets SQLAlchemy Core's execution
+model.
 
-SQLAlchemy is known for its performance when querying a database and it is very fast. The core
-being part of **Saffier** also means that saffier performs extremely well when doing it.
+Managers hand out querysets, querysets accumulate query state lazily, and the
+database is only touched when you execute a terminal operation such as `get()`,
+`all()`, `create()`, `update()`, or `delete()`.
 
-When making queries in a [model][model], the ORM uses the [managers][managers] to
-perform those same actions.
+That means a good mental model for Saffier queries is:
 
-If you haven't yet seen the [models][model] and [managers][managers] section, now would
-be a great time to have a look and get yourself acquainted.
+1. build a queryset
+2. keep chaining until the intent is complete
+3. execute once
+
+If you have not yet read the [models][model] and [managers][managers] pages,
+read those first. Query behavior makes more sense once you know where the
+queryset comes from.
+
+## A realistic querying example
+
+```python
+recent_active_users = (
+    User.query
+    .filter(is_active=True, email__icontains="@example.com")
+    .select_related("profile")
+    .order_by("-created_at")
+    .limit(50)
+)
+
+rows = await recent_active_users.all()
+```
+
+This example shows the most important queryset traits:
+
+* every method returns a new queryset
+* nothing executes until `all()` runs
+* relation loading is part of the query plan, not a side effect afterwards
 
 ## QuerySet
 
@@ -28,7 +53,7 @@ Let us assume you have the following `User` model defined.
 {!> ../docs_src/queries/model.py !}
 ```
 
-As mentioned before, Saffier returns queysets and simple objects and when queysets are returned
+As mentioned before, Saffier returns querysets and simple objects and when querysets are returned
 those can be chained together, for example, with `filter()` or `limit()`.
 
 ```python

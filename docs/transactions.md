@@ -37,7 +37,7 @@ it as example.
 
 **You can use whatever you want, from Starlette to FastAPI. It is your choice**.
 
-```python hl_lines="18"
+```python
 {!> ../docs_src/transactions/decorator.py!}
 ```
 
@@ -49,7 +49,7 @@ still valid to be implemented.
 This is probably the most common use-case for the majority of the applications where within a view
 or an operation, you will need to make some transactions that need atomocity.
 
-```python hl_lines="22"
+```python
 {!> ../docs_src/transactions/context_manager.py!}
 ```
 

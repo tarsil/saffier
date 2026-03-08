@@ -4,7 +4,7 @@ If you need to generate a `declarative_model` from SQLAlchemy ORM type, you can 
 `Model.declarative()`. Example, `User.declarative()`. This will automatically generate the
 declarative model type for you.
 
-```python hl_lines="23"
+```python
 {!> ../docs_src/models/declarative/example.py !}
 ```
 
@@ -14,7 +14,7 @@ for you automatically and append `relation` at the end of the declared field.
 
 Let us see an example.
 
-```python hl_lines="20-29"
+```python
 {!> ../docs_src/models/declarative/fk_relationship.py !}
 ```
 

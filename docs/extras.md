@@ -35,7 +35,7 @@ current Saffier bootstrap.
 Let us use [Ravyn](https://ravyn.dymmond.com) again as an example like we did for the
 [tips and tricks](./tips-and-tricks.md).
 
-```python hl_lines="12 47"
+```python
 {!> ../docs_src/extras/app.py !}
 ```
 

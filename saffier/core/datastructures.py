@@ -4,8 +4,10 @@ from typing import Any
 
 
 class HashableBaseModel:
-    """
-    Lightweight mutable object used by Saffier internals.
+    """Lightweight mutable object used by Saffier internals.
+
+    The class provides a predictable hash implementation while still allowing
+    dynamic attributes.
     """
 
     __slots__ = ("__dict__", "__weakref__")
@@ -25,6 +27,4 @@ class HashableBaseModel:
 
 
 class ArbitraryHashableBaseModel(HashableBaseModel):
-    """
-    Backwards-compatible alias for internals that allow dynamic attributes.
-    """
+    """Backward-compatible alias for hashable mutable helper objects."""

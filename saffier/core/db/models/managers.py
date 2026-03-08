@@ -1,3 +1,5 @@
+"""Manager descriptors used to bind query behavior to Saffier models."""
+
 import copy
 from typing import TYPE_CHECKING, Any, cast
 
@@ -10,6 +12,13 @@ if TYPE_CHECKING:
 
 
 class BaseManager:
+    """Base descriptor for model-bound queryset factories.
+
+    Concrete manager implementations mainly customize `get_queryset()` while the
+    descriptor behavior keeps track of the current owner model and bound
+    instance.
+    """
+
     queryset_class = QuerySet
 
     def __init__(
@@ -41,28 +50,17 @@ class BaseManager:
 
 
 class Manager(BaseManager):
-    """
-    Base Manager for the Saffier Models.
-    To create a custom manager, the best approach is to inherit from the ModelManager.
+    """Default manager descriptor for Saffier models.
 
-    Example:
-        from saffier.managers import ModelManager
-        from saffier.core.db.models import Model
+    A manager is both a descriptor and a queryset factory. Accessing it on a
+    model class returns a class-bound manager; accessing it on an instance
+    returns a shallow copy bound to that instance so schema and database context
+    can follow the instance.
 
-
-        class MyCustomManager(ModelManager):
-            ...
-
-
-        class MyOtherManager(ModelManager):
-            ...
-
-
-        class MyModel(saffier.Model):
-            query = MyCustomManager()
-            active = MyOtherManager()
-
-            ...
+    Examples:
+        class PublishedManager(saffier.Manager):
+            def get_queryset(self) -> saffier.QuerySet:
+                return super().get_queryset().filter(is_published=True)
     """
 
     def __get__(self, instance: Any, owner: Any) -> Any:
@@ -82,10 +80,14 @@ class Manager(BaseManager):
         return manager
 
     def get_queryset(self) -> "QuerySet":
-        """
-        Returns the queryset object.
+        """Build a queryset bound to the current model, instance, and schema context.
 
-        Checks for a global possible tenant and returns the corresponding queryset.
+        Returns:
+            QuerySet: Queryset configured for the active model, schema, and
+            database context.
+
+        Raises:
+            ImproperlyConfigured: If the manager is used on an abstract model.
         """
         if getattr(self.model_class.meta, "abstract", False):
             raise ImproperlyConfigured("Cannot query abstract models.")
@@ -136,6 +138,13 @@ class Manager(BaseManager):
 
 
 class RedirectManager(Manager):
+    """Manager proxy that forwards operations to another manager attribute.
+
+    Redirect managers are used for aliases such as `query_related`, where the
+    framework wants a second manager name with the same underlying queryset
+    behavior as another manager on the model.
+    """
+
     def __init__(self, *, redirect_name: str, **kwargs: Any) -> None:
         self.redirect_name = redirect_name
         super().__init__(**kwargs)

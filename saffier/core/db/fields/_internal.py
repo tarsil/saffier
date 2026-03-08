@@ -1,3 +1,5 @@
+"""Internal validator objects backing Saffier model fields."""
+
 import decimal
 import re
 import typing
@@ -24,8 +26,16 @@ NO_DEFAULT = object()
 
 
 class SaffierField(ArbitraryHashableBaseModel):
-    """
-    The base of all fields used by Saffier
+    """Base validator shared by all Saffier field types.
+
+    Args:
+        title: Optional display title used by schema generation.
+        description: Human-readable field description.
+        help_text: Additional guidance exposed by schema helpers.
+        default: Default value or callable default for the field.
+        null: Whether `None` is accepted.
+        read_only: Whether write-time validation should reject client input.
+        **kwargs: Additional model attributes forwarded to the base model.
     """
 
     error_messages: dict[str, str] = {}
@@ -86,8 +96,9 @@ class SaffierField(ArbitraryHashableBaseModel):
 
 
 class String(SaffierField):
-    """
-    SaffierField representation of a String.
+    """Validate textual input with length, format, and pattern checks.
+
+    This is the base validator behind most text-like Saffier fields.
     """
 
     error_messages: dict[str, str] = {
@@ -174,6 +185,11 @@ class String(SaffierField):
 
 
 class Number(SaffierField):
+    """Base numeric validator for integer, float, and decimal field types.
+
+    Concrete subclasses choose the target Python numeric type.
+    """
+
     field_type: typing.Any = None
     error_messages: dict[str, str] = {
         "type": "Must be a number.",
@@ -271,18 +287,38 @@ class Number(SaffierField):
 
 
 class Integer(Number):
+    """Integer-specialized numeric validator.
+
+    It coerces validated values to Python integers.
+    """
+
     field_type: typing.Any = int
 
 
 class Float(Number):
+    """Floating-point-specialized numeric validator.
+
+    It coerces validated values to Python floats.
+    """
+
     field_type: typing.Any = float
 
 
 class Decimal(Number):
+    """Decimal-specialized numeric validator.
+
+    It preserves fixed precision using `decimal.Decimal`.
+    """
+
     field_type: typing.Any = decimal.Decimal
 
 
 class Boolean(SaffierField):
+    """Validate booleans with optional coercion from common string values.
+
+    String and integer truthy/falsy forms can be normalized when enabled.
+    """
+
     error_messages: dict[str, str] = {
         "type": "Must be a boolean.",
         "null": "May not be null.",
@@ -325,6 +361,12 @@ class Boolean(SaffierField):
 
 
 class Duration(SaffierField):
+    """Validate `timedelta` values or second-like numeric input.
+
+    Numeric and string inputs are interpreted as seconds when coercion is
+    enabled.
+    """
+
     error_messages: dict[str, str] = {
         "type": "Must be a timedelta or seconds.",
         "null": "May not be null.",
@@ -355,6 +397,11 @@ class Duration(SaffierField):
 
 
 class Binary(SaffierField):
+    """Validate bytes-like payloads for binary storage fields.
+
+    The validator can enforce a maximum payload length.
+    """
+
     error_messages: dict[str, str] = {
         "type": "Must be bytes.",
         "null": "May not be null.",
@@ -391,6 +438,11 @@ class Binary(SaffierField):
 
 
 class Choice(SaffierField):
+    """Validate that a value belongs to a predefined set of choices.
+
+    Choices are normalized to `(value, label)` pairs during initialization.
+    """
+
     error_messages: dict[str, str] = {
         "null": "May not be null.",
         "required": "This field is required.",
@@ -427,26 +479,51 @@ class Choice(SaffierField):
 
 
 class Text(String):
+    """String validator configured for unconstrained text values.
+
+    It simply pins the string format to `"text"`.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="text", **kwargs)
 
 
 class Date(String):
+    """String validator configured for date input.
+
+    Parsed values are returned as `datetime.date`.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="date", **kwargs)
 
 
 class Time(String):
+    """String validator configured for time input.
+
+    Parsed values are returned as `datetime.time`.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="time", **kwargs)
 
 
 class DateTime(String):
+    """String validator configured for datetime input.
+
+    Parsed values are returned as `datetime.datetime`.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="datetime", **kwargs)
 
 
 class Union(SaffierField):
+    """Validate a value against multiple candidate validators.
+
+    The first child validator that succeeds determines the final value.
+    """
+
     error_messages: dict[str, str] = {
         "null": "May not be null.",
         "union": "Did not match any valid type.",
@@ -485,13 +562,19 @@ class Union(SaffierField):
 
 
 class Any(SaffierField):
+    """Pass-through validator that accepts any value.
+
+    It is used for virtual or intentionally unconstrained fields.
+    """
+
     def check(self, value: typing.Any) -> typing.Any:
         return value
 
 
 class Const(SaffierField):
-    """
-    Only ever matches the given given value.
+    """Validate that a value exactly matches a predefined constant.
+
+    This is useful for fixed sentinel values in schema validation.
     """
 
     error_messages: dict[str, str] = {
@@ -513,25 +596,52 @@ class Const(SaffierField):
 
 
 class UUID(String):
+    """String validator configured for UUID input.
+
+    Parsed values are returned as `uuid.UUID`.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="uuid", **kwargs)
 
 
 class Email(String):
+    """String validator configured for e-mail input.
+
+    It delegates parsing to the low-level e-mail formatter.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="email", **kwargs)
 
 
 class Password(String):
+    """String validator configured for password-like input.
+
+    It validates password-shaped strings without hashing them.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="password", **kwargs)
 
 
 class IPAddress(String):
+    """String validator configured for IP address input.
+
+    Parsed values are returned as `ipaddress` objects.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="ipaddress", **kwargs)
 
 
 class URL(String):
+    """String validator configured for absolute URL input.
+
+    The validator delegates parsing to `pydantic_core` and accepts the same URL
+    forms supported there, returning a normalized URL object on successful
+    validation.
+    """
+
     def __init__(self, **kwargs: typing.Any) -> None:
         super().__init__(format="url", **kwargs)

@@ -1,3 +1,5 @@
+"""Reverse relation descriptors for foreign-key and one-to-one fields."""
+
 import functools
 import warnings
 from collections.abc import Sequence
@@ -16,9 +18,12 @@ _undefined = object()
 
 
 class RelatedField:
-    """
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
+    """Descriptor that exposes reverse foreign-key style accessors.
+
+    A `RelatedField` behaves like a queryset factory bound to a parent instance
+    while also supporting staged reverse writes such as `add()`, `create()`, and
+    `remove()`. It is the object behind auto-generated reverse relations such as
+    `user.posts_set` or singular one-to-one reverse accessors.
     """
 
     def __init__(
@@ -43,7 +48,11 @@ class RelatedField:
 
     @functools.cached_property
     def manager(self) -> "Manager":
-        """Returns the manager class"""
+        """Return the manager used to service reverse relation queries.
+
+        `query_related` takes precedence when present so models can customize
+        reverse access independently from the default manager.
+        """
         manager = getattr(self.related_from, "query_related", None)
         if manager is None:
             manager = self.related_from.meta.manager  # type: ignore[attr-defined]
@@ -116,6 +125,16 @@ class RelatedField:
         database: Any = _undefined,
         schema: Any = _undefined,
     ) -> "QuerySet":
+        """Return the reverse queryset bound to a specific database or schema.
+
+        Args:
+            _positional: Deprecated positional schema argument.
+            database: Optional database override.
+            schema: Optional schema override.
+
+        Returns:
+            QuerySet: Reverse queryset scoped to the parent instance.
+        """
         if _positional is not _sentinel:
             warnings.warn(
                 "Passing positional arguments to using is deprecated. Use schema= instead.",
@@ -134,9 +153,11 @@ class RelatedField:
         return self._configure_queryset(queryset)
 
     def m2m_related(self) -> Any:
-        """
-        Guarantees the the m2m filter is done by the owner of the call
-        and not by the children.
+        """Return through-model FK field names used by reverse many-to-many access.
+
+        Returns:
+            Any: Related through-field names, or `None` for non-many-to-many
+            reverse relations.
         """
         if not self.related_from.meta.is_multi:  # type: ignore
             return
@@ -200,9 +221,10 @@ class RelatedField:
         )[self.related_name]
 
     def __getattr__(self, item: Any) -> Any:
-        """
-        Gets the attribute from the queryset and if it does not
-        exist, then lookup in the model.
+        """Delegate unknown attributes to the scoped queryset or source model.
+
+        Queryset methods such as `filter()` and terminal methods such as
+        `create()` are exposed transparently through the reverse relation object.
         """
         if item in {"create", "get_or_create", "update_or_create"}:
             attr = getattr(self.queryset, item)
@@ -217,11 +239,10 @@ class RelatedField:
         return func
 
     def get_foreign_key_field_name(self) -> str:
-        """
-        Table lookup for the given field containing the related field.
+        """Resolve the child foreign-key field that points back to the parent.
 
-        If there is no field with the related_name declared, find the first field
-        with the FK to the related_to.
+        Returns:
+            str: Field name on `related_from` that targets the parent model.
         """
         for field, value in self.related_from.fields.items():  # type: ignore
             if isinstance(value, (fields.ForeignKey, fields.OneToOneField)) and (
@@ -278,6 +299,14 @@ class RelatedField:
         return wrapped
 
     def stage(self, *children: Any) -> None:
+        """Queue reverse children to be persisted after the parent saves.
+
+        Args:
+            *children: Child instances or dictionaries accepted by the relation.
+
+        Raises:
+            RelationshipIncompatible: If a staged child has the wrong type.
+        """
         for child in children:
             if self.is_m2m:
                 related_names = self.m2m_related() or []
@@ -324,6 +353,19 @@ class RelatedField:
         return results
 
     async def add(self, child: Any) -> Any:
+        """Attach one child to the reverse relation.
+
+        Dictionaries are converted into model instances before being persisted.
+        For many-to-many reverse accessors, a through-row is created if it does
+        not already exist.
+
+        Args:
+            child: Child instance or dictionary payload.
+
+        Returns:
+            Any: Persisted child instance, or `None` when the relation already
+            exists or the insert fails with an integrity error.
+        """
         if self.is_m2m:
             related_names = self.m2m_related() or []
             if not related_names:
@@ -380,6 +422,16 @@ class RelatedField:
             await self.remove(child)
 
     async def remove(self, child: Any | None = None) -> None:
+        """Remove one child from the reverse relation.
+
+        Args:
+            child: Child instance to detach. For unique relations it may be
+                omitted and will be resolved automatically.
+
+        Raises:
+            RelationshipNotFound: If the requested relation does not exist.
+            RelationshipIncompatible: If `child` has the wrong model type.
+        """
         foreign_key = self.foreign_key
         if child is None:
             if getattr(foreign_key, "unique", False):

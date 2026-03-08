@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class TenantMixin(saffier.Model):
-    """
-    Abstract table that acts as an entry-point for
-    the tenants with saffier contrib.
+    """Abstract base model for tenant records.
+
+    The mixin stores tenant identity and schema metadata, and its save/delete
+    hooks coordinate schema creation and teardown for schema-based multi-tenancy.
     """
 
     schema_name = saffier.CharField(max_length=63, unique=True, index=True)
@@ -87,8 +88,10 @@ class TenantMixin(saffier.Model):
         return cast("type[TenantMixin]", tenant)
 
     async def delete(self, force_drop: bool = False) -> None:
-        """
-        Validates the permissions for the schema before deleting it.
+        """Delete the tenant row after validating schema-drop rules.
+
+        Args:
+            force_drop: Reserved for backward compatibility.
         """
         if self.schema_name == settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
@@ -100,8 +103,10 @@ class TenantMixin(saffier.Model):
 
 
 class DomainMixin(saffier.Model):
-    """
-    All models that store the domains must use this class
+    """Abstract base model for domains attached to tenants.
+
+    The mixin enforces one primary domain per tenant and protects the configured
+    public domain from accidental deletion.
     """
 
     domain = saffier.CharField(max_length=253, unique=True, db_index=True)
@@ -143,8 +148,10 @@ class DomainMixin(saffier.Model):
 
 
 class TenantUserMixin(saffier.Model):
-    """
-    Mapping between user and a client (tenant).
+    """Abstract join model mapping users to tenants.
+
+    The mixin tracks the active tenant per user and ensures only one mapping is
+    active at a time.
     """
 
     user = saffier.ForeignKey(
@@ -170,8 +177,13 @@ class TenantUserMixin(saffier.Model):
 
     @classmethod
     async def get_active_user_tenant(cls, user: type["Model"]) -> type["Model"] | None:
-        """
-        Obtains the active user tenant.
+        """Return the active tenant for one user, if any.
+
+        Args:
+            user: User model instance whose tenant mapping should be resolved.
+
+        Returns:
+            type[Model] | None: Active tenant model or `None`.
         """
         try:
             tenant = await get_model(  # type: ignore

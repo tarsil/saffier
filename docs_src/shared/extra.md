@@ -25,7 +25,7 @@ Nothing like a good example to simplify those possible confusing thoughts.
 Let us assume we want to `bulk_create` some users in the
 `alternative` database instead of the `default`.
 
-```python hl_lines="6-7"
+```python
 {!> ../docs_src/registry/extra/declaration.py !}
 ```
 
@@ -34,7 +34,7 @@ model **as required**.
 
 Now we can simply use that connection and create the data in the `alternative` database.
 
-```python hl_lines="23"
+```python
 {!> ../docs_src/registry/extra/create.py !}
 ```
 

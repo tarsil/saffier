@@ -27,7 +27,7 @@ This will create a table called `users` in the database as expected.
 
 Now you want to reflect the existing table `users` from the database into your models (code).
 
-```python hl_lines="8"
+```python
 {!> ../docs_src/reflection/reflect.py !}
 ```
 
@@ -68,7 +68,7 @@ field is **mandatory** and it will raise an `ImproperlyConfigured` error if no r
 
 Example:
 
-```python hl_lines="13 14"
+```python
 {!> ../docs_src/reflection/reflect.py !}
 ```
 
@@ -79,7 +79,7 @@ the reflected database table or view.
 
 Example:
 
-```python hl_lines="9 10"
+```python
 {!> ../docs_src/reflection/reflect.py !}
 ```
 
@@ -108,7 +108,7 @@ Now imagine somewhere in another application you want to reflect the existing `u
 
 Your reflect model would look like this:
 
-```python hl_lines="9-11"
+```python
 {!> ../docs_src/reflection/reflect/reflect.py !}
 ```
 

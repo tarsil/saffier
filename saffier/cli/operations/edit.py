@@ -7,5 +7,8 @@ from saffier.cli.state import get_migration_app
 
 @command
 def edit(revision: RevisionHeadArgument, directory: DirectoryOption) -> None:
-    """Edit a revision file"""
+    """Open the selected migration revision in the configured editor.
+
+    The actual editor integration is handled by Alembic.
+    """
     _edit(get_migration_app(), directory, revision)
