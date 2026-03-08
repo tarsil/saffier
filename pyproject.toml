@@ -88,6 +88,8 @@ test = [
     "types-orjson==3.6.2",
     "ruff>=0.14.2,<1.0.0",
     "ty>=0.0.1",
+    "pydantic",
+    "msgspec"
 ]
 
 dev = [
