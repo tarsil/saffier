@@ -273,7 +273,10 @@ class Migrate(BaseExtra):
 
 @catch_errors
 def list_templates() -> None:
-    """List all available migration repository templates."""
+    """List all available migration repository templates.
+
+    Each entry includes the template synopsis from its bundled README.
+    """
     config = Config()
     config.print_stdout("Available templates:\n")
 
@@ -290,7 +293,10 @@ def init(
     template: str | None = None,
     package: bool = False,
 ) -> None:
-    """Initialize a new Alembic migration repository for Saffier."""
+    """Initialize a new Alembic migration repository for Saffier.
+
+    The generated repository is ready for Saffier's migration commands and docs.
+    """
     if directory is None:
         directory = str(settings.migration_directory)
 
@@ -379,7 +385,10 @@ def migrate(
 
 @catch_errors
 def edit(app: typing.Any | None, directory: str | None = None, revision: str = "current") -> None:
-    """Open a revision file in Alembic's configured editor."""
+    """Open a revision file in Alembic's configured editor.
+
+    This delegates to Alembic's native `edit` command when supported.
+    """
     if alembic_version >= (1, 9, 4):
         config = _get_config(app, directory)
         command.edit(config, revision)
@@ -396,7 +405,10 @@ def merge(
     branch_label: str | None = None,
     revision_id: str | None = None,
 ) -> None:
-    """Merge multiple revision heads into a new migration file."""
+    """Merge multiple revision heads into a new migration file.
+
+    The resulting revision records the provided heads as merge points.
+    """
     config = _get_config(app, directory)
     command.merge(
         config, revisions, message=message, branch_label=branch_label, rev_id=revision_id
@@ -412,7 +424,10 @@ def upgrade(
     tag: str | None = None,
     arg: typing.Any | None = None,
 ) -> None:
-    """Upgrade the database to a later revision."""
+    """Upgrade the database to a later revision.
+
+    The command respects SQL-output and custom Alembic tag arguments.
+    """
     config = _get_config(app, directory, arg=arg)
     command.upgrade(config, revision, sql=sql, tag=tag)
 
@@ -426,7 +441,10 @@ def downgrade(
     tag: str | None = None,
     arg: typing.Any | None = None,
 ) -> None:
-    """Downgrade the database to an earlier revision."""
+    """Downgrade the database to an earlier revision.
+
+    SQL-output mode follows Alembic's downgrade semantics and revision syntax.
+    """
     config = _get_config(app, directory, arg=arg)
     if sql and revision == "-1":
         revision = "head:-1"
@@ -439,7 +457,10 @@ def show(
     directory: str | None = None,
     revision: str = "head",
 ) -> None:
-    """Show the revision denoted by the given symbol."""
+    """Show the revision denoted by the given symbol.
+
+    This prints the revision script metadata and message details.
+    """
     config = _get_config(app, directory)
     command.show(config, revision)
 
@@ -452,7 +473,10 @@ def history(
     verbose: bool = False,
     indicate_current: bool = False,
 ) -> None:
-    """List changeset scripts in chronological order."""
+    """List changeset scripts in chronological order.
+
+    Optional flags can include verbose details and current-revision markers.
+    """
     config = _get_config(app, directory)
     command.history(config, rev_range, verbose=verbose, indicate_current=indicate_current)
 
@@ -464,21 +488,30 @@ def heads(
     verbose: bool = False,
     resolve_dependencies: bool = False,
 ) -> None:
-    """Show available revision heads in the migration repository."""
+    """Show available revision heads in the migration repository.
+
+    Dependency resolution can be enabled when supported by Alembic.
+    """
     config = _get_config(app, directory)
     command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
 @catch_errors
 def branches(app: typing.Any | None, directory: str | None = None, verbose: bool = False) -> None:
-    """Show branch points in the migration history."""
+    """Show branch points in the migration history.
+
+    This is useful when the repository contains diverging migration heads.
+    """
     config = _get_config(app, directory)
     command.branches(config, verbose=verbose)
 
 
 @catch_errors
 def current(app: typing.Any | None, directory: str | None = None, verbose: bool = False) -> None:
-    """Display the current database revision."""
+    """Display the current database revision.
+
+    Verbose mode includes more Alembic metadata for the current state.
+    """
     config = _get_config(app, directory)
     command.current(config, verbose=verbose)
 
@@ -502,6 +535,9 @@ def check(
     app: typing.Any | None,
     directory: str | None = None,
 ) -> None:
-    """Check whether model changes would generate new migration operations."""
+    """Check whether model changes would generate new migration operations.
+
+    It is a lightweight guard for CI and release workflows.
+    """
     config = _get_config(app, directory)
     command.check(config)

@@ -429,15 +429,28 @@ class Q:
 
 
 def or_(*args: Any, **kwargs: Any) -> Any:
-    """Return a raw SQLAlchemy `OR` clause for the provided expressions."""
+    """Return a raw SQLAlchemy `OR` clause.
+
+    This helper mirrors `sqlalchemy.or_` so callers can import the clause
+    builder from Saffier's queryset namespace without reaching into SQLAlchemy
+    directly.
+    """
     return sqlalchemy.or_(*args, **kwargs)
 
 
 def and_(*args: Any, **kwargs: Any) -> Any:
-    """Return a raw SQLAlchemy `AND` clause for the provided expressions."""
+    """Return a raw SQLAlchemy `AND` clause.
+
+    This helper mirrors `sqlalchemy.and_` so callers can compose manual clause
+    trees alongside regular Saffier lookups.
+    """
     return sqlalchemy.and_(*args, **kwargs)
 
 
 def not_(*args: Any, **kwargs: Any) -> Any:
-    """Return a raw SQLAlchemy `NOT` clause for the provided expressions."""
+    """Return a raw SQLAlchemy `NOT` clause.
+
+    This helper mirrors `sqlalchemy.not_` for manual clause composition inside
+    queryset filters.
+    """
     return sqlalchemy.not_(*args, **kwargs)

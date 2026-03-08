@@ -27,5 +27,8 @@ def history(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """List migration revisions in chronological order."""
+    """List migration revisions in chronological order.
+
+    Revision range and verbosity options are passed through unchanged.
+    """
     _history(get_migration_app(), directory, rev_range, verbose, indicate_current)

@@ -18,6 +18,9 @@ def inspect_db(
     ],
     schema: Annotated[str, Option(None, help="Database schema to be applied.")],
 ) -> None:
-    """Inspect an existing database and print Saffier `ReflectModel` definitions."""
+    """Inspect an existing database and print Saffier `ReflectModel` definitions.
+
+    The output is intended as a starting point for reflection-based model modules.
+    """
     inspect_db = InspectDB(database=database, schema=schema)
     inspect_db.inspect()

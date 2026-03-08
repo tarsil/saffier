@@ -15,14 +15,58 @@ saffier_setattr = object.__setattr__
 
 
 class ModelRow(SaffierBaseModel):
+    """Build model instances from raw SQLAlchemy row objects.
+
+    `ModelRow` centralizes the translation layer between SQLAlchemy result rows
+    and hydrated Saffier model instances. It is responsible for reconstructing
+    plain column values, lazy foreign-key placeholders, `select_related`
+    branches, `prefetch_related` payloads, and `reference_select` aliases from
+    one row payload.
+
+    The implementation is deliberately recursive because one SQL query can
+    describe an entire object graph. Nested `select_related` paths are resolved
+    first, then local foreign-key placeholders are populated, and finally any
+    prefetch instructions are executed against the already materialized root
+    instance.
+    """
+
     @staticmethod
     def _row_value(row: Row, key: str) -> Any:
+        """Return one value from a SQLAlchemy row mapping.
+
+        The SQLAlchemy result API may expose values either through the row's
+        mapping interface or as attributes. This helper hides that difference so
+        higher-level row loaders can ask for one key without caring how the
+        result object was produced.
+
+        Args:
+            row (Row): SQLAlchemy row produced by a compiled query.
+            key (str): Column or label name to resolve.
+
+        Returns:
+            Any: Resolved value, or `None` when the row does not expose `key`.
+        """
         if key in row._mapping:
             return row._mapping[key]
         return getattr(row, key, None)
 
     @classmethod
     def _table_row_value(cls, row: Row, table: Any, key: str) -> Any:
+        """Resolve a row value using table-column objects when available.
+
+        Joined queries may store row data under SQLAlchemy `Column` objects
+        instead of plain string keys. This helper first tries the concrete table
+        column and falls back to the generic key lookup used by `_row_value`.
+
+        Args:
+            row (Row): SQLAlchemy row produced by a query.
+            table (Any): SQLAlchemy table-like object exposing `.c`.
+            key (str): Column key to resolve.
+
+        Returns:
+            Any: Value associated with the requested column, or `None` when the
+            row does not contain it.
+        """
         column = getattr(getattr(table, "c", None), key, None)
         if column is not None and column in row._mapping:
             return row._mapping[column]
@@ -30,6 +74,21 @@ class ModelRow(SaffierBaseModel):
 
     @classmethod
     def _build_related_pk_filter(cls, path: str, row: Row, model_class: Any) -> dict[str, Any]:
+        """Build a queryset filter targeting one related object's primary key.
+
+        Prefetch helpers need a deterministic filter payload for related
+        lookups, even when the related model has a composite primary key. This
+        method expands the supplied path into one `path__pk_field=value` entry
+        per primary-key column.
+
+        Args:
+            path (str): Lookup prefix leading to the related model.
+            row (Row): Source row containing the root primary-key values.
+            model_class (Any): Model class or instance exposing `pknames`.
+
+        Returns:
+            dict[str, Any]: Keyword arguments suitable for queryset filtering.
+        """
         target_class = model_class if isinstance(model_class, type) else type(model_class)
         return {
             f"{path}__{pk_name}": cls._row_value(row, pk_name) for pk_name in target_class.pknames
@@ -42,6 +101,18 @@ class ModelRow(SaffierBaseModel):
         model: type["Model"],
         prefetch_related: Sequence["Prefetch"],
     ) -> type["Model"]:
+        """Apply prefetch directives to an already materialized model instance.
+
+        Args:
+            row (Row): Source row used to derive relation filters.
+            model (type[Model]): Model instance returned by row materialization.
+            prefetch_related (Sequence[Prefetch]): Prefetch directives attached
+                to the queryset.
+
+        Returns:
+            type[Model]: The same model instance after all prefetch targets have
+            been attached.
+        """
         if not prefetch_related:
             return model
         return await cls.__handle_prefetch_related_async(
@@ -66,19 +137,43 @@ class ModelRow(SaffierBaseModel):
         root_model_class: type["Model"] | None = None,
         prefix: str = "",
     ) -> type["Model"] | None:
-        """
-        Class method to convert a SQLAlchemy Row result into a SaffierModel row type.
+        """Convert one SQLAlchemy result row into a Saffier model instance.
 
-        Looping through select_related fields if the query comes from a select_related operation.
-        Validates if exists the select_related and related_field inside the models.
+        The loader reconstructs the requested object graph in three phases:
+        nested `select_related` branches are materialized first, local
+        foreign-key placeholders are populated next, and finally the base model
+        fields are copied from the row. Optional `only()`, `defer()`,
+        `reference_select()`, secret-field exclusion, and schema overrides are
+        all handled during the same pass so downstream queryset code receives a
+        fully consistent model instance.
 
-        When select_related and related_field exist for the same field being validated, the related
-        field is ignored as it won't override the value already collected from the select_related.
+        Args:
+            row (Row): SQLAlchemy row returned by the executed query.
+            select_related (Sequence[Any] | None): Related paths that were joined
+                into the query and should be materialized recursively.
+            prefetch_related (Sequence[Prefetch] | None): Deferred prefetch
+                instructions to apply after the base instance exists.
+            is_only_fields (bool): Whether the row was produced by an `only()`
+                queryset.
+            only_fields (Sequence[str] | None): Explicit field subset requested
+                by `only()`.
+            is_defer_fields (bool): Whether the row omits deferred fields.
+            exclude_secrets (bool): Whether secret fields should be left unloaded
+                on the resulting model.
+            using_schema (str | None): Schema override applied to generated table
+                lookups and related instances.
+            reference_select (dict[str, Any] | None): Extra row aliases to copy
+                onto the model or nested related objects.
+            tables_and_models (dict[str, tuple[Any, Any]] | None): Mapping
+                produced by queryset compilation for joined table aliases.
+            root_model_class (type[Model] | None): Root model being materialized
+                when recursion traverses into nested related models.
+            prefix (str): Prefix identifying the current join branch inside
+                `tables_and_models`.
 
-        If there is no select_related, then goes through the related field where it **should**
-        only return the instance of the the ForeignKey with the ID, making it lazy loaded.
-
-        :return: Model class.
+        Returns:
+            type[Model] | None: Materialized model instance, or `None` when a
+            nested branch cannot be populated from the row.
         """
         item: dict[str, Any] = {}
         select_related = select_related or []
@@ -279,6 +374,23 @@ class ModelRow(SaffierBaseModel):
         root_model_class: type["Model"],
         using_schema: str | None = None,
     ) -> None:
+        """Copy `reference_select()` aliases from a row onto the model tree.
+
+        `reference_select()` can target local attributes or nested related
+        objects. Nested dictionaries mirror the object graph and are traversed
+        recursively until a concrete row source is found.
+
+        Args:
+            model (type[Model] | None): Materialized model instance to mutate.
+            row (Row): Row containing the selected values.
+            references (dict[str, Any]): Mapping produced by queryset
+                compilation for reference selections.
+            tables_and_models (dict[str, tuple[Any, Any]] | None): Joined-table
+                lookup map used to resolve nested sources.
+            root_model_class (type[Model]): Root model for fallback column
+                resolution.
+            using_schema (str | None): Optional schema override for table lookup.
+        """
         if model is None:
             return
 
@@ -317,6 +429,26 @@ class ModelRow(SaffierBaseModel):
         root_model_class: type["Model"],
         using_schema: str | None = None,
     ) -> Any:
+        """Resolve one `reference_select()` source from the current row.
+
+        The source may already be a row key, a SQLAlchemy column-like object, or
+        a double-underscore path pointing at a joined table column.
+
+        Args:
+            row (Row): SQLAlchemy row containing the selected values.
+            source (Any): Raw source token stored in the reference-select map.
+            tables_and_models (dict[str, tuple[Any, Any]] | None): Joined-table
+                lookup map used for path-based resolution.
+            root_model_class (type[Model]): Root model used when a direct table
+                lookup is required.
+            using_schema (str | None): Optional schema override for table lookup.
+
+        Returns:
+            Any: Resolved value copied onto the model instance.
+
+        Raises:
+            QuerySetError: If the source cannot be resolved from the row.
+        """
         if source in row._mapping:
             return row._mapping[source]
 
@@ -353,6 +485,20 @@ class ModelRow(SaffierBaseModel):
         root_model_class: type["Model"],
         using_schema: str | None = None,
     ) -> Any | None:
+        """Resolve a string reference-select source into a SQLAlchemy column.
+
+        Args:
+            source (str): Column name or `join__path__column` lookup string.
+            tables_and_models (dict[str, tuple[Any, Any]] | None): Joined-table
+                lookup map keyed by queryset prefixes.
+            root_model_class (type[Model]): Root model used when no joined table
+                is specified.
+            using_schema (str | None): Optional schema override for table lookup.
+
+        Returns:
+            Any | None: Resolved SQLAlchemy column object, or `None` when the
+            column is not available.
+        """
         table = None
         column_name = source
 
@@ -374,6 +520,16 @@ class ModelRow(SaffierBaseModel):
 
     @classmethod
     def __apply_schema(cls, model: type["Model"], schema: str | None = None) -> type["Model"]:
+        """Attach a schema-specific table to one model instance when needed.
+
+        Args:
+            model (type[Model]): Model class or instance being prepared.
+            schema (str | None): Schema name requested by the queryset.
+
+        Returns:
+            type[Model]: The original `model`, potentially with its instance
+            table rebound to a schema-specific version.
+        """
         # Apply the schema to model instances without mutating class-level table caches.
         if schema is not None and not isinstance(model, type):
             model.table = model.build(schema)  # type: ignore
@@ -383,8 +539,20 @@ class ModelRow(SaffierBaseModel):
     def __should_ignore_related_name(
         cls, related_name: str, select_related: Sequence[str]
     ) -> bool:
-        """
-        Validates if it should populate the related field if select related is not considered.
+        """Return whether a foreign-key placeholder is covered by `select_related`.
+
+        When a joined related object is already being materialized recursively,
+        the loader must not also inject the lighter foreign-key placeholder for
+        the same attribute. Doing so would overwrite the fully populated related
+        instance.
+
+        Args:
+            related_name (str): Foreign-key attribute currently being evaluated.
+            select_related (Sequence[str]): Joined relation paths attached to the
+                queryset.
+
+        Returns:
+            bool: `True` when the foreign-key placeholder should be skipped.
         """
         for related_field in select_related:
             fields = related_field.split("__")
@@ -402,12 +570,29 @@ class ModelRow(SaffierBaseModel):
         original_prefetch: Optional["Prefetch"] = None,
         is_nested: bool = False,
     ) -> type["Model"]:
-        """
-        Handles any prefetch related scenario from the model.
-        Loads in advance all the models needed for a specific record
+        """Populate prefetched relations for one materialized model instance.
 
-        Recursively checks for the related field and validates if there is any conflicting
-        attribute. If there is, a `QuerySetError` is raised.
+        The synchronous implementation is used when row materialization already
+        runs inside sync-only code paths. It resolves plain relations,
+        many-to-many paths, and nested prefetch chains while guarding against
+        `to_attr` collisions on the destination model.
+
+        Args:
+            row (Row): Source row containing the root primary-key values.
+            model (type[Model]): Materialized model instance to enrich.
+            prefetch_related (Sequence[Prefetch]): Prefetch directives attached
+                to the queryset.
+            parent_cls (type[Model] | None): Parent object for nested traversal.
+            original_prefetch (Prefetch | None): Root prefetch object preserved
+                while recursion walks nested paths.
+            is_nested (bool): Whether the current call is processing a nested
+                branch.
+
+        Returns:
+            type[Model]: The same model instance with prefetched attributes set.
+
+        Raises:
+            QuerySetError: If `to_attr` would overwrite an existing attribute.
         """
         if not parent_cls:
             parent_cls = model
@@ -502,6 +687,25 @@ class ModelRow(SaffierBaseModel):
         original_prefetch: Optional["Prefetch"] = None,
         is_nested: bool = False,
     ) -> type["Model"]:
+        """Async variant of `__handle_prefetch_related`.
+
+        Args:
+            row (Row): Source row containing the root primary-key values.
+            model (type[Model]): Materialized model instance to enrich.
+            prefetch_related (Sequence[Prefetch]): Prefetch directives attached
+                to the queryset.
+            parent_cls (type[Model] | None): Parent object for nested traversal.
+            original_prefetch (Prefetch | None): Root prefetch object preserved
+                while recursion walks nested paths.
+            is_nested (bool): Whether the current call is processing a nested
+                branch.
+
+        Returns:
+            type[Model]: The same model instance with prefetched attributes set.
+
+        Raises:
+            QuerySetError: If `to_attr` would overwrite an existing attribute.
+        """
         if not parent_cls:
             parent_cls = model
 
@@ -579,8 +783,24 @@ class ModelRow(SaffierBaseModel):
         original_prefetch: "Prefetch",
         queryset: "QuerySet",
     ) -> list[type["Model"]]:
-        """
-        Processes the nested prefetch related names.
+        """Resolve one nested reverse-relation prefetch synchronously.
+
+        Nested prefetches such as `"team__members"` need to be rewritten into a
+        queryset filter rooted at the child model. This helper derives the child
+        foreign-key path, injects the current parent primary-key values, and
+        executes the resulting queryset.
+
+        Args:
+            row (Row): Source row containing the current parent identifiers.
+            prefetch_related (Prefetch): Current nested prefetch branch.
+            parent_cls (type[Model]): Parent model instance used to derive the
+                related filter.
+            original_prefetch (Prefetch): Root prefetch declaration from the
+                queryset.
+            queryset (QuerySet): Queryset used to load the related records.
+
+        Returns:
+            list[type[Model]]: Prefetched related records for the current branch.
         """
         query_split = original_prefetch.related_name.split("__")
         query_split.reverse()
@@ -612,6 +832,20 @@ class ModelRow(SaffierBaseModel):
         original_prefetch: "Prefetch",
         queryset: "QuerySet",
     ) -> list[type["Model"]]:
+        """Async variant of `__process_nested_prefetch_related`.
+
+        Args:
+            row (Row): Source row containing the current parent identifiers.
+            prefetch_related (Prefetch): Current nested prefetch branch.
+            parent_cls (type[Model]): Parent model instance used to derive the
+                related filter.
+            original_prefetch (Prefetch): Root prefetch declaration from the
+                queryset.
+            queryset (QuerySet): Queryset used to load the related records.
+
+        Returns:
+            list[type[Model]]: Prefetched related records for the current branch.
+        """
         query_split = original_prefetch.related_name.split("__")
         query_split.reverse()
         query_split.pop(query_split.index(prefetch_related.related_name))
@@ -632,6 +866,19 @@ class ModelRow(SaffierBaseModel):
         related_name: str,
         queryset: Optional["QuerySet"] = None,
     ) -> list[type["Model"]]:
+        """Collect prefetched records reachable through an attribute path.
+
+        Args:
+            model (type[Model]): Root model instance that already exists.
+            related_name (str): Relation path, including nested `__` segments.
+            queryset (QuerySet | None): Optional queryset used to constrain the
+                collected records by primary key.
+
+        Returns:
+            list[type[Model]]: Related records discovered through the path. When
+            `queryset` is provided, the returned records come from that queryset
+            filtered to the discovered primary keys.
+        """
         records = await cls.__traverse_prefetch_path(model, related_name.split("__"))
         if queryset is None:
             return records
@@ -656,6 +903,16 @@ class ModelRow(SaffierBaseModel):
         model: type["Model"],
         path_parts: Sequence[str],
     ) -> list[type["Model"]]:
+        """Traverse a relation path on an already materialized model tree.
+
+        Args:
+            model (type[Model]): Current model instance being inspected.
+            path_parts (Sequence[str]): Remaining relation segments to resolve.
+
+        Returns:
+            list[type[Model]]: Models found at the end of the path. Empty when
+            any segment is missing.
+        """
         if not path_parts:
             return [model]
 
@@ -679,8 +936,18 @@ class ModelRow(SaffierBaseModel):
         extra: dict[str, Any] | None = None,
         queryset: Optional["QuerySet"] = None,
     ) -> list[type["Model"]] | Any:
-        """
-        Runs a specific query against a given model with filters.
+        """Execute a relation-loading queryset with optional extra filters.
+
+        Args:
+            model (type[Model] | None): Model whose default manager should be
+                used when `queryset` is not supplied.
+            extra (dict[str, Any] | None): Additional filter keyword arguments
+                derived from the source row.
+            queryset (QuerySet | None): Explicit queryset to execute.
+
+        Returns:
+            list[type[Model]] | Any: Query result produced by the provided
+            queryset or the model's default manager.
         """
 
         if not queryset:

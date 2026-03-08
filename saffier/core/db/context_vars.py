@@ -17,7 +17,11 @@ EXPLICIT_SPECIFIED_VALUES: ContextVar[set[str] | None] = ContextVar(
 
 
 def get_tenant() -> str | None:
-    """Return the active tenant schema stored in the current context."""
+    """Return the tenant schema bound to the current async context.
+
+    Query construction and registry helpers consult this value to decide which
+    tenant schema should take precedence when multi-tenancy is enabled.
+    """
     return TENANT.get()
 
 

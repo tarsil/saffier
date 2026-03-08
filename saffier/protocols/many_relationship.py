@@ -14,7 +14,13 @@ if TYPE_CHECKING:  # pragma: nocover
 
 @runtime_checkable
 class ManyRelationProtocol(Protocol):
-    """Defines the what needs to be implemented when using the ManyRelationProtocol"""
+    """Structural contract for many-to-many relation manager implementations.
+
+    Many relation helpers inside Saffier only depend on a small async API for
+    staging, creating, attaching, and removing related records. Using a
+    protocol keeps those helpers independent from one concrete manager class
+    while still documenting the behavior expected by the ORM.
+    """
 
     instance: Model
 

@@ -21,5 +21,8 @@ def merge(
     revisions: Annotated[list[str], Argument(nargs=-1)],
     directory: DirectoryOption,
 ) -> None:
-    """Merge two or more revision heads into a new revision file."""
+    """Merge two or more revision heads into a new revision file.
+
+    This is the thin Sayer command wrapper around the migration helper.
+    """
     _merge(get_migration_app(), directory, revisions, message, branch_label, rev_id)

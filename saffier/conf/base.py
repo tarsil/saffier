@@ -100,7 +100,10 @@ class BaseSettings:
         self.post_init()
 
     def post_init(self) -> None:
-        """Hook for subclasses that need to finalize settings after initialization."""
+        """Hook for subclasses that need to finalize settings after initialization.
+
+        Subclasses override this when derived settings depend on resolved values.
+        """
 
     def _clone_default_value(self, key: str) -> Any:
         if hasattr(type(self), key):

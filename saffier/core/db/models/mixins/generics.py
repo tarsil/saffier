@@ -5,10 +5,21 @@ from sqlalchemy.orm import Mapped, relationship
 
 
 class DeclarativeMixin:
-    """Expose SQLAlchemy declarative-model generation for a Saffier model."""
+    """Expose SQLAlchemy declarative models derived from a Saffier model.
+
+    This mixin is the bridge used by integrations that need a classic
+    SQLAlchemy ORM class bound to the same table metadata and simple foreign-key
+    relationships already declared on the Saffier model.
+    """
 
     @classmethod
     def declarative(cls) -> typing.Any:
+        """Return the generated SQLAlchemy declarative model class.
+
+        Returns:
+            typing.Any: Declarative SQLAlchemy model created from the Saffier
+            model definition.
+        """
         return cls.generate_model_declarative()
 
     @classmethod

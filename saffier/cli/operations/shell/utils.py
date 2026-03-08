@@ -21,7 +21,10 @@ defaults.update(
 
 
 def welcome_message(app: Any) -> None:
-    """Render the interactive-shell banner for the current application."""
+    """Render the interactive-shell banner for the current application.
+
+    The banner includes the Saffier version, current time, and app name.
+    """
     now = datetime.datetime.now().strftime("%b %d %Y, %H:%M:%S")
     saffier_info_date = f"Saffier {saffier.__version__} (interactive shell, {now})"
     info = "Interactive shell that imports the application models and some python defaults."

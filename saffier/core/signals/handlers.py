@@ -6,7 +6,12 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Send:
-    """Decorator factory namespace for model lifecycle signal helpers."""
+    """Decorator factory namespace for model lifecycle signal helpers.
+
+    The class keeps the individual `pre_*` and `post_*` decorators thin while
+    centralizing the logic that binds one receiver function to one or more
+    model signal broadcasters.
+    """
 
     def consumer(signal: str, senders: type["Model"] | list[type["Model"]]) -> Callable:
         """Create a decorator that connects a receiver to one signal on many senders.
@@ -31,30 +36,78 @@ class Send:
 
 
 def pre_save(senders: type["Model"] | list[type["Model"]]) -> Callable:
-    """Return a decorator that subscribes a receiver to `pre_save`."""
+    """Return a decorator that subscribes a receiver to `pre_save`.
+
+    Args:
+        senders (type[Model] | list[type[Model]]): Model class or classes whose
+            `pre_save` signal should be observed.
+
+    Returns:
+        Callable: Decorator registering the wrapped receiver.
+    """
     return Send.consumer(signal="pre_save", senders=senders)
 
 
 def pre_update(senders: type["Model"] | list[type["Model"]]) -> Callable:
-    """Return a decorator that subscribes a receiver to `pre_update`."""
+    """Return a decorator that subscribes a receiver to `pre_update`.
+
+    Args:
+        senders (type[Model] | list[type[Model]]): Model class or classes whose
+            `pre_update` signal should be observed.
+
+    Returns:
+        Callable: Decorator registering the wrapped receiver.
+    """
     return Send.consumer(signal="pre_update", senders=senders)
 
 
 def pre_delete(senders: type["Model"] | list[type["Model"]]) -> Callable:
-    """Return a decorator that subscribes a receiver to `pre_delete`."""
+    """Return a decorator that subscribes a receiver to `pre_delete`.
+
+    Args:
+        senders (type[Model] | list[type[Model]]): Model class or classes whose
+            `pre_delete` signal should be observed.
+
+    Returns:
+        Callable: Decorator registering the wrapped receiver.
+    """
     return Send.consumer(signal="pre_delete", senders=senders)
 
 
 def post_save(senders: type["Model"] | list[type["Model"]]) -> Callable:
-    """Return a decorator that subscribes a receiver to `post_save`."""
+    """Return a decorator that subscribes a receiver to `post_save`.
+
+    Args:
+        senders (type[Model] | list[type[Model]]): Model class or classes whose
+            `post_save` signal should be observed.
+
+    Returns:
+        Callable: Decorator registering the wrapped receiver.
+    """
     return Send.consumer(signal="post_save", senders=senders)
 
 
 def post_update(senders: type["Model"] | list[type["Model"]]) -> Callable:
-    """Return a decorator that subscribes a receiver to `post_update`."""
+    """Return a decorator that subscribes a receiver to `post_update`.
+
+    Args:
+        senders (type[Model] | list[type[Model]]): Model class or classes whose
+            `post_update` signal should be observed.
+
+    Returns:
+        Callable: Decorator registering the wrapped receiver.
+    """
     return Send.consumer(signal="post_update", senders=senders)
 
 
 def post_delete(senders: type["Model"] | list[type["Model"]]) -> Callable:
-    """Return a decorator that subscribes a receiver to `post_delete`."""
+    """Return a decorator that subscribes a receiver to `post_delete`.
+
+    Args:
+        senders (type[Model] | list[type[Model]]): Model class or classes whose
+            `post_delete` signal should be observed.
+
+    Returns:
+        Callable: Decorator registering the wrapped receiver.
+    """
     return Send.consumer(signal="post_delete", senders=senders)

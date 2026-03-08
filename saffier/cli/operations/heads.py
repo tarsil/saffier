@@ -16,5 +16,8 @@ def heads(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """Show all head revisions in the migration repository."""
+    """Show all head revisions in the migration repository.
+
+    The wrapper keeps the CLI surface consistent with other Saffier commands.
+    """
     _heads(get_migration_app(), directory, verbose, resolve_dependencies)

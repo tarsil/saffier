@@ -7,5 +7,8 @@ from saffier.cli.state import get_migration_app
 
 @command
 def current(verbose: VerboseOption, directory: DirectoryOption) -> None:
-    """Display the currently applied migration revision."""
+    """Display the currently applied migration revision.
+
+    This exposes Alembic's current-revision view through Saffier's CLI.
+    """
     _current(get_migration_app(), directory, verbose)

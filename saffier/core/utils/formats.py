@@ -40,7 +40,10 @@ IPV6_REGEX = re.compile(r"(?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4}")
 
 
 class BaseFormat:
-    """Base protocol for converting textual input into native Python values."""
+    """Base protocol for converting textual input into native Python values.
+
+    Concrete subclasses implement both native-type detection and string parsing.
+    """
 
     error_messages: dict[str, str] = {}
 
@@ -56,7 +59,10 @@ class BaseFormat:
 
 
 class DateFormat(BaseFormat):
-    """Parse ISO-like `YYYY-MM-DD` strings into `datetime.date`."""
+    """Parse ISO-like `YYYY-MM-DD` strings into `datetime.date`.
+
+    Invalid dates produce a `ValidationError` with a Saffier-specific code.
+    """
 
     error_messages = {
         "format": "Must be a valid date format.",
@@ -79,7 +85,10 @@ class DateFormat(BaseFormat):
 
 
 class TimeFormat(BaseFormat):
-    """Parse ISO-like time strings into `datetime.time`."""
+    """Parse ISO-like time strings into `datetime.time`.
+
+    Fractional seconds are padded to microsecond precision when present.
+    """
 
     error_messages = {
         "format": "Must be a valid time format.",
@@ -106,7 +115,11 @@ class TimeFormat(BaseFormat):
 
 
 class DateTimeFormat(BaseFormat):
-    """Parse ISO-like datetime strings with optional timezone offsets."""
+    """Parse ISO-like datetime strings with optional timezone offsets.
+
+    The parser supports both `T` and space separators plus `Z` or offset
+    suffixes.
+    """
 
     error_messages = {
         "format": "Must be a valid datetime format.",
@@ -146,7 +159,10 @@ class DateTimeFormat(BaseFormat):
 
 
 class UUIDFormat(BaseFormat):
-    """Validate UUID strings before converting them to `uuid.UUID`."""
+    """Validate UUID strings before converting them to `uuid.UUID`.
+
+    Native `uuid.UUID` instances are passed through unchanged by callers.
+    """
 
     error_messages = {"format": "Must be a valid UUID format."}
 
@@ -162,7 +178,10 @@ class UUIDFormat(BaseFormat):
 
 
 class EmailFormat(BaseFormat):
-    """Validate e-mail addresses using Saffier's regex-based parser."""
+    """Validate e-mail addresses using Saffier's regex-based parser.
+
+    The formatter returns the original string when validation succeeds.
+    """
 
     error_messages = {"format": "Must be a valid email format."}
 
@@ -178,7 +197,10 @@ class EmailFormat(BaseFormat):
 
 
 class IPAddressFormat(BaseFormat):
-    """Validate IPv4 and IPv6 strings and return `ipaddress` objects."""
+    """Validate IPv4 and IPv6 strings and return `ipaddress` objects.
+
+    Both regex prechecks and the stdlib parser are used for validation.
+    """
 
     error_messages = {
         "format": "Must be a valid IP format.",
@@ -201,7 +223,11 @@ class IPAddressFormat(BaseFormat):
 
 
 class URLFormat(BaseFormat):
-    """Validate absolute URLs with a scheme and network location."""
+    """Validate absolute URLs with a scheme and network location.
+
+    Relative URLs are rejected because Saffier URL fields require fully
+    qualified addresses.
+    """
 
     error_messages = {"invalid": "Must be a real URL."}
 

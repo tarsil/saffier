@@ -43,7 +43,7 @@ class AyncLifespanContextManager:
         return self
 
     async def __aenter__(self) -> None:
-        """Run all configured startup handlers."""
+        """Run all configured startup handlers in declaration order."""
         for handler in self.on_startup:
             if is_async_callable(handler):
                 await handler()
@@ -51,7 +51,7 @@ class AyncLifespanContextManager:
                 handler()
 
     async def __aexit__(self, scope: Scope, receive: Receive, send: Send, **kwargs: Any) -> None:
-        """Run all configured shutdown handlers."""
+        """Run all configured shutdown handlers in declaration order."""
         for handler in self.on_shutdown:
             if is_async_callable(handler):
                 await handler()
@@ -64,10 +64,21 @@ def handle_lifespan_events(
     on_shutdown: Sequence[Callable] | None = None,
     lifespan: Any | None = None,
 ) -> Any:
-    """Handles with the lifespan events in the new Starlette format of lifespan.
-    This adds a mask that keeps the old `on_startup` and `on_shutdown` events variable
-    declaration for legacy and comprehension purposes and build the async context manager
-    for the lifespan.
+    """Normalize legacy startup/shutdown hooks into one lifespan object.
+
+    Saffier supports both the newer ASGI lifespan protocol and the older
+    Starlette-style `on_startup`/`on_shutdown` hooks. This helper preserves
+    backward compatibility by wrapping legacy hook lists in an async context
+    manager while passing through an explicit lifespan object unchanged.
+
+    Args:
+        on_startup (Sequence[Callable] | None): Legacy startup handlers.
+        on_shutdown (Sequence[Callable] | None): Legacy shutdown handlers.
+        lifespan (Any | None): Explicit lifespan object supplied by the caller.
+
+    Returns:
+        Any: A compatibility lifespan context manager, the explicit lifespan
+        object, or `None` when no lifecycle hooks are configured.
     """
     if on_startup or on_shutdown:
         return AyncLifespanContextManager(on_startup=on_startup, on_shutdown=on_shutdown)

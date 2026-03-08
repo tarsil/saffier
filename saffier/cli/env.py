@@ -20,7 +20,11 @@ from saffier.exceptions import CommandEnvironmentError
 
 @dataclass
 class Scaffold:
-    """Resolved application object together with the import path that produced it."""
+    """Resolved application object together with the import path that produced it.
+
+    CLI discovery returns this compact container before building a full
+    migration environment.
+    """
 
     path: str
     app: typing.Any
@@ -118,7 +122,10 @@ class MigrationEnv:
         return None
 
     def _get_folders(self, path: Path) -> list[str]:
-        """List immediate child directories used for one-level auto-discovery."""
+        """List immediate child directories used for one-level auto-discovery.
+
+        Only one directory level is scanned to keep CLI startup predictable.
+        """
         return [directory.path for directory in os.scandir(path) if directory.is_dir()]
 
     def _find_app_in_folder(self, path: Path, cwd: Path) -> Scaffold | None:

@@ -42,7 +42,10 @@ class GUID(BaseFieldProtocol):
 
 
 class IPAddress(BaseFieldProtocol):
-    """SQLAlchemy type decorator for IPv4 and IPv6 addresses."""
+    """SQLAlchemy type decorator for IPv4 and IPv6 addresses.
+
+    PostgreSQL uses `INET`; other backends fall back to a fixed-width character field.
+    """
 
     impl: str = sqlalchemy.CHAR  # type: ignore
     cache_ok: bool = True

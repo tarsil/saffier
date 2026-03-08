@@ -22,5 +22,8 @@ def init(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """Create a new migration repository."""
+    """Create a new migration repository.
+
+    This is the user-facing entry point for repository initialization.
+    """
     _init(None, directory, template, package)

@@ -5,7 +5,13 @@ from saffier.conf.global_settings import SaffierSettings
 
 
 class TenancySettings(SaffierSettings):
-    """Settings bundle used by Saffier's multi-tenancy contrib package."""
+    """Default settings consumed by Saffier's multi-tenancy contrib package.
+
+    These options control schema bootstrap behavior, the default tenant schema,
+    and model references used by tenant-aware helpers. Applications can inherit
+    from this settings object or override individual attributes through their
+    normal Saffier settings configuration.
+    """
 
     auto_create_schema: bool = True
     auto_drop_schema: bool = False

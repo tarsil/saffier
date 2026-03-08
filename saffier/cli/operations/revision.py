@@ -51,7 +51,10 @@ def revision(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """Create a new migration revision file."""
+    """Create a new migration revision file.
+
+    Optional autogeneration compares registered models against the database.
+    """
     _revision(
         get_migration_app(),
         directory,
