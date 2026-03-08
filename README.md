@@ -29,6 +29,7 @@
 **Source Code**: [https://github.com/tarsil/saffier](https://github.com/tarsil/saffier)
 
 **The official supported version is always the latest released**.
+
 ---
 
 ## Saffier 2.0+
