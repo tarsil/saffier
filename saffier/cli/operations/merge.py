@@ -21,5 +21,5 @@ def merge(
     revisions: Annotated[list[str], Argument(nargs=-1)],
     directory: DirectoryOption,
 ) -> None:
-    """Merge two revisions together, creating a new revision file"""
+    """Merge two or more revision heads into a new revision file."""
     _merge(get_migration_app(), directory, revisions, message, branch_label, rev_id)

@@ -1256,7 +1256,11 @@ class Registry:
         return self
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
-        """Disconnect all configured databases in reverse registration order."""
+        """Disconnect all configured databases in reverse registration order.
+
+        Reverse teardown mirrors connection order and helps dependent databases
+        shut down cleanly.
+        """
         for _, database in reversed(self._iter_databases()):
             if database.is_connected:
                 await database.disconnect()

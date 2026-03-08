@@ -12,7 +12,12 @@ if TYPE_CHECKING:
 
 
 class BaseManager:
-    """Base descriptor for model-bound queryset factories."""
+    """Base descriptor for model-bound queryset factories.
+
+    Concrete manager implementations mainly customize `get_queryset()` while the
+    descriptor behavior keeps track of the current owner model and bound
+    instance.
+    """
 
     queryset_class = QuerySet
 

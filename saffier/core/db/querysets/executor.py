@@ -29,8 +29,10 @@ def get_current_row():
 
 
 class QueryExecutor:
-    """
-    Compatibility facade around Saffier's queryset execution helpers.
+    """Compatibility facade around queryset execution helpers.
+
+    The executor preserves older integration points that expected separate query
+    compilation, execution, and row-parsing objects.
     """
 
     def __init__(

@@ -2,19 +2,19 @@ from saffier.core.terminal.base import Base, OutputColour
 
 
 class Print(Base):
-    """Base output class for the terminal"""
+    """Terminal writer that prints styled messages immediately."""
 
     def write_success(
         self,
         message: str,
         colour: str = OutputColour.SUCCESS,
     ) -> None:
-        """Outputs the successes to the console"""
+        """Print a success message to the console."""
         message = self.message(message, colour)
         self.print(message)
 
     def write_info(self, message: str, colour: str = OutputColour.INFO) -> None:
-        """Outputs the info to the console"""
+        """Print an informational message to the console."""
         message = self.message(message, colour)
         self.print(message)
 
@@ -23,7 +23,7 @@ class Print(Base):
         message: str,
         colour: str = OutputColour.WARNING,
     ) -> None:
-        """Outputs the warnings to the console"""
+        """Print a warning message to the console."""
         message = self.message(message, colour)
         self.print(message)
 
@@ -36,6 +36,6 @@ class Print(Base):
         message: str,
         colour: str = OutputColour.ERROR,
     ) -> None:
-        """Outputs the errors to the console"""
+        """Print an error message to the console."""
         message = self.message(message, colour)
         self.print(message)

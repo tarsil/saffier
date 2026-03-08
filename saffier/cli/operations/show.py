@@ -7,5 +7,5 @@ from saffier.cli.state import get_migration_app
 
 @command
 def show(revision: RevisionHeadArgument, directory: DirectoryOption) -> None:
-    """Show the revision denoted by the given symbol."""
+    """Show details for one migration revision."""
     _show(get_migration_app(), directory, revision)

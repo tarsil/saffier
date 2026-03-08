@@ -1420,7 +1420,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def only(self, *fields: Sequence[str]) -> "QuerySet":
-        """Load only the given fields plus the primary-key columns."""
+        """Load only the given fields plus the primary-key columns.
+
+        Primary-key columns are always retained so Saffier can still identify
+        and cache hydrated model instances correctly.
+        """
         only_fields = list(fields)
         for pkcolumn in reversed(tuple(self.model_class.pkcolumns)):
             if pkcolumn not in only_fields:
@@ -1431,7 +1435,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def defer(self, *fields: Sequence[str]) -> "QuerySet":
-        """Defer loading of the given fields until attribute access time."""
+        """Defer loading of the given fields until attribute access time.
+
+        Deferred attributes trigger lazy loading when accessed on a hydrated
+        model instance.
+        """
         queryset: QuerySet = self._clone()
         queryset._defer = fields
         return queryset
@@ -2316,23 +2324,38 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return self._combine(other, "union", all_=all)
 
     def union_all(self, other: "QuerySet") -> "CombinedQuerySet":
-        """Combine two querysets using SQL `UNION ALL`."""
+        """Combine two querysets using SQL `UNION ALL`.
+
+        Unlike `union()`, duplicate rows are preserved.
+        """
         return self._combine(other, "union", all_=True)
 
     def intersect(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
-        """Combine two querysets using SQL `INTERSECT`."""
+        """Combine two querysets using SQL `INTERSECT`.
+
+        Only rows present in both querysets are returned.
+        """
         return self._combine(other, "intersect", all_=all)
 
     def intersect_all(self, other: "QuerySet") -> "CombinedQuerySet":
-        """Combine two querysets using SQL `INTERSECT ALL`."""
+        """Combine two querysets using SQL `INTERSECT ALL`.
+
+        Duplicate row counts from both sides are preserved where supported.
+        """
         return self._combine(other, "intersect", all_=True)
 
     def except_(self, other: "QuerySet", *, all: bool = False) -> "CombinedQuerySet":
-        """Combine two querysets using SQL `EXCEPT`."""
+        """Combine two querysets using SQL `EXCEPT`.
+
+        Rows produced by `other` are removed from the left-hand queryset.
+        """
         return self._combine(other, "except", all_=all)
 
     def except_all(self, other: "QuerySet") -> "CombinedQuerySet":
-        """Combine two querysets using SQL `EXCEPT ALL`."""
+        """Combine two querysets using SQL `EXCEPT ALL`.
+
+        Duplicate row counts are considered where the backend supports it.
+        """
         return self._combine(other, "except", all_=True)
 
     def select_for_update(
@@ -2362,7 +2385,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return queryset
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Any:
-        """Return a transaction context manager bound to the queryset database."""
+        """Return a transaction context manager bound to the queryset database.
+
+        This is a convenience pass-through to the underlying database object.
+        """
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
     def _embed_parent_in_result(self, result: SaffierModel) -> SaffierModel:

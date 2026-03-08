@@ -538,7 +538,11 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
                 )
 
     def get_instance_name(self) -> str:
-        """Return the lowercase class name used by relation helpers."""
+        """Return the lowercase class name used by relation helpers.
+
+        Returns:
+            str: Lowercase model class name.
+        """
         return self.__class__.__name__.lower()
 
     @classmethod

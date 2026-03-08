@@ -160,7 +160,11 @@ class Relation(ManyRelationProtocol):
             self.refs.append(child)
 
     async def save_related(self) -> None:
-        """Persist all children previously queued through `stage()`."""
+        """Persist all children previously queued through `stage()`.
+
+        The staged children are flushed in FIFO order by repeatedly delegating to
+        `add()`.
+        """
         while self.refs:
             await self.add(self.refs.pop(0))
 

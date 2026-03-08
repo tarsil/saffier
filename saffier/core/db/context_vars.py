@@ -17,16 +17,15 @@ EXPLICIT_SPECIFIED_VALUES: ContextVar[set[str] | None] = ContextVar(
 
 
 def get_tenant() -> str | None:
-    """
-    Gets the current active tenant in the context.
-    """
+    """Return the active tenant schema stored in the current context."""
     return TENANT.get()
 
 
 def set_tenant(value: str | None) -> None:
-    """
-    Sets the global tenant for the context of the queries.
-    When a global tenant is set the `get_context_schema` -> `SCHEMA` is ignored.
+    """Set the active tenant schema for the current context.
+
+    When a tenant is set, queryset helpers prefer it over the plain schema
+    context variable.
     """
     TENANT.set(value)
 
@@ -44,9 +43,15 @@ def set_queryset_schema(
     model_class: type["Model"],
     value: str | None,
 ) -> "QuerySet":
-    """
-    Returns a new queryset object pointing to the desired schema of the
-    using.
+    """Return a queryset rebound to a specific schema.
+
+    Args:
+        queryset: Source queryset being cloned.
+        model_class: Model class targeted by the queryset.
+        value: Schema name to bind.
+
+    Returns:
+        QuerySet: Schema-bound queryset clone.
     """
     return queryset.__class__(
         model_class=model_class,
@@ -61,9 +66,16 @@ def set_queryset_database(
     database: type["Database"],
     schema: str | None = None,
 ) -> "QuerySet":
-    """
-    Returns a new queryset object pointing to the desired schema of the
-    using.
+    """Return a queryset rebound to a specific database and optional schema.
+
+    Args:
+        queryset: Source queryset being cloned.
+        model_class: Model class targeted by the queryset.
+        database: Database object to bind.
+        schema: Optional schema override.
+
+    Returns:
+        QuerySet: Database-bound queryset clone.
     """
     if not schema:
         return queryset.__class__(

@@ -5,10 +5,7 @@ from sqlalchemy.orm import Mapped, relationship
 
 
 class DeclarativeMixin:
-    """
-    Exposes all the declarative operations
-    for a given Saffier model object.
-    """
+    """Expose SQLAlchemy declarative-model generation for a Saffier model."""
 
     @classmethod
     def declarative(cls) -> typing.Any:
@@ -16,8 +13,11 @@ class DeclarativeMixin:
 
     @classmethod
     def generate_model_declarative(cls) -> typing.Any:
-        """
-        Transforms a core Saffier table into a Declarative model table.
+        """Transform the Saffier table into a SQLAlchemy declarative model.
+
+        Returns:
+            typing.Any: Declarative model class bound to the same SQLAlchemy
+            table.
         """
         Base = cls.meta.registry.declarative_base
 

@@ -22,5 +22,5 @@ def init(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """Creates a new migration repository."""
+    """Create a new migration repository."""
     _init(None, directory, template, package)

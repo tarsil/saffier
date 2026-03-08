@@ -51,7 +51,7 @@ def revision(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """Create a new revision file."""
+    """Create a new migration revision file."""
     _revision(
         get_migration_app(),
         directory,

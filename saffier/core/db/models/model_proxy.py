@@ -6,9 +6,10 @@ if TYPE_CHECKING:
 
 
 class ProxyModel:
-    """
-    When a model needs to be mirrored without affecting the
-    original, this instance is triggered instead.
+    """Builder object used to generate detached proxy models.
+
+    Proxy models mirror a concrete model's fields and metadata without
+    registering themselves as first-class runtime models.
     """
 
     def __init__(
@@ -36,8 +37,10 @@ class ProxyModel:
         self.__model__ = None
 
     def build(self) -> "ProxyModel":
-        """
-        Generates the model proxy for the __model__ definition.
+        """Generate and attach the proxy model class described by this builder.
+
+        Returns:
+            ProxyModel: The current builder with `model` populated.
         """
         from saffier.core.utils.models import create_saffier_model
 

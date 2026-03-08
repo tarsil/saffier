@@ -19,13 +19,13 @@ if TYPE_CHECKING:
 
 
 class DateParser:
-    """
-    Utils used by the Registry
-    """
+    """Utility mixin for model/date helpers shared across dynamic model tooling."""
 
     def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
-        """
-        Updates the auto fields
+        """Refresh `auto_now` date and datetime fields inside a payload.
+
+        Returns:
+            Any: Updated payload dictionary.
         """
         for k, v in fields.items():
             if isinstance(v, (DateField, DateTimeField)) and v.auto_now:
@@ -52,8 +52,11 @@ def create_saffier_model(
     __bases__: tuple[type["Model"]] | None = None,
     __proxy__: bool = False,
 ) -> type["Model"]:
-    """
-    Generates a dynamic `saffier.Model` using the provided metadata and definitions.
+    """Generate a dynamic Saffier model class.
+
+    This helper is used by registry copying, reflection, proxy-model generation,
+    and other runtime features that need to synthesize model classes from a
+    field-definition payload.
     """
 
     if not __bases__:

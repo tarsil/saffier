@@ -45,7 +45,10 @@ def makemigrations(
     arg: ExtraArgOption,
     directory: DirectoryOption,
 ) -> None:
-    """Autogenerate a new revision file (alias for `revision --autogenerate`)."""
+    """Autogenerate a new revision file.
+
+    This command is the user-facing alias for `revision --autogenerate`.
+    """
     _migrate(
         get_migration_app(),
         directory,

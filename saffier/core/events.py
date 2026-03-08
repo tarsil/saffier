@@ -23,17 +23,12 @@ def is_async_callable(obj: typing.Any) -> bool:
 
 
 class AyncLifespanContextManager:
-    """
-    Manages and handles the on_startup and on_shutdown events
-    in an Ravyn way.
+    """Compatibility lifespan context manager for startup and shutdown hooks.
 
-    This is not the same as the on_startup and on_shutdown
-    from Starlette. Those are now deprecated and will be removed
-    in the version 1.0 of Starlette.
-
-    This aims to provide a similar functionality but by generating
-    a lifespan event based on the values from the on_startup and on_shutdown
-    lists.
+    Older Saffier integrations often still expose Starlette-style `on_startup`
+    and `on_shutdown` lists. This wrapper adapts those handlers into the newer
+    lifespan protocol without forcing applications to rewrite their bootstrap
+    code immediately.
     """
 
     def __init__(
@@ -48,7 +43,7 @@ class AyncLifespanContextManager:
         return self
 
     async def __aenter__(self) -> None:
-        """Runs the functions on startup"""
+        """Run all configured startup handlers."""
         for handler in self.on_startup:
             if is_async_callable(handler):
                 await handler()
@@ -56,7 +51,7 @@ class AyncLifespanContextManager:
                 handler()
 
     async def __aexit__(self, scope: Scope, receive: Receive, send: Send, **kwargs: Any) -> None:
-        """Runs the functions on shutdown"""
+        """Run all configured shutdown handlers."""
         for handler in self.on_shutdown:
             if is_async_callable(handler):
                 await handler()

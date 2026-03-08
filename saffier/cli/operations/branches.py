@@ -11,5 +11,5 @@ from saffier.cli.state import get_migration_app
 
 @command
 def branches(verbose: VerboseOption, directory: DirectoryOption) -> None:
-    """Show current branch points"""
+    """Show current migration branch points."""
     _branches(get_migration_app(), directory, verbose)

@@ -429,21 +429,15 @@ class Q:
 
 
 def or_(*args: Any, **kwargs: Any) -> Any:
-    """
-    Creates a SQLAlchemy OR clause for the expressions being passed.
-    """
+    """Return a raw SQLAlchemy `OR` clause for the provided expressions."""
     return sqlalchemy.or_(*args, **kwargs)
 
 
 def and_(*args: Any, **kwargs: Any) -> Any:
-    """
-    Creates a SQLAlchemy AND clause for the expressions being passed.
-    """
+    """Return a raw SQLAlchemy `AND` clause for the provided expressions."""
     return sqlalchemy.and_(*args, **kwargs)
 
 
 def not_(*args: Any, **kwargs: Any) -> Any:
-    """
-    Creates a SQLAlchemy NOT clause for the expressions being passed.
-    """
+    """Return a raw SQLAlchemy `NOT` clause for the provided expressions."""
     return sqlalchemy.not_(*args, **kwargs)

@@ -338,14 +338,22 @@ class IntegerField(Field):
 
 
 class SmallIntegerField(IntegerField):
-    """Integer field stored using the database's small-integer type."""
+    """Integer field stored using the database's small-integer type.
+
+    Use this when database-level storage size matters and the value range fits a
+    small integer.
+    """
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.SmallInteger()
 
 
 class FloatField(Field):
-    """Floating-point numeric field backed by a SQL `FLOAT` column."""
+    """Floating-point numeric field backed by a SQL `FLOAT` column.
+
+    This field is appropriate for approximate numeric values where binary
+    floating-point precision is acceptable.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Float(**kwargs)
@@ -358,7 +366,11 @@ class FloatField(Field):
 
 
 class BigIntegerField(Field):
-    """Integer field stored using the database's big-integer type."""
+    """Integer field stored using the database's big-integer type.
+
+    Use this for identifiers or counters that may exceed standard integer
+    ranges.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Integer(**kwargs)
@@ -368,7 +380,11 @@ class BigIntegerField(Field):
 
 
 class BooleanField(Field):
-    """Boolean field backed by a SQL `BOOLEAN` column."""
+    """Boolean field backed by a SQL `BOOLEAN` column.
+
+    The field also supports `isempty` lookups by treating `False` as the empty
+    value.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Boolean(**kwargs)
@@ -400,7 +416,10 @@ class AutoNowMixin(Field):
 
 
 class DateTimeField(AutoNowMixin):
-    """Date-time field with optional automatic timestamping."""
+    """Date-time field with optional automatic timestamping.
+
+    It is commonly used for created-at and updated-at columns.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         if self.auto_now_add or self.auto_now:
@@ -412,7 +431,10 @@ class DateTimeField(AutoNowMixin):
 
 
 class DateField(AutoNowMixin):
-    """Date-only field with optional automatic timestamping."""
+    """Date-only field with optional automatic timestamping.
+
+    It stores calendar dates without a time component.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         if self.auto_now_add or self.auto_now:
@@ -424,7 +446,10 @@ class DateField(AutoNowMixin):
 
 
 class TimeField(Field):
-    """Time-only field backed by a SQL `TIME` column."""
+    """Time-only field backed by a SQL `TIME` column.
+
+    The field stores wall-clock time values without any date component.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Time(**kwargs)
@@ -434,7 +459,11 @@ class TimeField(Field):
 
 
 class DurationField(Field):
-    """Timedelta field stored as a SQL interval/duration type."""
+    """Timedelta field stored as a SQL interval/duration type.
+
+    It accepts Python `timedelta` objects and can be queried for empty values by
+    comparing against zero duration.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Duration(**kwargs)
@@ -1620,7 +1649,10 @@ class DecimalField(Field):
 
 
 class UUIDField(Field):
-    """Field that stores UUID values using the database UUID type."""
+    """Field that stores UUID values using the database UUID type.
+
+    It is suitable for application-generated identifiers and public-facing keys.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return UUID(**kwargs)
@@ -1630,7 +1662,11 @@ class UUIDField(Field):
 
 
 class PasswordField(CharField):
-    """Character field that applies password-format validation."""
+    """Character field that applies password-format validation.
+
+    The storage type remains plain text; hashing and secret handling are left to
+    the application layer.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Password(**kwargs)
@@ -1640,7 +1676,11 @@ class PasswordField(CharField):
 
 
 class IPAddressField(Field):
-    """Field that stores IPv4 or IPv6 address values."""
+    """Field that stores IPv4 or IPv6 address values.
+
+    The field normalizes values through the IP-address validator before
+    persistence.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return CoreIPAddress(**kwargs)
@@ -1650,7 +1690,10 @@ class IPAddressField(Field):
 
 
 class EmailField(CharField):
-    """Character field with e-mail address validation."""
+    """Character field with e-mail address validation.
+
+    It uses the same bounded string storage as `CharField`.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Email(**kwargs)
@@ -1660,7 +1703,10 @@ class EmailField(CharField):
 
 
 class URLField(CharField):
-    """Character field with absolute-URL validation."""
+    """Character field with absolute-URL validation.
+
+    It validates scheme and network location before storing the value as text.
+    """
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return URL(**kwargs)
@@ -1717,7 +1763,11 @@ class ExcludeField(Field):
 
 
 class PlaceholderField(ExcludeField):
-    """Named placeholder field used by reverse-relation internals."""
+    """Named placeholder field used by reverse-relation internals.
+
+    Placeholder fields make reverse relation names visible in metadata without
+    creating any database columns.
+    """
 
 
 class ComputedField(Field):
@@ -1838,7 +1888,10 @@ class ComputedField(Field):
 
 
 class FileField(CharField):
-    """Text field intended for file path or storage reference values."""
+    """Text field intended for file path or storage reference values.
+
+    It is a semantic alias of `CharField` with a file-oriented default length.
+    """
 
     def __init__(self, max_length: int = 255, **kwargs: typing.Any) -> None:
         kwargs.setdefault("max_length", max_length)
@@ -1846,7 +1899,11 @@ class FileField(CharField):
 
 
 class ImageField(FileField):
-    """File-like text field intended for image references."""
+    """File-like text field intended for image references.
+
+    The field does not inspect image contents; it simply signals image intent in
+    model definitions.
+    """
 
 
 class PGArrayField(Field):

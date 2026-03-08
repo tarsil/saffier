@@ -78,8 +78,10 @@ def admin_serve(
         ),
     ],
 ) -> None:
-    """
-    Starts Saffier admin server.
+    """Run the built-in Saffier admin application.
+
+    The command wraps the discovered app with the admin interface when possible,
+    configures basic auth, and can optionally create all tables before serving.
     """
     try:
         import palfrey

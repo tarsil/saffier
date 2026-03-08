@@ -7,5 +7,5 @@ from saffier.cli.state import get_migration_app
 
 @command
 def check(directory: DirectoryOption) -> None:
-    """Check if there are any new operations to migrate"""
+    """Check whether current models would produce new migration operations."""
     _check(get_migration_app(), directory)

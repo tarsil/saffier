@@ -256,7 +256,7 @@ class OutputColour(str, Enum):
 
 
 class Base(ABC, Console):
-    """Base output class for the terminal"""
+    """Abstract Rich-backed terminal output helper."""
 
     @abstractmethod
     def write_success(self, message: str, colour: str = OutputColour.SUCCESS) -> str | None:
@@ -264,25 +264,29 @@ class Base(ABC, Console):
 
     @abstractmethod
     def write_info(self, message: str, colour: str = OutputColour.INFO) -> str | None:
-        """Outputs the info to the console"""
+        """Render or print an informational message."""
         raise NotImplementedError()
 
     @abstractmethod
     def write_warning(self, message: str, colour: str = OutputColour.WARNING) -> str | None:
-        """Outputs the warnings to the console"""
+        """Render or print a warning message."""
 
     @abstractmethod
     def write_error(self, message: str, colour: str = OutputColour.ERROR) -> str | None:
-        """Outputs the errors to the console"""
+        """Render or print an error message."""
         raise NotImplementedError()
 
     def write_plain(self, message: str, colour: str = OutputColour.WHITE) -> str | None:
-        """Outputs the custom plain"""
+        """Render or print a plain message."""
         raise NotImplementedError()
 
     def write(self, message: Any) -> None:
         self.print(message)
 
     def message(self, message: str, colour: str) -> str:
-        """Returns a message formated with specific colours"""
+        """Wrap a message in Rich color markup.
+
+        Returns:
+            str: Markup string suitable for Rich output.
+        """
         return f"[{colour}]{message}[/{colour}]"

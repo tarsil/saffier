@@ -27,5 +27,5 @@ def history(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """List changeset scripts in chronological order."""
+    """List migration revisions in chronological order."""
     _history(get_migration_app(), directory, rev_range, verbose, indicate_current)

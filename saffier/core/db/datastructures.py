@@ -5,8 +5,10 @@ from typing import Any, ClassVar
 
 @dataclass
 class Index:
-    """
-    Class responsible for handling and declaring the database indexes.
+    """Declarative representation of a model-level database index.
+
+    Instances are stored on `Meta.indexes` and later translated into SQLAlchemy
+    `Index` objects when a model table is built.
     """
 
     suffix: str = "idx"
@@ -32,8 +34,10 @@ class Index:
 
 @dataclass
 class UniqueConstraint:
-    """
-    Class responsible for handling and declaring the database unique_together.
+    """Declarative representation of a multi-field uniqueness constraint.
+
+    Instances are stored on `Meta.unique_together` and expanded into SQLAlchemy
+    `UniqueConstraint` objects during table construction.
     """
 
     fields: list[str]
@@ -55,8 +59,10 @@ class UniqueConstraint:
 
 
 class QueryModelResultCache:
-    """
-    Lightweight queryset result cache keyed by model attributes.
+    """Shared queryset result cache keyed by selected model attributes.
+
+    Querysets use this cache to reuse hydrated model instances across repeated
+    lookups and relation traversals without forcing a global identity map.
     """
 
     def __init__(

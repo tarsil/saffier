@@ -2,14 +2,14 @@ from saffier.core.terminal.base import Base, OutputColour
 
 
 class Terminal(Base):
-    """Base output class for the terminal"""
+    """Terminal helper that returns styled strings instead of printing them."""
 
     def write_success(
         self,
         message: str,
         colour: str = OutputColour.SUCCESS,
     ) -> str:
-        """Outputs the successes to the console"""
+        """Return a styled success message."""
         message = self.message(message, colour)
         return message
 
@@ -18,7 +18,7 @@ class Terminal(Base):
         message: str,
         colour: str = OutputColour.INFO,
     ) -> str:
-        """Outputs the info to the console"""
+        """Return a styled informational message."""
         message = self.message(message, colour)
         return message
 
@@ -27,7 +27,7 @@ class Terminal(Base):
         message: str,
         colour: str = OutputColour.WARNING,
     ) -> str:
-        """Outputs the warnings to the console"""
+        """Return a styled warning message."""
         message = self.message(message, colour)
         return message
 
@@ -36,7 +36,7 @@ class Terminal(Base):
         message: str,
         colour: str = OutputColour.ERROR,
     ) -> str:
-        """Outputs the errors to the console"""
+        """Return a styled error message."""
         message = self.message(message, colour)
         return message
 

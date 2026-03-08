@@ -7,5 +7,5 @@ from saffier.cli.state import get_migration_app
 
 @command
 def current(verbose: VerboseOption, directory: DirectoryOption) -> None:
-    """Display the current revision for each database."""
+    """Display the currently applied migration revision."""
     _current(get_migration_app(), directory, verbose)

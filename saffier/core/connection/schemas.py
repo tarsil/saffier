@@ -12,10 +12,11 @@ if TYPE_CHECKING:
 
 
 class Schema:
-    """
-    All the schema operations object.
+    """Schema management helper bound to a registry.
 
-    All the operations regarding a schema are placed in one object
+    The object centralizes low-level schema creation, teardown, and schema-path
+    switching so the registry can reuse the same logic for migrations, tenancy,
+    and table-creation helpers.
     """
 
     def __init__(self, registry: type["Registry"]) -> None:
@@ -26,8 +27,10 @@ class Schema:
         return self.registry.database
 
     def get_default_schema(self) -> str | None:
-        """
-        Returns the default schema which is usually None
+        """Return the database dialect's default schema name.
+
+        Returns:
+            str | None: Default schema reported by the active dialect.
         """
         if not hasattr(self, "_default_schema"):
             self._default_schema = self.database.url.sqla_url.get_dialect(True).default_schema_name
@@ -53,8 +56,19 @@ class Schema:
         update_cache: bool = True,
         databases: Sequence[str | None] = (None,),
     ) -> None:
-        """
-        Creates a model schema if it does not exist.
+        """Create a schema and optionally create model tables inside it.
+
+        Args:
+            schema: Schema name to create. `None` means "create tables in the
+                default database namespace only".
+            if_not_exists: Whether schema and table creation should be
+                idempotent.
+            init_models: Whether registered model tables should be created after
+                the schema exists.
+            init_tenant_models: Reserved for backward compatibility.
+            update_cache: Whether schema-specific table caches should be
+                refreshed when building tables.
+            databases: Database aliases that should receive the operation.
         """
         del init_tenant_models
         schema_tables_by_metadata: dict[sqlalchemy.MetaData, list[sqlalchemy.Table]] = {}
@@ -105,8 +119,14 @@ class Schema:
         if_exists: bool = False,
         databases: Sequence[str | None] = (None,),
     ) -> None:
-        """
-        Drops an existing model schema.
+        """Drop a schema or all tables from the selected databases.
+
+        Args:
+            schema: Schema name to drop, or `None` to drop tables from the
+                default namespace.
+            cascade: Whether the schema drop should cascade.
+            if_exists: Whether missing schema/table objects should be ignored.
+            databases: Database aliases that should receive the operation.
         """
 
         for database_name in databases:

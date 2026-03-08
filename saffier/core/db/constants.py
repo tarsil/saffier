@@ -7,15 +7,11 @@ PROTECT = "PROTECT"
 
 
 class NEW_M2M_NAMING:
-    """
-    Marker for the field-oriented through-table naming convention.
-    """
+    """Marker selecting the newer field-oriented many-to-many naming scheme."""
 
 
 class ConditionalRedirect(dict):
-    """
-    Lightweight pure-Python equivalent used by composite-field integrations.
-    """
+    """Dictionary marker used by composite-field redirect integrations."""
 
 
 __all__ = [

@@ -5,9 +5,7 @@ from saffier.conf.global_settings import SaffierSettings
 
 
 class TenancySettings(SaffierSettings):
-    """
-    BaseSettings used for the contrib of Saffier tenancy
-    """
+    """Settings bundle used by Saffier's multi-tenancy contrib package."""
 
     auto_create_schema: bool = True
     auto_drop_schema: bool = False

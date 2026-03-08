@@ -8,8 +8,10 @@ from saffier.exceptions import ModelReferenceError
 
 
 class ModelRef(HashableBaseModel):
-    """
-    Pure Python model reference used by ``RefForeignKey`` for nested related inserts.
+    """Pure Python reference object used by `RefForeignKey`.
+
+    `ModelRef` instances let callers stage nested related inserts without
+    importing or instantiating the full target ORM model up front.
     """
 
     __related_name__: ClassVar[str]

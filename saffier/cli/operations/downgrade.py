@@ -15,5 +15,5 @@ def downgrade(
     revision: Annotated[str, Argument("-1")],
     directory: DirectoryOption,
 ) -> None:
-    """Revert to a previous version"""
+    """Downgrade the database to the selected revision."""
     _downgrade(get_migration_app(), directory, revision, sql, tag, arg)

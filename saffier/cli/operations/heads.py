@@ -16,5 +16,5 @@ def heads(
     ],
     directory: DirectoryOption,
 ) -> None:
-    """Show current available heads in the script directory"""
+    """Show all head revisions in the migration repository."""
     _heads(get_migration_app(), directory, verbose, resolve_dependencies)

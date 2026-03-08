@@ -12,8 +12,10 @@ DIALECTS = {"postgres": "postgres", "postgresql": "postgresql"}
 
 
 class GUID(BaseFieldProtocol):
-    """
-    GUID type representation.
+    """SQLAlchemy type decorator that stores UUID values portably.
+
+    PostgreSQL uses the native UUID type, while other backends fall back to a
+    fixed-width character representation.
     """
 
     impl: Any = sqlalchemy.CHAR
@@ -40,9 +42,7 @@ class GUID(BaseFieldProtocol):
 
 
 class IPAddress(BaseFieldProtocol):
-    """
-    Representation of an IP field.
-    """
+    """SQLAlchemy type decorator for IPv4 and IPv6 addresses."""
 
     impl: str = sqlalchemy.CHAR  # type: ignore
     cache_ok: bool = True
@@ -65,8 +65,10 @@ class IPAddress(BaseFieldProtocol):
 
 
 class List(BaseFieldProtocol):
-    """
-    Representation of a List.
+    """SQLAlchemy type decorator for list-like values stored as text/varchar.
+
+    PostgreSQL gets a varchar representation, while other databases use a
+    delimited string fallback.
     """
 
     impl: Any = sqlalchemy.TEXT

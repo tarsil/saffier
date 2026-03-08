@@ -40,9 +40,7 @@ DB_MODULE = "saffier"
 
 
 def func_accepts_kwargs(func: Callable) -> bool:
-    """
-    Checks if a function accepts **kwargs.
-    """
+    """Return whether a callable accepts arbitrary keyword arguments."""
     return any(
         param
         for param in inspect.signature(func).parameters.values()
@@ -51,14 +49,15 @@ def func_accepts_kwargs(func: Callable) -> bool:
 
 
 class InspectDB:
-    """
-    Class that builds the inspection of a database.
+    """Reflect an existing database and emit Saffier model definitions.
+
+    The inspector is the engine behind the `saffier inspectdb` command. It
+    reflects database metadata, translates SQLAlchemy types into Saffier fields,
+    and prints a starter module built from `ReflectModel` classes.
     """
 
     def __init__(self, database: str, schema: str | None) -> None:
-        """
-        Creates an instance of an InspectDB and triggers the proccess.
-        """
+        """Store the database URL and optional schema targeted for reflection."""
         self._database = database
         self._schema = schema
 
@@ -71,9 +70,7 @@ class InspectDB:
         return self._schema
 
     def inspect(self) -> None:
-        """
-        Starts the InspectDB and passes all the configurations.
-        """
+        """Run the reflection workflow and write generated models to stdout."""
         registry = Registry(database=self.database)
         metadata = execsync(self._collect_metadata)(registry=registry)
 
@@ -99,9 +96,14 @@ class InspectDB:
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData
     ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-        """
-        Generates the tables from the reflection and maps them into the
-        `reflected` dictionary of the `Registry`.
+        """Transform reflected metadata into code-generation payloads.
+
+        Args:
+            metadata: Reflected SQLAlchemy metadata.
+
+        Returns:
+            tuple[list[dict[str, Any]], dict[str, str]]: Table descriptors and a
+            lookup from table name to generated class name.
         """
         tables_dict = dict(metadata.tables.items())
         tables = []
@@ -127,9 +129,7 @@ class InspectDB:
     def get_foreign_keys(
         self, table_or_column: sqlalchemy.Table | sqlalchemy.Column
     ) -> list[dict[str, Any]]:
-        """
-        Extracts all the information needed of the foreign keys.
-        """
+        """Extract normalized foreign-key metadata for one table or column."""
         details: list[dict[str, Any]] = []
 
         for foreign_key in table_or_column.foreign_keys:
@@ -185,9 +185,7 @@ class InspectDB:
     def get_meta(
         self, table: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
     ) -> NoReturn:
-        """
-        Produces the Meta class.
-        """
+        """Generate the `Meta` class body for one reflected model."""
         unique_together: list[saffier.UniqueConstraint] = []
         unique_indexes: list[saffier.Index] = []
         indexes = list(table["indexes"])
@@ -232,9 +230,10 @@ class InspectDB:
     async def reflect(
         self, *, engine: sqlalchemy.Engine, metadata: sqlalchemy.MetaData
     ) -> sqlalchemy.MetaData:
-        """
-        Connects to the database and reflects all the information about the
-        schema bringing all the data available.
+        """Reflect database metadata through an async SQLAlchemy engine.
+
+        Returns:
+            sqlalchemy.MetaData: Reflected metadata object.
         """
 
         async with engine.connect() as connection:
@@ -243,8 +242,12 @@ class InspectDB:
         return metadata
 
     def write_output(self, tables: list[Any], connection_string: str) -> NoReturn:
-        """
-        Writes to stdout.
+        """Yield the generated Python source for reflected models.
+
+        Args:
+            tables: Table descriptors produced by reflection.
+            connection_string: Database connection string used in the generated
+                file.
         """
         yield f"# This is an auto-generated Saffier model module. Saffier version `{saffier.__version__}`.\n"
         yield "#   * Rearrange models' order.\n"

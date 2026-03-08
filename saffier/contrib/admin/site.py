@@ -14,8 +14,10 @@ from .exceptions import AdminModelNotFound, AdminValidationError
 
 
 class AdminSite:
-    """
-    Python-native admin service for registry browsing and CRUD operations.
+    """Registry-backed admin service for browsing and editing Saffier models.
+
+    The admin site exposes lightweight schema inspection, listing, search, CRUD,
+    and pagination helpers that power the built-in admin UI.
     """
 
     def __init__(

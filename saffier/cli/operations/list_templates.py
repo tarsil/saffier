@@ -9,7 +9,5 @@ from saffier.cli.base import list_templates as template_list
 
 @command
 def list_templates() -> None:
-    """
-    Lists all the available templates available to Saffier
-    """
+    """List all available migration repository templates."""
     template_list()

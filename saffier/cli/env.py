@@ -20,11 +20,7 @@ from saffier.exceptions import CommandEnvironmentError
 
 @dataclass
 class Scaffold:
-    """
-    Simple Application scaffold that holds the
-    information about the app and the path to
-    the same app.
-    """
+    """Resolved application object together with the import path that produced it."""
 
     path: str
     app: typing.Any
@@ -32,9 +28,11 @@ class Scaffold:
 
 @dataclass
 class MigrationEnv:
-    """
-    Loads an arbitraty application into the object
-    and returns the App.
+    """Application discovery helper used by the Saffier CLI.
+
+    The environment object knows how to load an app from an explicit import
+    string, from the active global instance, or by scanning a project tree for
+    conventional discovery files.
     """
 
     path: str | None = None
@@ -44,8 +42,14 @@ class MigrationEnv:
     def load_from_env(
         self, path: str | None = None, enable_logging: bool = True
     ) -> "MigrationEnv":
-        """
-        Loads the environment variables into the scaffold.
+        """Load the application environment from CLI args or environment vars.
+
+        Args:
+            path: Optional explicit import path supplied by the CLI.
+            enable_logging: Reserved for backward compatibility.
+
+        Returns:
+            MigrationEnv: Resolved migration environment.
         """
         # Adds the current path where the command is being invoked
         # To the system path
@@ -114,14 +118,18 @@ class MigrationEnv:
         return None
 
     def _get_folders(self, path: Path) -> list[str]:
-        """
-        Lists all the folders and checks if there is any file from the DISCOVERY_FILES available
-        """
+        """List immediate child directories used for one-level auto-discovery."""
         return [directory.path for directory in os.scandir(path) if directory.is_dir()]
 
     def _find_app_in_folder(self, path: Path, cwd: Path) -> Scaffold | None:
-        """
-        Iterates inside the folder and looks up to the DISCOVERY_FILES.
+        """Search one folder for a discoverable Saffier application.
+
+        Args:
+            path: Folder being scanned.
+            cwd: Base path used to compute dotted module paths.
+
+        Returns:
+            Scaffold | None: Resolved scaffold when discovery succeeds.
         """
         for discovery_file in DISCOVERY_FILES:
             filename = f"{str(path)}/{discovery_file}"
@@ -160,10 +168,17 @@ class MigrationEnv:
         return MigrationEnv(path=path, app=app)
 
     def find_app(self, path: str | None, cwd: Path) -> Scaffold:
-        """
-        Loads the application based on the path provided via env var.
+        """Resolve the target application from an explicit path or auto-discovery.
 
-        If no --app is provided, goes into auto discovery up to one level.
+        Args:
+            path: Optional explicit import string.
+            cwd: Current working directory used for discovery.
+
+        Returns:
+            Scaffold: Resolved application scaffold.
+
+        Raises:
+            CommandEnvironmentError: If no application can be discovered.
         """
 
         if path:

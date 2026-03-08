@@ -7,8 +7,10 @@ if TYPE_CHECKING:
 
 
 class QueryCompiler:
-    """
-    Thin compatibility wrapper around Saffier's in-queryset compiler.
+    """Compatibility facade around queryset SQL compilation helpers.
+
+    Older integrations expect a dedicated compiler object; Saffier now compiles
+    queries inside the queryset itself, and this wrapper preserves that API.
     """
 
     def __init__(self, queryset: BaseQuerySet):
