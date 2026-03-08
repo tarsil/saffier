@@ -79,6 +79,9 @@ or opt out via `Meta.model_engine = False`.
 This keeps engine selection at the same application boundary where database,
 metadata, and model registration are already configured.
 
+The built-in adapter names are currently `pydantic` and `msgspec`, but custom
+engines can also be registered.
+
 ## Custom registry
 
 Can you have your own custom Registry? Yes, of course! You simply need to subclass the `Registry`

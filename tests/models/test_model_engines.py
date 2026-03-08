@@ -1,6 +1,7 @@
 import copy
 
 import pytest
+from msgspec import ValidationError as MsgspecValidationError
 from pydantic import ValidationError as PydanticValidationError
 
 import saffier
@@ -73,6 +74,16 @@ class PydanticWidget(saffier.Model):
     class Meta:
         registry = dummy_models
         model_engine = "pydantic"
+
+
+class MsgspecWidget(saffier.Model):
+    name = saffier.CharField(max_length=100)
+    quantity = saffier.IntegerField(default=1)
+    note = saffier.CharField(max_length=100, null=True)
+
+    class Meta:
+        registry = dummy_models
+        model_engine = "msgspec"
 
 
 class EngineBase(saffier.Model):
@@ -159,6 +170,37 @@ def test_pydantic_engine_exposes_validation_schema() -> None:
 def test_pydantic_engine_reports_validation_errors() -> None:
     with pytest.raises(PydanticValidationError):
         PydanticWidget.engine_validate({"name": "bad", "quantity": "wrong"})
+
+
+def test_msgspec_engine_projection_validation_and_roundtrip() -> None:
+    widget = MsgspecWidget(name="apples", quantity=3, note=None)
+
+    projected = widget.to_engine_model()
+    validated = MsgspecWidget.engine_validate({"name": "pears", "quantity": "7"})
+    rebuilt = MsgspecWidget.from_engine({"name": "pears", "quantity": "7", "note": None})
+
+    assert hasattr(type(projected), "__struct_fields__")
+    assert projected.name == "apples"
+    assert projected.quantity == 3
+    assert widget.engine_dump() == {"name": "apples", "quantity": 3, "note": None}
+    assert '"note":null' in widget.engine_dump_json()
+    assert validated.name == "pears"
+    assert validated.quantity == 7
+    assert isinstance(rebuilt, MsgspecWidget)
+    assert rebuilt.model_dump() == {"name": "pears", "quantity": 7, "note": None}
+
+
+def test_msgspec_engine_exposes_validation_schema() -> None:
+    schema = MsgspecWidget.engine_json_schema(mode="validation")
+
+    assert "$defs" in schema
+    assert "MsgspecWidgetValidationEngineModel" in schema["$defs"]
+    assert "name" in schema["$defs"]["MsgspecWidgetValidationEngineModel"]["properties"]
+
+
+def test_msgspec_engine_reports_validation_errors() -> None:
+    with pytest.raises(MsgspecValidationError):
+        MsgspecWidget.engine_validate({"name": "bad", "quantity": "wrong"})
 
 
 def test_unknown_engine_name_raises_when_resolved() -> None:

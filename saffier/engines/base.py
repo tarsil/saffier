@@ -1,3 +1,5 @@
+"""Core engine adapter interfaces and registration helpers."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -16,12 +18,17 @@ EngineIncludeExclude: TypeAlias = set[int] | set[str] | dict[int, Any] | dict[st
 
 
 class ModelEngine(ABC):
-    """Base class for optional model-engine adapters layered on top of Saffier."""
+    """Base class for optional model-engine adapters layered on top of Saffier.
+
+    Concrete adapters expose external model representations such as Pydantic or
+    msgspec while keeping Saffier's own model lifecycle as the source of truth.
+    """
 
     name: str = ""
 
     @staticmethod
     def _is_included(field_name: str, include: EngineIncludeExclude) -> bool:
+        """Return whether one field should be kept by an include rule."""
         if include is None:
             return True
         if isinstance(include, dict):
@@ -30,6 +37,7 @@ class ModelEngine(ABC):
 
     @staticmethod
     def _is_excluded(field_name: str, exclude: EngineIncludeExclude) -> bool:
+        """Return whether one field should be removed by an exclude rule."""
         if exclude is None:
             return False
         if isinstance(exclude, dict):
@@ -44,6 +52,18 @@ class ModelEngine(ABC):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> dict[str, Any]:
+        """Build the Saffier-owned payload used to project one instance.
+
+        Args:
+            instance: Source Saffier model instance.
+            include: Optional nested include rules.
+            exclude: Optional nested exclude rules.
+            exclude_none: Whether `None` values should be omitted.
+
+        Returns:
+            dict[str, Any]: Payload containing Saffier field data plus any
+            declared plain Python fields.
+        """
         payload = instance.model_dump(include=include, exclude=exclude, exclude_none=exclude_none)
 
         for field_name in type(instance).get_plain_model_fields():
@@ -67,6 +87,7 @@ class ModelEngine(ABC):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> Any:
+        """Project one Saffier model instance into the engine representation."""
         payload = self.build_projection_payload(
             instance,
             include=include,
@@ -83,6 +104,7 @@ class ModelEngine(ABC):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> dict[str, Any]:
+        """Serialize one projected engine model back into a plain dictionary."""
         projected = self.project_model(
             instance,
             include=include,
@@ -129,6 +151,7 @@ class ModelEngine(ABC):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> str:
+        """Serialize one projected engine model into JSON."""
         projected = self.project_model(
             instance,
             include=include,
@@ -197,6 +220,18 @@ ModelEngineFactory: TypeAlias = Callable[[], ModelEngine] | type[ModelEngine] | 
 
 
 def _ensure_model_engine_instance(configured: ModelEngineFactory) -> ModelEngine:
+    """Normalize one engine registration entry into an adapter instance.
+
+    Args:
+        configured: Registered engine object, class, or factory.
+
+    Returns:
+        ModelEngine: Instantiated adapter.
+
+    Raises:
+        ImproperlyConfigured: If the configured object does not resolve to a
+            valid `ModelEngine`.
+    """
     if isinstance(configured, ModelEngine):
         engine = configured
     elif (
@@ -219,6 +254,7 @@ class ModelEngineRegistry:
     """Global registry of named model-engine adapters."""
 
     def __init__(self) -> None:
+        """Initialize the empty adapter registry."""
         self._registered: dict[str, ModelEngineFactory] = {}
         self._resolved: dict[str, ModelEngine] = {}
 
@@ -229,6 +265,17 @@ class ModelEngineRegistry:
         *,
         overwrite: bool = False,
     ) -> ModelEngine:
+        """Register one model-engine adapter under a stable name.
+
+        Args:
+            name: Adapter name. When omitted, the adapter instance's `name` is
+                used.
+            engine: Engine class, instance, or factory.
+            overwrite: Whether an existing registration may be replaced.
+
+        Returns:
+            ModelEngine: Resolved adapter instance for the registered name.
+        """
         resolved = _ensure_model_engine_instance(engine)
         engine_name = (name or resolved.name).strip()
         if not engine_name:
@@ -240,6 +287,7 @@ class ModelEngineRegistry:
         return self.get(engine_name)
 
     def get(self, name: str) -> ModelEngine:
+        """Return one previously registered adapter by name."""
         engine_name = name.strip()
         if not engine_name:
             raise ImproperlyConfigured("Model engine names cannot be empty.")
@@ -263,14 +311,25 @@ def register_model_engine(
     *,
     overwrite: bool = False,
 ) -> ModelEngine:
+    """Register one model-engine adapter in the global registry."""
     return _MODEL_ENGINE_REGISTRY.register(name, engine, overwrite=overwrite)
 
 
 def get_model_engine(name: str) -> ModelEngine:
+    """Return one globally registered model-engine adapter."""
     return _MODEL_ENGINE_REGISTRY.get(name)
 
 
 def resolve_model_engine(configured: str | ModelEngineFactory | None | bool) -> ModelEngine | None:
+    """Resolve one model-engine configuration value.
+
+    Args:
+        configured: Configuration entry from a model or registry.
+
+    Returns:
+        ModelEngine | None: Resolved adapter, or `None` when engine support is
+            disabled.
+    """
     if configured in (None, False):
         return None
     if isinstance(configured, str):

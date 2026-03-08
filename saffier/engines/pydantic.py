@@ -1,18 +1,15 @@
+"""Pydantic-backed model engine adapter."""
+
 from __future__ import annotations
 
-import datetime
-import decimal
-import ipaddress
-import sys
 import typing
-import uuid
-from typing import Any, cast, get_args, get_origin
+from typing import Any, cast
 
 from saffier.engines.base import ModelEngine
+from saffier.engines.utils import optional_annotation, resolve_annotation, saffier_field_annotation
 from saffier.exceptions import ImproperlyConfigured
 
 if typing.TYPE_CHECKING:
-    from saffier.core.db.fields.base import Field
     from saffier.core.db.models.model import Model
 
 
@@ -22,10 +19,12 @@ class PydanticModelEngine(ModelEngine):
     name = "pydantic"
 
     def __init__(self, *, config: dict[str, Any] | None = None) -> None:
+        """Initialize the adapter with optional `ConfigDict` overrides."""
         self.config = dict(config or {})
         self._model_cache: dict[tuple[type[Model], str, int], type[Any]] = {}
 
-    def _import_pydantic(self) -> tuple[Any, Any, Any]:
+    def _import_pydantic(self) -> tuple[Any, Any, Any, Any]:
+        """Import and return the required Pydantic symbols lazily."""
         try:
             from pydantic import BaseModel, ConfigDict, Field, create_model
         except ImportError as exc:  # pragma: no cover
@@ -34,97 +33,31 @@ class PydanticModelEngine(ModelEngine):
             ) from exc
         return BaseModel, ConfigDict, Field, create_model
 
-    def _resolve_annotation(self, annotation: Any, model_class: type[Model]) -> Any:
-        if not isinstance(annotation, str):
-            return annotation
-
-        module_name = getattr(model_class, "__module__", "")
-        globalns = dict(sys.modules[module_name].__dict__) if module_name in sys.modules else {}
-        localns = dict(model_class.__dict__)
-        localns.setdefault("typing", typing)
-        localns.setdefault("ClassVar", typing.ClassVar)
-
-        try:
-            return eval(annotation, globalns, localns)
-        except Exception:
-            return Any
-
-    def _annotation_allows_none(self, annotation: Any) -> bool:
-        origin = get_origin(annotation)
-        if origin is typing.Union:
-            return type(None) in get_args(annotation)
-        return annotation is Any or annotation is type(None)
-
-    def _optional_annotation(self, annotation: Any) -> Any:
-        if annotation in (Any, typing.Any):
-            return Any
-        if self._annotation_allows_none(annotation):
-            return annotation
-        return annotation | None
-
-    def _infer_field_type(self, field: Field) -> Any:
-        if hasattr(field, "target"):
-            return Any
-
-        validator_name = field.validator.__class__.__name__
-        if validator_name in {"String", "Email", "URL", "Password"}:
-            return str
-        if validator_name == "UUID":
-            return uuid.UUID
-        if validator_name == "Integer":
-            return int
-        if validator_name == "Float":
-            return float
-        if validator_name == "Decimal":
-            return decimal.Decimal
-        if validator_name == "Boolean":
-            return bool
-        if validator_name == "Binary":
-            return bytes
-        if validator_name == "Date":
-            return datetime.date
-        if validator_name == "Time":
-            return datetime.time
-        if validator_name == "DateTime":
-            return datetime.datetime
-        if validator_name == "Duration":
-            return datetime.timedelta
-        if validator_name == "IPAddress":
-            return ipaddress.IPv4Address
-        if validator_name == "JSON":
-            return dict[str, Any]
-        return Any
-
-    def _field_annotation(self, field: Field, model_class: type[Model]) -> Any:
-        annotation = getattr(field, "annotation", None)
-        if annotation not in (None, Any):
-            return self._resolve_annotation(annotation, model_class)
-        return self._infer_field_type(field)
-
     def _field_definition(
         self,
         field_name: str,
-        field: Field,
+        field: Any,
         model_class: type[Model],
         *,
         mode: str,
     ) -> tuple[Any, Any]:
+        """Build one Pydantic field definition from a Saffier field."""
         _, _, pydantic_field, _ = self._import_pydantic()
-        annotation = self._field_annotation(field, model_class)
+        annotation = saffier_field_annotation(field, model_class)
 
         if mode == "projection":
-            return self._optional_annotation(annotation), None
+            return optional_annotation(annotation), None
 
         if getattr(field, "is_computed", False):
-            return self._optional_annotation(annotation), None
+            return optional_annotation(annotation), None
         if getattr(field, "primary_key", False) and getattr(field, "autoincrement", False):
-            return self._optional_annotation(annotation), None
+            return optional_annotation(annotation), None
         if getattr(field.validator, "read_only", False):
-            return self._optional_annotation(annotation), None
+            return optional_annotation(annotation), None
         if getattr(field, "server_default", None) is not None:
-            return self._optional_annotation(annotation), None
+            return optional_annotation(annotation), None
         if getattr(field, "null", False):
-            return self._optional_annotation(annotation), None
+            return optional_annotation(annotation), None
         if field.validator.has_default():
             default = getattr(field.validator, "default", None)
             if callable(default):
@@ -140,15 +73,17 @@ class PydanticModelEngine(ModelEngine):
         *,
         mode: str,
     ) -> tuple[Any, Any]:
+        """Build one Pydantic field definition from a plain Python field."""
         del field_name
-        annotation = self._resolve_annotation(plain_field.get("annotation", Any), model_class)
-        annotation = self._optional_annotation(annotation)
+        annotation = resolve_annotation(plain_field.get("annotation", Any), model_class)
+        annotation = optional_annotation(annotation)
         default = plain_field.get("default")
         if mode == "projection":
             return annotation, default
         return annotation, default
 
     def get_model_class(self, model_class: type[Model], *, mode: str = "projection") -> type[Any]:
+        """Return the Pydantic model class for one Saffier model."""
         _, config_dict, _, create_model = self._import_pydantic()
         cache_key = (model_class, mode, getattr(model_class.meta, "_engine_generation", 0))
         if cache_key in self._model_cache:
@@ -199,6 +134,7 @@ class PydanticModelEngine(ModelEngine):
         *,
         mode: str = "validation",
     ) -> Any:
+        """Validate or coerce a value into the Pydantic representation."""
         engine_model = self.get_model_class(model_class, mode=mode)
         if isinstance(value, engine_model):
             return value
@@ -213,6 +149,7 @@ class PydanticModelEngine(ModelEngine):
         *,
         exclude_unset: bool = False,
     ) -> dict[str, Any]:
+        """Convert a Pydantic value back into a Saffier constructor payload."""
         if hasattr(value, "model_dump"):
             kwargs = {"exclude_unset": exclude_unset}
             try:
@@ -229,6 +166,7 @@ class PydanticModelEngine(ModelEngine):
         mode: str = "projection",
         **kwargs: Any,
     ) -> dict[str, Any]:
+        """Return the Pydantic-generated JSON schema for one model."""
         engine_model = self.get_model_class(model_class, mode=mode)
         return cast("dict[str, Any]", engine_model.model_json_schema(**kwargs))
 

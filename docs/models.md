@@ -154,7 +154,10 @@ When enabled, the model gains opt-in helpers such as:
 The normal ORM lifecycle stays the same. Querysets, relations, save/load, and
 `model_dump()` are still owned by Saffier.
 
-See [Model Engines](./engines.md) for the full design and usage guide.
+Built-in engine adapters currently include `pydantic` and `msgspec`.
+
+See [Model Engines](./engines.md) for the full design, examples, custom-engine
+guide, guarantees, and migration notes.
 
 Saffier models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.

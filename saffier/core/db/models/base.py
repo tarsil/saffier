@@ -266,6 +266,12 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def get_model_engine_name(cls) -> str | None:
+        """Return the configured engine name for the model, if any.
+
+        Returns:
+            str | None: Explicit model engine name, inherited registry default,
+                or `None` when engine support is disabled.
+        """
         configured = getattr(cls.meta, "model_engine", None)
         if configured is False:
             return None
@@ -279,6 +285,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def get_model_engine(cls) -> "ModelEngine | None":
+        """Resolve and return the configured engine adapter for the model."""
         configured = getattr(cls.meta, "model_engine", None)
         if configured is False:
             return None
@@ -288,6 +295,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def require_model_engine(cls) -> "ModelEngine":
+        """Return the model engine or raise when none is configured."""
         engine = cls.get_model_engine()
         if engine is None:
             raise ImproperlyConfigured(f"Model '{cls.__name__}' has no model engine configured.")
@@ -295,14 +303,26 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def get_engine_model_class(cls, *, mode: str = "projection") -> type[Any]:
+        """Return the engine-backed class for the model."""
         return cls.require_model_engine().get_model_class(cls, mode=mode)
 
     @classmethod
     def engine_validate(cls, value: Any, *, mode: str = "validation") -> Any:
+        """Validate external data through the configured engine adapter."""
         return cls.require_model_engine().validate_model(cls, value, mode=mode)
 
     @classmethod
     def from_engine(cls, value: Any, *, exclude_unset: bool = True) -> "Self":
+        """Build a Saffier model instance from an engine-backed value.
+
+        Args:
+            value: Engine-backed object or input payload accepted by the engine.
+            exclude_unset: Whether engine defaults absent from the original
+                input should be omitted from the Saffier constructor payload.
+
+        Returns:
+            Self: New Saffier model instance.
+        """
         payload = cls.require_model_engine().to_saffier_data(
             cls,
             value,
@@ -312,6 +332,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
 
     @classmethod
     def engine_json_schema(cls, *, mode: str = "projection", **kwargs: Any) -> dict[str, Any]:
+        """Return the engine-generated JSON schema for the model."""
         return cls.require_model_engine().json_schema(cls, mode=mode, **kwargs)
 
     def to_engine_model(
@@ -321,6 +342,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> Any:
+        """Project the current instance into the configured engine model."""
         return (
             type(self)
             .require_model_engine()
@@ -339,6 +361,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> dict[str, Any]:
+        """Serialize the engine-backed projection of the current instance."""
         return (
             type(self)
             .require_model_engine()
@@ -357,6 +380,7 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         exclude: EngineIncludeExclude = None,
         exclude_none: bool = False,
     ) -> str:
+        """Serialize the engine-backed projection of the current instance to JSON."""
         return (
             type(self)
             .require_model_engine()

@@ -1,4 +1,4 @@
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 import importlib
 import sys
@@ -80,7 +80,13 @@ from .core.extras import SaffierExtra
 from .core.marshalls import ConfigMarshall, Marshall, MarshallField, MarshallMethodField
 from .core.signals import Signal
 from .core.utils.sync import run_sync
-from .engines import ModelEngine, PydanticModelEngine, get_model_engine, register_model_engine
+from .engines import (
+    ModelEngine,
+    MsgspecModelEngine,
+    PydanticModelEngine,
+    get_model_engine,
+    register_model_engine,
+)
 from .exceptions import (
     DatabaseNotConnectedWarning,
     FieldDefinitionError,
@@ -203,6 +209,7 @@ __all__ = [
     "RedirectManager",
     "Migrate",
     "ModelEngine",
+    "MsgspecModelEngine",
     "Model",
     "ModelRef",
     "MultipleObjectsReturned",

@@ -112,7 +112,7 @@ specific queries and querysets at ease.
 * **Permissions contrib** - Reusable permission model and permission manager helpers.
 * **Admin subsystem** - Python-native admin site and optional ASGI admin app.
 * **Python-native marshalls** - DTO/serializer layer with custom fields, context, schema output, and save support.
-* **Model engines** - Optional adapter layer for Pydantic today and future engines such as msgspec or attrs.
+* **Model engines** - Optional adapter layer for built-in Pydantic and msgspec support, plus custom future engines such as attrs.
 * **Standalone file storage API** - `saffier.files` now exposes file objects, storage backends, and safe filesystem handling.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you

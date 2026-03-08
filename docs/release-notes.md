@@ -1,5 +1,32 @@
 # Release Notes
 
+## 2.1.0
+
+Saffier 2.1.0 expands the ORM into its next layer: engine-pluggable models.
+
+This release keeps the Saffier core as the source of truth while adding an
+optional adapter layer for external model engines, richer serialization and
+validation entry points, and substantially expanded documentation for adopting
+or extending the new architecture.
+
+### Added
+
+- Engine-pluggable model support through `Registry(model_engine=...)` and `Meta.model_engine`.
+- Built-in `pydantic` and `msgspec` model engine adapters with lazy imports.
+- New engine-facing model APIs: `get_model_engine()`, `get_engine_model_class()`, `engine_validate()`, `from_engine()`, `to_engine_model()`, `engine_dump()`, `engine_dump_json()`, and `engine_json_schema()`.
+- Dedicated model-engine documentation, reference pages, runnable examples, and a custom-engine implementation guide.
+
+### Changed
+
+- Saffier models remain fully functional with no engine configured; engine support is now a pure opt-in adapter layer on top of the existing ORM behavior.
+- Engine selection now participates in model inheritance, proxy-model generation, and registry-level defaults.
+- New and touched engine/model code paths now include comprehensive docstrings across both public and internal helpers.
+
+### Fixed
+
+- Model-engine metadata now propagates correctly through proxy models, inherited models, and copied registries.
+- Engine-backed payload generation preserves Saffier-owned serialization semantics while allowing per-engine projection and validation behavior.
+
 ## 2.0.0
 
 Saffier 2.0.0 marks the beginning of a new chapter for the project: a sharper,

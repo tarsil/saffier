@@ -7,6 +7,7 @@ from tests.settings import DATABASE_URL
 database = Database(url=DATABASE_URL)
 plain_models = saffier.Registry(database=database)
 engine_models = saffier.Registry(database=database, model_engine="pydantic")
+msgspec_models = saffier.Registry(database=database, model_engine="msgspec")
 
 pytestmark = pytest.mark.anyio
 
@@ -63,11 +64,39 @@ class EngineOrganisation(saffier.Model):
         table_prefix = "pydantic_engine"
 
 
+class MsgspecProfile(saffier.Model):
+    name = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = msgspec_models
+        table_prefix = "msgspec_engine"
+
+
+class MsgspecUser(saffier.Model):
+    email = saffier.EmailField(max_length=255)
+    profile = saffier.ForeignKey(MsgspecProfile, on_delete=saffier.CASCADE)
+
+    class Meta:
+        registry = msgspec_models
+        table_prefix = "msgspec_engine"
+
+
+class MsgspecOrganisation(saffier.Model):
+    user = saffier.ForeignKey(MsgspecUser, on_delete=saffier.CASCADE)
+    label = saffier.CharField(max_length=100)
+
+    class Meta:
+        registry = msgspec_models
+        table_prefix = "msgspec_engine"
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await plain_models.create_all()
     await engine_models.create_all()
+    await msgspec_models.create_all()
     yield
+    await msgspec_models.drop_all()
     await engine_models.drop_all()
     await plain_models.drop_all()
 
@@ -144,3 +173,32 @@ async def test_engine_configuration_does_not_change_query_update_or_count_behavi
         "email": "updated@example.com",
         "profile": {"id": profile.id, "name": "initial"},
     }
+
+
+async def test_msgspec_engine_queryset_and_relations_keep_core_model_behavior() -> None:
+    profile = await MsgspecProfile.query.create(name="msgspec")
+    user = await MsgspecUser.query.create(email="msgspec@example.com", profile=profile)
+    await MsgspecOrganisation.query.create(user=user, label="msgspec-org")
+
+    organisation = await MsgspecOrganisation.query.select_related("user__profile").get()
+    projected_user = organisation.user.to_engine_model()
+
+    assert isinstance(organisation, MsgspecOrganisation)
+    assert isinstance(organisation.user, MsgspecUser)
+    assert isinstance(organisation.user.profile, MsgspecProfile)
+    assert hasattr(type(projected_user), "__struct_fields__")
+    assert organisation.model_dump() == {
+        "id": 1,
+        "user": {
+            "id": 1,
+            "email": "msgspec@example.com",
+            "profile": {"id": 1, "name": "msgspec"},
+        },
+        "label": "msgspec-org",
+    }
+    assert organisation.user.engine_dump() == {
+        "id": 1,
+        "email": "msgspec@example.com",
+        "profile": {"id": 1, "name": "msgspec"},
+    }
+    assert '"email":"msgspec@example.com"' in organisation.user.engine_dump_json()
