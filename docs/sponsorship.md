@@ -2,9 +2,9 @@
 
 Do you like **Saffier** and would like to help Saffier, other userd and the author?
 
-## 🐦 Follow Saffier and Esmerald on Twitter
+## 🐦 Follow Saffier and Ravyn on Twitter
 
-[Follow @apiesmerald on Twitter](https://twitter.com/apiesmerald) to get the latest news.
+[Follow Ravyn on GitHub](https://github.com/dymmond/ravyn) to get the latest news.
 
 ## ⭐ Star **Saffier** on GitHub
 

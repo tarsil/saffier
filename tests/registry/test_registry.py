@@ -43,7 +43,7 @@ async def rollback_connections():
             yield
 
 
-@pytest.mark.parametrize("schema", ["saffier", "edgy", "esmerald", "tenant"])
+@pytest.mark.parametrize("schema", ["saffier", "tenant_alpha", "ravyn", "tenant"])
 async def test_create_schema(schema):
     # Get rid of the schema
     await registry.schema.drop_schema(schema=schema, cascade=True, if_exists=True)

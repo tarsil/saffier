@@ -1,20 +1,20 @@
-import click
+from typing import Annotated
+
+from sayer import Option, command
 
 from saffier.cli.base import heads as _heads
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, VerboseOption
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
-@click.option(
-    "--resolve-dependencies", is_flag=True, help="Treat dependency versions as down revisions"
-)
-@click.command()
-def heads(env: MigrationEnv, directory: str, verbose: bool, resolve_dependencies: bool) -> None:
+@command
+def heads(
+    verbose: VerboseOption,
+    resolve_dependencies: Annotated[
+        bool,
+        Option(False, is_flag=True, help="Treat dependency versions as down revisions"),
+    ],
+    directory: DirectoryOption,
+) -> None:
     """Show current available heads in the script directory"""
-    _heads(env.app, directory, verbose, resolve_dependencies)
+    _heads(get_migration_app(), directory, verbose, resolve_dependencies)

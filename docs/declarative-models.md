@@ -26,9 +26,9 @@ then it will create automatically the following fields:
 * `receiver_relation`
 
 For the core use of Saffier, this doesn't do anything and does not impact anything but if you
-are using a third party package like [Esmerald Admin](https://esmerald-admin.tarsild.io) where it
+are using a third party package like [Ravyn Admin](https://ravyn-admin.tarsild.io) where it
 uses the Saffier declarative models, then this makes the whole difference to interact with.
 
 !!! Info
     In general you don't need to worry about this. This is mainly used by third parties that need
-    to use declarative models from Saffier, like [Esmerald Admin](https://esmerald-admin.tarsild.io).
+    to use declarative models from Saffier, like [Ravyn Admin](https://ravyn-admin.tarsild.io).

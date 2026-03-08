@@ -1,5 +1,4 @@
 import pytest
-from pydantic import __version__
 
 import saffier
 from saffier.contrib.multi_tenancy import TenantRegistry
@@ -11,10 +10,9 @@ models = TenantRegistry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
-class EdgyTenantBaseModel(saffier.Model):
+class SaffierTenantBaseModel(saffier.Model):
     id: int = saffier.IntegerField(primary_key=True)
 
     class Meta:
@@ -22,21 +20,21 @@ class EdgyTenantBaseModel(saffier.Model):
         abstract = True
 
 
-class Designation(EdgyTenantBaseModel):
+class Designation(SaffierTenantBaseModel):
     name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_designation"
 
 
-class AppModule(EdgyTenantBaseModel):
+class AppModule(SaffierTenantBaseModel):
     name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_module"
 
 
-class Permission(EdgyTenantBaseModel):
+class Permission(SaffierTenantBaseModel):
     module = saffier.ForeignKey(AppModule)
     designation = saffier.ForeignKey("Designation")
     can_read = saffier.BooleanField(default=False)

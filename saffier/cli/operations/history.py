@@ -1,28 +1,31 @@
-import click
+from typing import Annotated
+
+from sayer import Option, command
 
 from saffier.cli.base import history as _history
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, VerboseOption
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option(
-    "-r", "--rev-range", default=None, help="Specify a revision range; format is [start]:[end]"
-)
-@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
-@click.option(
-    "-i",
-    "--indicate-current",
-    is_flag=True,
-    help=("Indicate current version (Alembic 0.9.9 or greater is " "required)"),
-)
-@click.command()
+@command
 def history(
-    env: MigrationEnv, directory: str, rev_range: str, verbose: bool, indicate_current: bool
+    rev_range: Annotated[
+        str | None,
+        Option(
+            None, "-r", "--rev-range", help="Specify a revision range; format is [start]:[end]"
+        ),
+    ],
+    verbose: VerboseOption,
+    indicate_current: Annotated[
+        bool,
+        Option(
+            False,
+            "-i",
+            is_flag=True,
+            help=("Indicate current version (Alembic 0.9.9 or greater is required)"),
+        ),
+    ],
+    directory: DirectoryOption,
 ) -> None:
     """List changeset scripts in chronological order."""
-    _history(env.app, directory, rev_range, verbose, indicate_current)
+    _history(get_migration_app(), directory, rev_range, verbose, indicate_current)

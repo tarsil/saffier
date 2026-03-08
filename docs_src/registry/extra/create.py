@@ -22,7 +22,7 @@ async def bulk_create_users() -> None:
     """
     await User.query.using_with_db("alternative").bulk_create(
         [
-            {"name": "Edgy", "email": "saffier@example.com"},
-            {"name": "Edgy Alternative", "email": "saffier.alternative@example.com"},
+            {"name": "Saffier", "email": "saffier@example.com"},
+            {"name": "Saffier Alternative", "email": "saffier.alternative@example.com"},
         ]
     )

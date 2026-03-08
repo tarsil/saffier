@@ -47,7 +47,7 @@ Let us create some data.
 
 ```python
 await User.query.create(name="Saffier", email="saffier@example.dev", password="A@Pass123")
-await User.query.create(name="Esmerald", email="esmerald@esmerald.dev", password="A@Pass321")
+await User.query.create(name="Ravyn", email="ravyn@ravyn.dev", password="A@Pass321")
 ```
 
 Now, let us query excluding the secrets.
@@ -76,6 +76,11 @@ the `secret` declared. This can be specially useful if you don't want to be both
 manipulate all of those details manually and simlpy still using the normal ORM queries without any
 hassle.
 
+When a queryset is running in `exclude_secrets()` mode, Saffier also blocks those
+secret attributes from being loaded implicitly through attribute access or computed
+field serialization. This keeps `model_dump()` aligned with the filtered query
+instead of lazily reintroducing secret data by accident.
+
 #### Other examples
 
 As mentioned before, you can mix the operations with the `exclude_secrets` which means you can do
@@ -85,6 +90,7 @@ things like this.
 users = await User.query.filter(id=1).exclude_secrets()
 users = await User.query.filter(id=1).exclude_secrets().get() # returns only 1 object
 users = await User.query.exclude_secrets().only("email")
+users = await User.query.exclude_secrets().exclude_secrets(False).get(id=1)
 ```
 
 And the list goes on and on.
@@ -97,6 +103,19 @@ There are different ways of making this happen.
 
 One of the ways is by **not using the exclude_secrets** queryset and the other is by removing the
 flag `secret` from the field.
+
+If you already have a queryset chain that enables secret filtering, you can turn it back off with:
+
+```python
+user = await User.query.exclude_secrets().exclude_secrets(False).get(id=1)
+await user.load_recursive()
+```
+
+`load_recursive()` is useful when the secret query masked foreign-key relations and you want to
+reload the full related graph before dumping it again.
+
+For a single model instance, `await user.load()` is enough to restore the masked
+scalar fields before serializing again.
 
 Removing the flag has no issue since you can add it back at any given time but the best way it would
 be by simply not calling `exclude_secrets` at all since the flag `secret=True` is only used for that

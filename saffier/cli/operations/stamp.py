@@ -1,24 +1,14 @@
-import click
+from sayer import command
 
 from saffier.cli.base import stamp as _stamp
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, RevisionHeadArgument, SQLOption, TagOption
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option(
-    "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
-)
-@click.option(
-    "--tag", default=None, help=('Arbitrary "tag" name - can be used by custom env.py ' "scripts")
-)
-@click.argument("revision", default="head")
-@click.command()
-def stamp(env: MigrationEnv, directory: str, sql: bool, tag: str, revision: str) -> None:
+@command
+def stamp(
+    sql: SQLOption, tag: TagOption, revision: RevisionHeadArgument, directory: DirectoryOption
+) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    _stamp(env.app, directory, revision, sql, tag)
+    _stamp(get_migration_app(), directory, revision, sql, tag)

@@ -47,7 +47,8 @@ async def test_exclude_secrets_query():
     user = await User.query.exclude_secrets(id=1).get()
 
     assert user.pk == 1
-    assert user.__dict__ == {"id": 1, "name": "saffier", "email": "user@dev.com"}
+    assert user.model_dump() == {"id": 1, "name": "saffier", "email": "user@dev.com"}
+    assert user.__no_load_trigger_attrs__ == {"password"}
 
 
 async def test_exclude_secrets():
@@ -58,8 +59,10 @@ async def test_exclude_secrets():
     assert profile.pk == 1
     assert profile.model_dump() == {"id": 1, "is_valid": True}
 
-    profile.access  # noqa
+    with pytest.raises(AttributeError):
+        profile.access  # noqa: B018
 
+    await profile.load()
     assert profile.model_dump() == {"id": 1, "is_valid": True, "access": "admin"}
 
     profile = await Profile.query.exclude_secrets(id=1).get()

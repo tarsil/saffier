@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 
 import saffier
@@ -29,8 +31,8 @@ async def test_inherited_abstract_base_model_managers_raises_error_on_multiple()
     with pytest.raises(ImproperlyConfigured) as raised:
 
         class BaseModel(saffier.Model):
-            query = ObjectsManager()
-            languages = LanguageManager()
+            query: ClassVar[Manager] = ObjectsManager()
+            languages: ClassVar[Manager] = LanguageManager()
 
             class Meta:
                 abstract = True

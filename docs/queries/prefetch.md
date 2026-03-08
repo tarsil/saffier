@@ -42,7 +42,10 @@ Using the `Prefetch` also means something. You **must** use the [related names](
 of the [ForeignKey](../relationships.md#foreignkey) declared.
 
 !!! Warning
-    **The Prefetch does not work on [ManyToMany](./many-to-many.md) fields**.
+    `Prefetch` follows relationship paths, so the `related_name` you pass must match the
+    actual traversal path. That includes reverse foreign-key paths such as
+    `companies__studios__tracks` and forward/reverse many-to-many paths such as
+    `groups` or `groups__role__users`.
 
 This means, imagine you have the following:
 
@@ -88,6 +91,28 @@ if you don't provide a related name, **automatically Saffier generates it and th
 The way you do [queries](./queries.md) remains exactly the same you do all the time with **Saffier**
 as the [Prefetch](#prefetch) is another process running internally, so that means you can apply
 any filter you want as you would normal do in a query.
+
+### Many-to-many prefetch
+
+Forward and reverse many-to-many traversals can be prefetched as well.
+
+```python
+space = await Space.query.prefetch_related(
+    Prefetch("groups", to_attr="prefetched_groups"),
+    Prefetch(
+        "groups__role__users",
+        to_attr="prefetched_users",
+        queryset=User.query.all().distinct("id"),
+    ),
+).get(id=1)
+```
+
+This works with direct many-to-many collections and with longer mixed paths that cross
+many-to-many and foreign-key relations.
+
+Reverse foreign-key and reverse many-to-many traversals follow the same relationship-path rules
+used by `filter()` and `Q(...)`, so nested paths such as `albums__tracks` and `groups__users`
+can be prefetched as long as each segment matches the real traversal name.
 
 ### How to use
 

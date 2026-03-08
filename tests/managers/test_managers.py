@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 
 import saffier
@@ -24,10 +26,11 @@ class User(saffier.Model):
 
     class Meta:
         registry = models
+        tablename = "manager_test_users"
 
 
 class Product(saffier.Model):
-    active = ActiveManager()
+    active: ClassVar[Manager] = ActiveManager()
 
     name = saffier.CharField(max_length=100)
     rating = saffier.IntegerField(minimum=1, maximum=5)
@@ -36,7 +39,7 @@ class Product(saffier.Model):
 
     class Meta:
         registry = models
-        name = "products"
+        tablename = "manager_test_products"
 
 
 @pytest.fixture(autouse=True, scope="function")

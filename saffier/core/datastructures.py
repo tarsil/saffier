@@ -1,25 +1,22 @@
+from __future__ import annotations
+
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
 
-object_setattr = object.__setattr__
-
-
-class HashableBaseModel(BaseModel):
+class HashableBaseModel:
     """
-    Pydantic BaseModel by default doesn't handle with hashable types the same way
-    a python object would and therefore there are types that are mutable (list, set)
-    not hashable and those need to be handled properly.
-
-    HashableBaseModel handles those corner cases.
+    Lightweight mutable object used by Saffier internals.
     """
 
-    __slots__ = ["__weakref__"]
+    __slots__ = ("__dict__", "__weakref__")
 
-    def __hash__(self) -> Any:
-        values: Any = {}
+    def __init__(self, **kwargs: Any) -> None:
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def __hash__(self) -> int:
+        values: dict[str, Any] = {}
         for key, value in self.__dict__.items():
-            values[key] = None
             if isinstance(value, (list, set)):
                 values[key] = tuple(value)
             else:
@@ -29,7 +26,5 @@ class HashableBaseModel(BaseModel):
 
 class ArbitraryHashableBaseModel(HashableBaseModel):
     """
-    Same as HashableBaseModel but allowing arbitrary values
+    Backwards-compatible alias for internals that allow dynamic attributes.
     """
-
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)

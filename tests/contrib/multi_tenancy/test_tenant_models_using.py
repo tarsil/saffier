@@ -12,6 +12,7 @@ database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)
 
 pytestmark = pytest.mark.anyio
+TENANT_SCHEMAS = ("saffier", "tenant_alpha", "tenant_beta")
 
 
 def time():
@@ -21,9 +22,13 @@ def time():
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     try:
+        for schema_name in TENANT_SCHEMAS:
+            await drop_schemas(schema_name)
         await models.create_all()
         yield
         await models.drop_all()
+        for schema_name in TENANT_SCHEMAS:
+            await drop_schemas(schema_name)
     except Exception as e:
         pytest.skip(f"Error: {str(e)}")
 
@@ -36,7 +41,7 @@ async def rollback_connections():
 
 
 async def drop_schemas(name):
-    await models.schema.drop_schema(name, if_exists=True)
+    await models.schema.drop_schema(name, cascade=True, if_exists=True)
 
 
 class Tenant(TenantMixin):
@@ -92,45 +97,51 @@ async def test_schema_with_using_in_different_place():
 
 
 async def test_can_have_multiple_tenants_with_different_records_with_using():
-    edgy = await Tenant.query.create(
-        schema_name="edgy",
-        domain_url="https://edgy.tarsild.io",
-        tenant_name="edgy",
+    tenant_alpha = await Tenant.query.create(
+        schema_name="tenant_alpha",
+        domain_url="https://tenant-alpha.saffier.test",
+        tenant_name="tenant_alpha",
     )
-    saffier = await Tenant.query.create(
-        schema_name="saffier",
-        domain_url="https://saffier.tarsild.io",
-        tenant_name="saffier",
+    tenant_beta = await Tenant.query.create(
+        schema_name="tenant_beta",
+        domain_url="https://tenant-beta.saffier.test",
+        tenant_name="tenant_beta",
     )
 
-    # Create a user for edgy
-    user_edgy = await User.query.using(edgy.schema_name).create(name="Edgy")
+    # Create a user for tenant alpha
+    user_alpha = await User.query.using(tenant_alpha.schema_name).create(name="Saffier Alpha")
 
-    # Create products for user_edgy
+    # Create products for user_alpha
     for i in range(5):
-        await Product.query.using(edgy.schema_name).create(name=f"product-{i}", user=user_edgy)
+        await Product.query.using(tenant_alpha.schema_name).create(
+            name=f"product-{i}", user=user_alpha
+        )
 
-    # Create a user for saffier
-    user_saffier = await User.query.group_by().using(saffier.schema_name).create(name="Saffier")
+    # Create a user for tenant beta
+    user_beta = (
+        await User.query.group_by().using(tenant_beta.schema_name).create(name="Saffier Beta")
+    )
 
-    # Create products for user_saffier
+    # Create products for user_beta
     for i in range(25):
-        await Product.query.exclude().using(saffier.schema_name).create(
-            name=f"product-{i}", user=user_saffier
+        await (
+            Product.query.exclude()
+            .using(tenant_beta.schema_name)
+            .create(name=f"product-{i}", user=user_beta)
         )
 
     # Create top level users
     for name in range(10):
-        await User.query.filter().using(saffier.schema_name).create(name=f"user-{name}")
-        await User.query.filter().using(edgy.schema_name).create(name=f"user-{name}")
+        await User.query.filter().using(tenant_beta.schema_name).create(name=f"user-{name}")
+        await User.query.filter().using(tenant_alpha.schema_name).create(name=f"user-{name}")
         await User.query.distinct().create(name=f"user-{name}")
 
     # Check the totals
     top_level_users = await User.query.all()
     assert len(top_level_users) == 10
 
-    users_edgy = await User.query.using(edgy.schema_name).all()
-    assert len(users_edgy) == 11
+    users_alpha = await User.query.using(tenant_alpha.schema_name).all()
+    assert len(users_alpha) == 11
 
-    users_saffier = await User.query.using(saffier.schema_name).all()
-    assert len(users_saffier) == 11
+    users_beta = await User.query.using(tenant_beta.schema_name).all()
+    assert len(users_beta) == 11

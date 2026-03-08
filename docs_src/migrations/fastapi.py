@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from my_project.utils import get_db_connection
 
-from saffier.cli import Migrate
+from saffier import Instance, monkay
 
 
 def build_path():
@@ -30,7 +30,7 @@ def get_application():
 
     app = FastAPI(__name__)
 
-    Migrate(app=app, registry=registry)
+    monkay.set_instance(Instance(registry=registry, app=app))
     return app
 
 

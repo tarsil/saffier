@@ -1,7 +1,4 @@
-from typing import Optional
-
 import pytest
-from pydantic import __version__
 
 import saffier
 from saffier.contrib.multi_tenancy import TenantRegistry
@@ -13,10 +10,9 @@ models = TenantRegistry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
-class EdgyTenantBaseModel(saffier.Model):
+class SaffierTenantBaseModel(saffier.Model):
     id: int = saffier.IntegerField(primary_key=True)
 
     class Meta:
@@ -39,7 +35,7 @@ class User(saffier.Model):
         registry = models
 
 
-class Designation(EdgyTenantBaseModel):
+class Designation(SaffierTenantBaseModel):
     name: str = saffier.CharField(max_length=100)
     user: User = saffier.ForeignKey(User, null=True)
 
@@ -47,16 +43,16 @@ class Designation(EdgyTenantBaseModel):
         tablename = "ut_designation"
 
 
-class AppModule(EdgyTenantBaseModel):
+class AppModule(SaffierTenantBaseModel):
     name: str = saffier.CharField(max_length=100)
 
     class Meta:
         tablename = "ut_module"
 
 
-class Permission(EdgyTenantBaseModel):
-    module: Optional[AppModule] = saffier.ForeignKey(AppModule)
-    designation: Optional[Designation] = saffier.ForeignKey("Designation")
+class Permission(SaffierTenantBaseModel):
+    module: AppModule | None = saffier.ForeignKey(AppModule)
+    designation: Designation | None = saffier.ForeignKey("Designation")
     can_read: bool = saffier.BooleanField(default=False)
     can_write: bool = saffier.BooleanField(default=False)
     can_update: bool = saffier.BooleanField(default=False)

@@ -1,9 +1,42 @@
----
-hide:
-  - navigation
----
-
 # Release Notes
+
+## 2.0.0
+
+Saffier 2.0.0 marks the beginning of a new chapter for the project: a sharper,
+fully modernized ORM with a pure-Python core, stronger query and relationship
+capabilities, and a cleaner long-term foundation for framework-agnostic async applications.
+
+This release focuses on the areas that matter most in real projects: model behavior,
+queryset power, relation handling, migration tooling, tenancy support, compatibility,
+and documentation.
+
+Saffier became faster, better, cleaner. This is the same Saffier you know and love, but with a sharper edge and a stronger core
+and... a lot of new features and improvements but also... Faster!
+
+### Added
+
+- QuerySet set operations: `union`, `union_all`, `intersect`, `intersect_all`, `except_`, and `except_all`.
+- QuerySet `bulk_get_or_create` with `bulk_select_or_insert` alias.
+- QuerySet `local_or`, `batch_size`, `extra_select`, and `reference_select` APIs.
+- Settings runtime helpers: `configure_settings`, `reload_settings`, and `override_settings`.
+- Edgy compatibility modules for legacy imports across queryset, tenancy, admin, Lilya middleware, and model helpers.
+- Pure-Python `Model.model_json_schema(...)` compatibility and richer tenancy helpers such as `with_schema(...)` and `using(database=..., schema=...)`.
+
+### Changed
+
+- Saffier now ships with a fully pure-Python model/runtime layer and no longer depends on Pydantic internally (Like its sibling Edgy does).
+- Query and model `delete()` now return deleted row counts.
+- Documentation tooling now follows the Zensical workflow with Edgy-aligned Hatch/Taskfile docs commands (`docs_prepare`, `docs_build`, `docs_clean`, `serve`).
+- CLI, migration, and application-discovery flows were refreshed for the current runtime and template system.
+
+### Fixed
+
+- Tenant schema table metadata now keeps foreign-key relationships consistent across related models in non-default schemas.
+- QuerySet `raw_delete()` added and delete filtering now respects accumulated OR clauses.
+- Removed `loguru`; Saffier now uses Python standard-library logging in core modules.
+- QuerySet cache parity improved for `all(clear_cache=True)`, cached `get()`, SQL rendering, and `select_for_update(...)`.
+- Permission, pagination, lazy-import, and nested `exclude_secrets()` compatibility now align more closely with Edgy behavior.
+- Model save/create extraction now matches Edgy for nullable/default fields, explicit read-only primary-key values, and composite-key / related-field inserts.
 
 ## 1.4.2
 
@@ -39,14 +72,13 @@ inspected.
 
 ### Changed
 
-- New lazy loading settings system making it more unique and dynamic working side by side
-with `dymmond-settings`.
+- New lazy loading settings system making runtime configuration more dynamic and centralized.
 
 ## 1.3.6
 
 ### Changed
 
-- Update internal `dymmond-settings` minimum requirement.
+- Update the internal settings implementation.
 
 ## 1.3.5
 
@@ -137,7 +169,7 @@ to the right tenant.
 
 ### Added
 
-- Support for `sync` queries. This will enable Edgy to run in blocking frameworks like
+- Support for `sync` queries. This will enable Saffier to run in blocking frameworks like
 Flask, bottle or any other by using the newly added [run_sync](./queries/queries.md#blocking-queries).
 
 ### Fixed
@@ -150,7 +182,7 @@ when querying the tenant.
 
 ### Added
 
-- Support for [`or_`, `and_` and `not_`](./queries/queries#saffier-style) for SQLAlchemy style queries and Edgy syntax sugar queries.
+- Support for [`or_`, `and_` and `not_`](./queries/queries#saffier-style) for SQLAlchemy style queries and Saffier syntax sugar queries.
 
 ### Changed
 
@@ -165,7 +197,7 @@ caused by the `urlsplit`.
 
 !!! Warning
 	This could impact your migrations, so the advise would be to generate a new migration
-	after upgrading to the new version of Edgy to make sure the database reflects the proper
+	after upgrading to the new version of Saffier to make sure the database reflects the proper
 	nullables/non-nullable fields.
 
 
@@ -177,7 +209,7 @@ caused by the `urlsplit`.
 
 ### Changed
 
-- Added `name` for `edgy.UniqueConstraint` allowing unique custom names for the `unique_together`.
+- Added `name` for `saffier.UniqueConstraint` allowing unique custom names for the `unique_together`.
 - `max_name_length` in the datastuctures changed to `__max_name_length__` and `ClassVar`.
 
 ## 1.0.1
@@ -288,7 +320,7 @@ performance.
     bring a whole new level of performance to Saffier as well.
 
 !!! Warning
-    To use this version of Saffier with Esmerald, until it is announced compatibility with pydantic 2.0 with Esmerald, it is recommended to use saffier prior to this release.
+    To use this version of Saffier with Ravyn, until it is announced compatibility with pydantic 2.0 with Ravyn, it is recommended to use saffier prior to this release.
 
 ## 0.13.0
 
@@ -449,7 +481,7 @@ to any saffier instance.
 
 ### Changed
 
-- Updated requirements to support Esmerald >= 1.1.0 for testing.
+- Updated requirements to support Ravyn >= 1.1.0 for testing.
 - Updated testing and docs requirements.
 
 ### Added

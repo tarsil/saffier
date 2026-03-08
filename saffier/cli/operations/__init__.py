@@ -1,3 +1,4 @@
+from .admin_serve import admin_serve as admin_serve  # noqa
 from .branches import branches as branches  # noqa
 from .check import check as check  # noqa
 from .current import current as current  # noqa

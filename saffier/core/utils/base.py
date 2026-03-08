@@ -1,6 +1,6 @@
 import typing
-from collections.abc import Mapping
-from typing import Any, Generator, List, Optional, TypeVar
+from collections.abc import Generator, Mapping
+from typing import Any, TypeVar
 
 from saffier.core.datastructures import ArbitraryHashableBaseModel as SaffierBaseModel
 
@@ -33,12 +33,12 @@ class Message(SaffierBaseModel):
         self,
         *,
         text: str,
-        code: Optional[str] = None,
-        key: Optional[typing.Union[int, str]] = None,
-        index: Optional[List[typing.Union[int, str]]] = None,
-        position: Optional[Position] = None,
-        start_position: Optional[Position] = None,
-        end_position: Optional[Position] = None,
+        code: str | None = None,
+        key: int | str | None = None,
+        index: list[int | str] | None = None,
+        position: Position | None = None,
+        start_position: Position | None = None,
+        end_position: Position | None = None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
@@ -81,20 +81,20 @@ class Message(SaffierBaseModel):
             position_str = f", position={self.start_position!r}"
         else:
             position_str = (
-                f", start_position={self.start_position!r}," f" end_position={self.end_position!r}"
+                f", start_position={self.start_position!r}, end_position={self.end_position!r}"
             )
-        return f"{class_name}(text={self.text!r}," f" code={self.code!r}{index_str}{position_str})"
+        return f"{class_name}(text={self.text!r}, code={self.code!r}{index_str}{position_str})"
 
 
 class BaseError(Mapping, Exception):
     def __init__(
         self,
         *,
-        text: Optional[str] = None,
-        code: Optional[str] = None,
-        key: Optional[typing.Union[int, str]] = None,
-        position: Optional[Position] = None,
-        messages: Optional[typing.List[Message]] = None,
+        text: str | None = None,
+        code: str | None = None,
+        key: int | str | None = None,
+        position: Position | None = None,
+        messages: list[Message] | None = None,
     ):
         if messages is None:
             assert text is not None
@@ -107,7 +107,7 @@ class BaseError(Mapping, Exception):
             assert len(messages)
 
         self._messages = messages
-        self._message_dict: typing.Dict[typing.Union[int, str], typing.Union[str, dict]] = {}
+        self._message_dict: dict[int | str, str | dict] = {}
 
         # Populate 'self._message_dict'
         for message in messages:
@@ -117,7 +117,7 @@ class BaseError(Mapping, Exception):
             insert_key = message.index[-1] if message.index else ""
             insert_into[insert_key] = message.text
 
-    def messages(self, *, prefix: Optional[typing.Union[str, int]] = None) -> typing.List[Message]:
+    def messages(self, *, prefix: str | int | None = None) -> list[Message]:
         """
         Return a list of all the messages.
 
@@ -142,7 +142,7 @@ class BaseError(Mapping, Exception):
     def __len__(self) -> int:
         return len(self._message_dict)
 
-    def __getitem__(self, key: typing.Any) -> typing.Union[str, dict]:
+    def __getitem__(self, key: typing.Any) -> str | dict:
         return self._message_dict[key]
 
     def __eq__(self, other: typing.Any) -> bool:
@@ -174,8 +174,8 @@ class ValidationResult(SaffierBaseModel):
     def __init__(
         self,
         *,
-        value: Optional[Any] = None,
-        error: Optional[BaseErrorType] = None,
+        value: Any | None = None,
+        error: BaseErrorType | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)

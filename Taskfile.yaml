@@ -1,0 +1,88 @@
+version: "3"
+
+tasks:
+  install:
+    desc: Install project and development dependencies
+    cmds:
+      - scripts/install
+
+  format:
+    desc: Apply formatting fixes
+    cmds:
+      - hatch run python -m ruff check saffier tests docs_src --line-length 99 --fix
+      - hatch run python -m ruff format saffier tests docs_src
+
+  lint:
+    desc: Run lint checks without modifying files
+    cmds:
+      - hatch run python -m ruff check saffier tests docs_src --line-length 99
+
+  typecheck:
+    desc: Run incremental static type checks
+    cmds:
+      - hatch run test:check_types
+
+  test:
+    desc: Run test suite
+    env:
+      SAFFIER_SETTINGS_MODULE: tests.settings.TestSettings
+    cmds:
+      - hatch run test:test
+
+  test-unit:
+    desc: Run unit-focused test selection
+    env:
+      SAFFIER_SETTINGS_MODULE: tests.settings.TestSettings
+    cmds:
+      - hatch run test:test tests/models tests/managers tests/foreign_keys tests/clauses tests/indexes tests/uniques --disable-pytest-warnings
+
+  test-integration:
+    desc: Run integration and CLI tests
+    env:
+      SAFFIER_SETTINGS_MODULE: tests.settings.TestSettings
+    cmds:
+      - hatch run test:test tests/integration tests/cli tests/contrib --disable-pytest-warnings
+
+  docs:
+    desc: Build docs with Zensical
+    cmds:
+      - hatch run docs:build
+
+  docs_prepare:
+    desc: Generate build-ready docs markdown (expands include directives)
+    cmds:
+      - hatch run docs:prepare
+
+  docs_build:
+    desc: Build documentation site with Zensical
+    cmds:
+      - hatch run docs:build
+
+  docs_clean:
+    desc: Clean generated docs and docs build cache
+    cmds:
+      - hatch run docs:clean
+
+  docs-serve:
+    desc: Serve docs with live reload
+    cmds:
+      - hatch run docs:serve
+
+  serve:
+    desc: Serve docs with live reload
+    cmds:
+      - task docs-serve
+
+  clean:
+    desc: Remove local caches and docs artifacts
+    cmds:
+      - scripts/clean
+      - hatch run docs:clean
+
+  ci:
+    desc: Run local CI checks
+    cmds:
+      - task lint
+      - task typecheck
+      - task test
+      - task docs

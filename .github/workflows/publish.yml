@@ -1,34 +1,30 @@
+---
 name: Publish
 
 on:
   push:
     tags:
-      - "*"
+      - '[0-9]*'
 
 jobs:
   publish:
     name: "Publish release"
     runs-on: "ubuntu-latest"
 
-    environment:
-      name: deploy
-
     steps:
       - uses: "actions/checkout@v4"
       - uses: "actions/setup-python@v5"
-        with:
-          python-version: 3.8
-      - name: "Install dependencies"
-        run: "scripts/install"
       - name: Install build dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: pip install build twine
+        run: |
+          pip install hatch virtualenv==20.39.1
       - name: "Build package"
-        run: "scripts/build"
+        run: "hatch build"
       - name: "Publish to PyPI"
-        run: "scripts/release"
+        run: "hatch publish -n"
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          HATCH_INDEX_USER: __token__
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
       - name: "Deploy docs"
-        run: curl -X POST '${{ secrets.DEPLOY_DOCS }}'
+        run: |
+          curl -X POST '${{ secrets.DEPLOY_DOCS }}'

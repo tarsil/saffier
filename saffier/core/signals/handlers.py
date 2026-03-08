@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Callable, List, Type, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
     from saffier import Model
@@ -9,7 +10,7 @@ class Send:
     Base for all the wrappers handling the signals.
     """
 
-    def consumer(signal: str, senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+    def consumer(signal: str, senders: type["Model"] | list[type["Model"]]) -> Callable:
         """
         Connects the function to all the senders.
         """
@@ -25,42 +26,42 @@ class Send:
         return wrapper
 
 
-def pre_save(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+def pre_save(senders: type["Model"] | list[type["Model"]]) -> Callable:
     """
     Connects all the senders to pre_save.
     """
     return Send.consumer(signal="pre_save", senders=senders)
 
 
-def pre_update(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+def pre_update(senders: type["Model"] | list[type["Model"]]) -> Callable:
     """
     Connects all the senders to pre_update.
     """
     return Send.consumer(signal="pre_update", senders=senders)
 
 
-def pre_delete(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+def pre_delete(senders: type["Model"] | list[type["Model"]]) -> Callable:
     """
     Connects all the senders to pre_delete.
     """
     return Send.consumer(signal="pre_delete", senders=senders)
 
 
-def post_save(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+def post_save(senders: type["Model"] | list[type["Model"]]) -> Callable:
     """
     Connects all the senders to post_save.
     """
     return Send.consumer(signal="post_save", senders=senders)
 
 
-def post_update(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+def post_update(senders: type["Model"] | list[type["Model"]]) -> Callable:
     """
     Connects all the senders to post_update.
     """
     return Send.consumer(signal="post_update", senders=senders)
 
 
-def post_delete(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
+def post_delete(senders: type["Model"] | list[type["Model"]]) -> Callable:
     """
     Connects all the senders to post_delete.
     """

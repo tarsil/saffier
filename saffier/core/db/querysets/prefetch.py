@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List, Optional, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 from saffier.exceptions import QuerySetError
 
@@ -35,10 +35,10 @@ class PrefetchMixin:
         from the select_related. Select related performs a follows the SQL foreign relation
         whereas the prefetch_related follows the python relations.
         """
-        queryset: "QuerySet" = self._clone()
+        queryset: QuerySet = self._clone()
 
         if not isinstance(prefetch, (list, tuple)):
-            prefetch = cast("List[Prefetch]", [prefetch])  # type: ignore
+            prefetch = cast("list[Prefetch]", [prefetch])  # type: ignore
 
         if isinstance(prefetch, tuple):
             prefetch = list(prefetch)  # type: ignore

@@ -1,11 +1,12 @@
+import logging
 import sys
 from functools import wraps
 from typing import Any, TypeVar
 
 from alembic.util import CommandError
-from loguru import logger
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 def catch_errors(fn: T) -> T:

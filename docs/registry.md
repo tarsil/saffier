@@ -50,6 +50,84 @@ that is also possible thanks to the registry with [Meta](./models.md#the-meta-cl
 {!> ../docs_src/registry/multiple.py !}
 ```
 
+When you use the `extra=` mapping for multiple databases, keep the keys stable and string-based.
+Saffier preserves a separate SQLAlchemy `MetaData` object per configured database and exposes both
+`metadata_by_name` and `metadata_by_url` for migration/runtime code that needs to target a specific
+connection.
+
+Names with surrounding whitespace still work, but Saffier warns about them because they make CLI
+and migration output harder to read.
+
+## Copying a Registry
+
+Migration workflows sometimes need an isolated copy of the registry instead of mutating the active
+application registry in place.
+
+```python
+import copy
+
+import saffier
+
+
+registry_copy = copy.copy(models)
+prepared_copy = saffier.get_migration_prepared_registry(registry_copy)
+```
+
+The copied registry keeps:
+
+* per-database metadata mappings
+* reflected-model metadata refresh behavior
+* copied many-to-many through models wired to the copied registry
+
+That makes it safe to prepare migration metadata without leaving copied relationship state attached
+to the original registry.
+
+## Dynamic model registration
+
+Saffier models can also be copied and attached to another registry at runtime.
+
+```python
+user_copy = User.copy_saffier_model()
+tenant_user = user_copy.add_to_registry(tenant_registry)
+```
+
+This is useful for migration preparation, extension-driven model composition, and tests that need
+isolated registries. If a copied model still references models that are added later, Saffier now
+defers the reverse-relation wiring until those models are registered in the target registry.
+
+## Automigration
+
+For managed runtimes, a registry can also opt into running migrations on first connect:
+
+```python
+from saffier import Registry
+from myproject.configs.settings import Settings
+
+
+registry = Registry(database=database, automigrate_config=Settings)
+```
+
+This delegates to the normal migration `upgrade()` flow and is still controlled by
+`settings.allow_automigrations`.
+
+## Synchronous Registry Environments
+
+When you need to drive async registry lifecycle and ORM calls from synchronous code, use
+`Registry.with_async_env()`:
+
+```python
+import saffier
+
+
+with models.with_async_env():
+    saffier.run_sync(models.create_all())
+    user = saffier.run_sync(User.query.create(name="Saffier"))
+    fetched = saffier.run_sync(User.query.get(pk=user.pk))
+```
+
+This binds `run_sync()` to the registry-managed event loop for the duration of the context and
+cleans the registry up on exit. Nested `with_async_env()` blocks are supported.
+
 ## Schemas
 
 This is another great supported feature from Saffier. This allows you to manipulate database schema

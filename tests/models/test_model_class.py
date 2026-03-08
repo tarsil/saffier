@@ -93,7 +93,8 @@ async def test_model_crud():
     assert user.pk is not None
     assert users == [user]
 
-    await user.delete()
+    deleted = await user.delete()
+    assert deleted == 1
     users = await User.query.all()
     assert users == []
 

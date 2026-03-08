@@ -1,7 +1,7 @@
 from saffier.contrib.multi_tenancy.settings import TenancySettings
 
 
-class EdgySettings(TenancySettings):
+class SaffierSettings(TenancySettings):
     tenant_model: str = "Tenant"
     """
     The Tenant model created

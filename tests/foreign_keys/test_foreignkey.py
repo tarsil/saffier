@@ -278,7 +278,7 @@ async def test_nullable_foreign_key():
 
 
 def test_assertation_error_on_set_null():
-    with pytest.raises(AssertionError) as raised:
+    with pytest.raises(saffier.FieldDefinitionError) as raised:
 
         class MyModel(saffier.Model):
             is_active = saffier.BooleanField(default=True)
@@ -290,7 +290,7 @@ def test_assertation_error_on_set_null():
 
 
 def test_assertation_error_on_missing_on_delete():
-    with pytest.raises(AssertionError) as raised:
+    with pytest.raises(saffier.FieldDefinitionError) as raised:
 
         class MyModel(saffier.Model):
             is_active = saffier.BooleanField(default=True)

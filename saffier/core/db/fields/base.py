@@ -1,19 +1,28 @@
+import copy
+import decimal
+import enum
 import typing
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import sqlalchemy
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.ext.mutable import MutableList
 
 import saffier
+from saffier.conf import settings
 from saffier.contrib.sqlalchemy.fields import IPAddress
-from saffier.core.db.constants import CASCADE, RESTRICT, SET_NULL
+from saffier.core.db.constants import CASCADE, NEW_M2M_NAMING, RESTRICT, SET_NULL
+from saffier.core.db.context_vars import CURRENT_INSTANCE, EXPLICIT_SPECIFIED_VALUES
 from saffier.core.db.fields._internal import (
     URL,
     UUID,
     Any,
+    Binary,
     Boolean,
     Date,
     DateTime,
     Decimal,
+    Duration,
     Email,
     Float,
     Integer,
@@ -24,6 +33,7 @@ from saffier.core.db.fields._internal import (
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
 from saffier.core.terminal import Print
+from saffier.exceptions import FieldDefinitionError, ImproperlyConfigured, ModelReferenceError
 
 if typing.TYPE_CHECKING:
     from saffier import Model
@@ -37,6 +47,8 @@ class Field:
     Base field for the model declaration fields.
     """
 
+    is_virtual: bool = False
+
     def __init__(
         self,
         *,
@@ -47,20 +59,28 @@ class Field:
     ) -> None:
         self.server_default = kwargs.pop("server_default", None)
         if primary_key:
-            default_value = kwargs.get("default", None)
+            default_value = kwargs.get("default")
             self.raise_for_non_default(default=default_value, server_default=self.server_default)
             kwargs["read_only"] = True
 
         self.null = kwargs.get("null", False)
-        self.default_value = kwargs.get("default", None)
+        self.default_value = kwargs.get("default")
         self.primary_key = primary_key
         self.index = index
         self.unique = unique
-        self.validator: typing.Union[SaffierField, typing.Type[SaffierField]] = self.get_validator(
-            **kwargs
-        )
-        self.comment = kwargs.get("comment", None)
+        self.validator: SaffierField | type[SaffierField] = self.get_validator(**kwargs)
+        self.comment = kwargs.get("comment")
+        self.column_name = kwargs.pop("column_name", None)
         self.owner = kwargs.pop("owner", None)
+        self.registry = kwargs.pop("registry", None)
+        self.name = kwargs.pop("name", "")
+        self.inherit = kwargs.pop("inherit", True)
+        self.no_copy = kwargs.pop("no_copy", False)
+        self.exclude = kwargs.pop("exclude", False)
+        self.inject_default_on_partial_update = kwargs.get(
+            "inject_default_on_partial_update",
+            False,
+        )
         self.server_onupdate = kwargs.pop("server_onupdate", None)
         self.autoincrement = kwargs.pop("autoincrement", False)
         self.secret = kwargs.pop("secret", False)
@@ -71,18 +91,24 @@ class Field:
         """
         column_type = self.get_column_type()
         constraints = self.get_constraints()
+        column_kwargs = {
+            "primary_key": self.primary_key,
+            "nullable": self.null and not self.primary_key,
+            "index": self.index,
+            "unique": self.unique,
+            "default": self.default_value,
+            "comment": self.comment,
+            "server_default": self.server_default,
+        }
+        if self.autoincrement:
+            column_kwargs["autoincrement"] = True
 
         return sqlalchemy.Column(
-            name,
+            self.column_name or name,
             column_type,
             *constraints,
-            primary_key=self.primary_key,
-            nullable=self.null and not self.primary_key,
-            index=self.index,
-            unique=self.unique,
-            default=self.default_value,
-            comment=self.comment,
-            server_default=self.server_default,
+            key=name,
+            **column_kwargs,
         )
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
@@ -94,26 +120,92 @@ class Field:
     def get_constraints(self) -> typing.Any:
         return []
 
+    def get_columns(self, name: str) -> typing.Sequence[sqlalchemy.Column]:
+        return [self.get_column(name)]
+
+    def get_global_constraints(
+        self,
+        name: str,
+        columns: typing.Sequence[sqlalchemy.Column],
+        *,
+        schema: str | None = None,
+    ) -> typing.Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
+        del name, columns, schema
+        return []
+
+    def has_column(self) -> bool:
+        return not self.is_virtual
+
+    def get_embedded_fields(
+        self,
+        field_name: str,
+        existing_fields: dict[str, "Field"],
+    ) -> dict[str, "Field"]:
+        del field_name, existing_fields
+        return {}
+
     def expand_relationship(self, value: typing.Any) -> typing.Any:
         return value
 
+    def clean(
+        self, name: str, value: typing.Any, *, for_query: bool = False
+    ) -> dict[str, typing.Any]:
+        del for_query
+        if not self.has_column():
+            return {}
+        return {name: value}
+
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        del name, kwargs
+
     def raise_for_non_default(self, default: typing.Any, server_default: typing.Any) -> typing.Any:
-        has_default: bool = True
-        has_server_default: bool = True
+        del default, server_default
 
-        if default is None or default is False:
-            has_default = False
-        if server_default is None or server_default is False:
-            has_server_default = False
+    def get_default_value(self) -> typing.Any:
+        return self.validator.get_default_value()
 
-        if (
-            not isinstance(self, (IntegerField, BigIntegerField))
-            and not has_default
-            and not has_server_default
-        ):
-            raise ValueError(
-                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
-            )
+    def has_default(self) -> bool:
+        return self.validator.has_default()
+
+    def get_default_values(
+        self,
+        field_name: str,
+        cleaned_data: dict[str, typing.Any],
+    ) -> dict[str, typing.Any]:
+        if field_name in cleaned_data or not self.has_column():
+            return {}
+        return {field_name: self.get_default_value()}
+
+    def is_required(self) -> bool:
+        if self.primary_key and self.autoincrement:
+            return False
+        return not (self.null or self.server_default is not None or self.has_default())
+
+    def get_is_null_clause(self, column: typing.Any) -> typing.Any:
+        return column == None  # noqa: E711
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return self.get_is_null_clause(column)
+
+    def operator_to_clause(
+        self,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: typing.Any,
+    ) -> typing.Any:
+        column = table.columns[field_name]
+        mapped_operator = settings.filter_operators.get(operator, operator)
+
+        if mapped_operator == "isnull":
+            is_null = self.get_is_null_clause(column)
+            return is_null if value else sqlalchemy.not_(is_null)
+
+        if mapped_operator == "isempty":
+            is_empty = self.get_is_empty_clause(column)
+            return is_empty if value else sqlalchemy.not_(is_empty)
+
+        return getattr(column, mapped_operator)(value)
 
 
 class CharField(Field):
@@ -130,6 +222,9 @@ class CharField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == "")
 
 
 class TextField(Field):
@@ -149,11 +244,65 @@ class IntegerField(Field):
     Representation of an IntegerField
     """
 
+    def __init__(self, increment_on_save: int = 0, **kwargs: typing.Any) -> None:
+        self.increment_on_save = increment_on_save
+        if self.increment_on_save != 0:
+            if kwargs.get("autoincrement"):
+                raise FieldDefinitionError(
+                    "'autoincrement' is incompatible with 'increment_on_save'"
+                )
+            if kwargs.get("null"):
+                raise FieldDefinitionError("'null' is incompatible with 'increment_on_save'")
+            kwargs.setdefault("read_only", True)
+        super().__init__(**kwargs)
+
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return Integer(**kwargs)
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Integer()
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == 0)
+
+    async def pre_save_callback(
+        self,
+        value: typing.Any,
+        original_value: typing.Any,
+        is_update: bool,
+    ) -> dict[str, typing.Any]:
+        if self.increment_on_save == 0:
+            return {}
+
+        explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
+        if explicit_values is not None and self.name in explicit_values:
+            return {}
+
+        current_value = original_value if value is None else value
+        if not is_update:
+            if current_value is None:
+                return {self.name: self.get_default_value()}
+            return {self.name: current_value + self.increment_on_save}
+
+        if self.primary_key:
+            return {}
+
+        current_instance = CURRENT_INSTANCE.get()
+        table = getattr(current_instance, "table", None)
+        if table is None:
+            if current_value is None:
+                current_value = self.get_default_value()
+            return {self.name: current_value + self.increment_on_save}
+        return {self.name: table.columns[self.name] + self.increment_on_save}
+
+
+class SmallIntegerField(IntegerField):
+    """
+    Representation of a SmallIntegerField.
+    """
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        return sqlalchemy.SmallInteger()
 
 
 class FloatField(Field):
@@ -166,6 +315,9 @@ class FloatField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Float()
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == 0.0)
 
 
 class BigIntegerField(Field):
@@ -190,6 +342,9 @@ class BooleanField(Field):
 
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
         return sqlalchemy.Boolean()
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column.is_(False))
 
 
 class AutoNowMixin(Field):
@@ -249,6 +404,21 @@ class TimeField(Field):
         return sqlalchemy.Time()
 
 
+class DurationField(Field):
+    """
+    Representation of a duration/timedelta.
+    """
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Duration(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.Interval:
+        return sqlalchemy.Interval()
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == timedelta())
+
+
 class JSONField(Field):
     """
     JSON Representation of an object field
@@ -260,6 +430,182 @@ class JSONField(Field):
     def get_column_type(self) -> sqlalchemy.JSON:
         return sqlalchemy.JSON()
 
+    def get_is_null_clause(self, column: typing.Any) -> typing.Any:
+        casted = sqlalchemy.cast(column, sqlalchemy.Text())
+        return sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "null")
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        casted = sqlalchemy.cast(column, sqlalchemy.Text())
+        return sqlalchemy.or_(
+            column.is_(sqlalchemy.null()),
+            casted.in_(["null", "[]", "{}", "0", "0.0", '""']),
+        )
+
+
+class CompositeField(Field):
+    """
+    Virtual field that groups multiple model fields under a single logical attribute.
+
+    It can expose existing fields by name and/or inject embedded fields declared inline.
+    """
+
+    is_virtual: bool = True
+
+    def __init__(
+        self,
+        *,
+        inner_fields: typing.Any = (),
+        prefix_embedded: str = "",
+        prefix_column_name: str = "",
+        absorb_existing_fields: bool = False,
+        model: typing.Any = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        kwargs.setdefault("null", True)
+        super().__init__(**kwargs)
+        self.inner_fields = inner_fields
+        self.prefix_embedded = prefix_embedded
+        self.prefix_column_name = prefix_column_name
+        self.absorb_existing_fields = absorb_existing_fields
+        self.model = model
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        raise RuntimeError(f"Virtual field '{name}' does not map to a database column.")
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        raise RuntimeError("CompositeField does not expose a column type.")
+
+    def _iter_inner_items(
+        self,
+        existing_fields: dict[str, Field],
+    ) -> list[tuple[str, Field] | str]:
+        inner = self.inner_fields
+        if hasattr(inner, "meta"):
+            inner = typing.cast("dict[str, Field]", inner.meta.fields)
+        if isinstance(inner, dict):
+            inner = list(inner.items())
+
+        collected: list[tuple[str, Field] | str] = []
+        for item in inner:
+            if isinstance(item, str) or (
+                isinstance(item, tuple)
+                and len(item) == 2
+                and isinstance(item[0], str)
+                and isinstance(item[1], Field)
+            ):
+                collected.append(item)
+            elif isinstance(item, tuple) and len(item) == 1 and isinstance(item[0], str):
+                collected.append(item[0])
+
+        del existing_fields
+        return collected
+
+    def _field_target_name(self, public_name: str) -> str:
+        if self.prefix_embedded:
+            return f"{self.prefix_embedded}{public_name}"
+        return public_name
+
+    def get_embedded_fields(
+        self,
+        field_name: str,
+        existing_fields: dict[str, Field],
+    ) -> dict[str, Field]:
+        del field_name
+        embedded: dict[str, Field] = {}
+        for item in self._iter_inner_items(existing_fields):
+            if isinstance(item, str):
+                continue
+            public_name, inner_field = item
+            if public_name == "pk":
+                raise ValueError("sub field uses reserved name pk")
+            if not getattr(inner_field, "inherit", True):
+                continue
+
+            target_name = self._field_target_name(public_name)
+            if target_name in existing_fields and not self.absorb_existing_fields:
+                continue
+
+            field_copy = (
+                inner_field if getattr(inner_field, "no_copy", False) else copy.copy(inner_field)
+            )
+            field_copy.name = target_name
+            base_column_name = getattr(inner_field, "column_name", None) or public_name
+            if self.prefix_column_name:
+                field_copy.column_name = f"{self.prefix_column_name}{base_column_name}"
+            embedded[target_name] = field_copy
+        return embedded
+
+    def _mapping(self, instance: typing.Any) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for item in self._iter_inner_items(instance.fields):
+            if isinstance(item, str):
+                target_name = self._field_target_name(item)
+                if target_name in instance.fields:
+                    mapping[item] = target_name
+                elif item in instance.fields:
+                    mapping[item] = item
+                continue
+            public_name, _ = item
+            target_name = self._field_target_name(public_name)
+            if target_name in instance.fields:
+                mapping[public_name] = target_name
+            elif public_name in instance.fields:
+                mapping[public_name] = public_name
+        return mapping
+
+    def get_value(self, instance: typing.Any, field_name: str) -> typing.Any:
+        del field_name
+        values: dict[str, typing.Any] = {}
+        for public_name, target_name in self._mapping(instance).items():
+            values[public_name] = getattr(instance, target_name, None)
+        if self.model is not None:
+            try:
+                return self.model(**values)
+            except Exception:
+                pass
+        return values
+
+    def set_value(self, instance: typing.Any, field_name: str, value: typing.Any) -> None:
+        del field_name
+        if value is None:
+            return
+        payload = value
+        if hasattr(payload, "model_dump"):
+            payload = payload.model_dump()
+        elif not isinstance(payload, dict):
+            payload = {
+                name: getattr(value, name) for name in dir(value) if not name.startswith("_")
+            }
+        for public_name, target_name in self._mapping(instance).items():
+            if public_name in payload:
+                setattr(instance, target_name, payload[public_name])
+
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        if name not in kwargs:
+            return
+        payload = kwargs.pop(name)
+        if payload is None:
+            return
+        if hasattr(payload, "model_dump"):
+            payload = payload.model_dump()
+        elif not isinstance(payload, dict):
+            payload = {
+                attr_name: getattr(payload, attr_name)
+                for attr_name in dir(payload)
+                if not attr_name.startswith("_")
+            }
+
+        owner = getattr(self, "owner", None)
+        if owner is None:
+            return
+
+        for public_name, target_name in self._mapping(owner).items():
+            if public_name in payload:
+                kwargs[target_name] = payload[public_name]
+
 
 class ForeignKey(Field):
     """
@@ -268,64 +614,417 @@ class ForeignKey(Field):
 
     class ForeignKeyValidator(SaffierField):
         def check(self, value: typing.Any) -> typing.Any:
-            return value.pk
+            if value is None and self.null:
+                return None
+            if value is None:
+                raise self.validation_error("null")
+            if hasattr(value, "pk"):
+                return value.pk
+            return value
 
     def __init__(
         self,
-        to: typing.Type["Model"],
+        to: type["Model"] | str,
         null: bool = False,
         on_delete: str = RESTRICT,
         on_update: str = CASCADE,
-        related_name: typing.Optional[str] = None,
+        related_name: str | None = None,
+        embed_parent: tuple[str, str] | None = None,
+        no_constraint: bool = False,
+        remove_referenced: bool = False,
+        use_model_based_deletion: bool = False,
+        force_cascade_deletion_relation: bool = False,
         **kwargs: Any,
     ):
-        assert on_delete is not None, "on_delete must not be null."
+        if on_delete is None:
+            raise FieldDefinitionError("on_delete must not be null.")
 
         if on_delete == SET_NULL and not null:
-            raise AssertionError("When SET_NULL is enabled, null must be True.")
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
 
         if on_update and (on_update == SET_NULL and not null):
-            raise AssertionError("When SET_NULL is enabled, null must be True.")
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
 
-        super().__init__(null=null)
+        primary_key = bool(kwargs.pop("primary_key", False))
+        index = bool(kwargs.pop("index", False))
+        unique = bool(kwargs.pop("unique", False))
+        self.related_fields = tuple(kwargs.pop("related_fields", ()))
+        self._target_registry = kwargs.pop("target_registry", None)
+        super().__init__(
+            null=null,
+            primary_key=primary_key,
+            index=index,
+            unique=unique,
+            **kwargs,
+        )
         self.to = to
         self.on_delete = on_delete
         self.on_update = on_update or CASCADE
         self.related_name = related_name
+        self.embed_parent = embed_parent
+        self.no_constraint = no_constraint
+        self.remove_referenced = remove_referenced
+        self.use_model_based_deletion = use_model_based_deletion
+        self.force_cascade_deletion_relation = force_cascade_deletion_relation
+
+        if embed_parent and "__" in embed_parent[1]:
+            raise FieldDefinitionError(
+                '"embed_parent" second argument (for embedding parent) cannot contain "__".'
+            )
+
+    @property
+    def target_registry(self) -> typing.Any:
+        if self._target_registry is not None:
+            return self._target_registry
+        owner_registry = getattr(getattr(self.owner, "meta", None), "registry", None)
+        if owner_registry is not None:
+            return owner_registry
+        return self.registry
+
+    @target_registry.setter
+    def target_registry(self, value: typing.Any) -> None:
+        self._target_registry = value
 
     @property
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
+                try:
+                    self._target = self.target_registry.get_model(self.to)
+                except LookupError:
+                    self._target = (
+                        self.target_registry.models.get(self.to)
+                        or self.target_registry.reflected[self.to]
+                    )
             else:
-                self._target = self.to  # type: ignore
-        return self._target  # type: ignore
+                self._target = self.to
+        return self._target
 
     def get_validator(self, **kwargs: typing.Any) -> SaffierField:
         return self.ForeignKeyValidator(**kwargs)
 
-    def get_column(self, name: str) -> sqlalchemy.Column:
+    @property
+    def related_columns(self) -> dict[str, sqlalchemy.Column | None]:
         target = self.target
-        to_field = target.fields[target.pkname]
+        columns: dict[str, sqlalchemy.Column | None] = {}
+        if self.related_fields:
+            for field_name in self.related_fields:
+                if field_name in target.meta.fields:
+                    for column in target.meta.field_to_columns[field_name]:
+                        columns[column.key] = column
+                else:
+                    columns[field_name] = None
+            return columns
+        keys = tuple(getattr(target, "pknames", ())) or tuple(getattr(target, "pkcolumns", ()))
+        if not keys:
+            keys = (getattr(target, "pkname", "id"),)
+        table = getattr(target, "_table", None)
+        for key in keys:
+            column = None
+            if table is not None:
+                column = getattr(table.c, key, None)
+            columns[key] = column
+        return columns
 
-        column_type = to_field.get_column_type()
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=self.on_delete,
-                onupdate=self.on_update,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+    def get_fk_name(self, name: str) -> str:
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+        return fk_name[:CHAR_LIMIT]
+
+    def get_fkindex_name(self, name: str) -> str:
+        fk_name = f"fkindex_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+        return fk_name[:CHAR_LIMIT]
+
+    def get_fk_field_name(self, name: str, fieldname: str) -> str:
+        if len(self.related_columns) == 1:
+            return name
+        return f"{name}_{fieldname}"
+
+    def get_fk_column_name(self, name: str, fieldname: str) -> str:
+        name = self.column_name or name
+        if len(self.related_columns) == 1:
+            return name
+        return f"{name}_{fieldname}"
+
+    def get_column_names(self, name: str) -> tuple[str, ...]:
+        return tuple(
+            self.get_fk_field_name(name, field_name) for field_name in self.related_columns
+        )
+
+    def from_fk_field_name(self, name: str, fieldname: str) -> str:
+        if len(self.related_columns) == 1:
+            return next(iter(self.related_columns.keys()))
+        return fieldname.removeprefix(f"{name}_")
+
+    def get_columns(self, name: str) -> typing.Sequence[sqlalchemy.Column]:
+        target = self.target
+        columns: list[sqlalchemy.Column] = []
+        for related_key, related_column in self.related_columns.items():
+            related_field = target.fields[related_key]
+            related_type = (
+                related_column.type
+                if related_column is not None
+                else related_field.get_column_type()
             )
-        ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+            related_name = (
+                getattr(related_column, "name", None) or related_field.column_name or related_key
+            )
+            related_nullable = (
+                related_column.nullable if related_column is not None else related_field.null
+            )
+            columns.append(
+                sqlalchemy.Column(
+                    key=self.get_fk_field_name(name, related_key),
+                    name=self.get_fk_column_name(name, related_name),
+                    type_=related_type,
+                    nullable=self.null or related_nullable,
+                    primary_key=self.primary_key,
+                    autoincrement=False,
+                )
+            )
+        return columns
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        columns = tuple(self.get_columns(name))
+        if len(columns) != 1:
+            raise RuntimeError(
+                f"Foreign key '{name}' on '{self.owner.__name__}' maps to multiple database columns."
+            )
+        return columns[0]
+
+    def get_global_constraints(
+        self,
+        name: str,
+        columns: typing.Sequence[sqlalchemy.Column],
+        *,
+        schema: str | None = None,
+    ) -> typing.Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
+        owner_registry = getattr(self.owner.meta, "registry", None)
+        target = self.target
+        target_registry = getattr(target.meta, "registry", None)
+        owner_database = getattr(self.owner, "database", None)
+        target_database = getattr(target, "database", None)
+        use_constraint = not (
+            self.no_constraint
+            or (
+                owner_registry not in (None, False)
+                and target_registry not in (None, False)
+                and owner_registry is not target_registry
+            )
+            or (
+                owner_database is not None
+                and target_database is not None
+                and owner_database is not target_database
+            )
+        )
+        constraints: list[sqlalchemy.Constraint | sqlalchemy.Index] = []
+        if use_constraint:
+            table_name = target.meta.tablename
+            if schema is not None:
+                table_name = f"{schema}.{table_name}"
+            constraints.append(
+                sqlalchemy.schema.ForeignKeyConstraint(
+                    columns,
+                    [
+                        f"{table_name}.{self.from_fk_field_name(name, column.key)}"
+                        for column in columns
+                    ],
+                    ondelete=self.on_delete,
+                    onupdate=self.on_update,
+                    name=self.get_fk_name(name),
+                )
+            )
+        if self.unique or self.index:
+            constraints.append(
+                sqlalchemy.Index(
+                    self.get_fkindex_name(name),
+                    *columns,
+                    unique=self.unique,
+                )
+            )
+        return constraints
+
+    def clean(
+        self, name: str, value: typing.Any, *, for_query: bool = False
+    ) -> dict[str, typing.Any]:
+        del for_query
+        cleaned: dict[str, typing.Any] = {}
+        related_keys = tuple(self.related_columns.keys())
+        column_names = self.get_column_names(name)
+
+        if value is None:
+            for column_name in column_names:
+                cleaned[column_name] = None
+            return cleaned
+
+        target = self.target
+        if isinstance(value, dict):
+            for related_key, column_name in zip(related_keys, column_names, strict=False):
+                if related_key in value:
+                    cleaned[column_name] = value[related_key]
+                elif column_name in value:
+                    cleaned[column_name] = value[column_name]
+            return cleaned
+
+        if isinstance(value, target):
+            for related_key, column_name in zip(related_keys, column_names, strict=False):
+                cleaned[column_name] = getattr(value, related_key, None)
+            return cleaned
+
+        if hasattr(value, "__db_model__"):
+            value_cls = value.__class__
+            if (
+                getattr(value_cls, "is_proxy_model", False)
+                and getattr(value_cls, "parent", None) is target
+            ):
+                for related_key, column_name in zip(related_keys, column_names, strict=False):
+                    cleaned[column_name] = getattr(value, related_key, None)
+                return cleaned
+
+        pk_value = getattr(value, "pk", None) if hasattr(value, "pk") else None
+        if isinstance(pk_value, dict):
+            return self.clean(name, pk_value)
+        if pk_value is not None and len(column_names) == 1:
+            cleaned[column_names[0]] = pk_value
+            return cleaned
+
+        if len(column_names) == 1:
+            cleaned[column_names[0]] = value
+            return cleaned
+
+        raise ValueError(f"Cannot handle composite foreign key value {value!r}.")
+
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        if name in kwargs:
+            return
+
+        column_names = self.get_column_names(name)
+        if len(column_names) <= 1:
+            return
+
+        payload: dict[str, typing.Any] = {}
+        for column_name in column_names:
+            if column_name in kwargs:
+                payload[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
+
+        if not payload:
+            return
+        if len(payload) != len(column_names):
+            raise ValueError("Cannot update the foreign key partially")
+        kwargs[name] = payload
+
+    async def pre_save_callback(
+        self,
+        value: typing.Any,
+        original_value: typing.Any,
+        is_update: bool,
+    ) -> dict[str, typing.Any]:
+        target = self.target
+        if value is None or (isinstance(value, dict) and not value):
+            value = original_value
+
+        if isinstance(value, target):
+            if (
+                getattr(value, "_saffier_save_in_progress", False)
+                or getattr(value, "pk", None) is not None
+            ):
+                return self.clean(self.name, value, for_query=False)
+            await value.save()
+            return self.clean(self.name, value, for_query=False)
+
+        if hasattr(value, "__db_model__"):
+            value_cls = value.__class__
+            if (
+                getattr(value_cls, "is_proxy_model", False)
+                and getattr(value_cls, "parent", None) is target
+            ):
+                if (
+                    getattr(value, "_saffier_save_in_progress", False)
+                    or getattr(value, "pk", None) is not None
+                ):
+                    return self.clean(self.name, value, for_query=False)
+                await value.save()
+                return self.clean(self.name, value, for_query=False)
+
+        if isinstance(value, dict):
+            return await self.pre_save_callback(
+                target(**value),
+                original_value=None,
+                is_update=is_update,
+            )
+
+        if hasattr(value, "pk") and getattr(value, "pk", None) is not None:
+            return self.clean(self.name, value, for_query=False)
+
+        if value is None:
+            return {}
+        return {self.name: value}
 
     def expand_relationship(self, value: typing.Any) -> typing.Any:
+        if value is None:
+            return None
         target = self.target
+        related_columns = tuple(self.related_columns.keys())
         if isinstance(value, target):
+            if (
+                self.null
+                and related_columns
+                and all(
+                    key in value.__dict__ and getattr(value, key) is None
+                    for key in related_columns
+                )
+            ):
+                return None
             return value
+        if hasattr(value, "__db_model__"):
+            value_cls = value.__class__
+            if (
+                getattr(value_cls, "is_proxy_model", False)
+                and getattr(value_cls, "parent", None) is target
+            ):
+                if (
+                    self.null
+                    and related_columns
+                    and all(
+                        key in value.__dict__ and getattr(value, key) is None
+                        for key in related_columns
+                    )
+                ):
+                    return None
+                return value
+        if isinstance(value, dict):
+            return target(**value)
+        if hasattr(value, "pk"):
+            pk_value = value.pk
+            if isinstance(pk_value, dict):
+                return target(pk=pk_value)
+            return target(pk=pk_value)
         return target(pk=value)
+
+    def is_cross_db(self, owner_database: typing.Any | None = None) -> bool:
+        if owner_database is None:
+            owner_database = getattr(self.owner, "database", None)
+            if owner_database is None:
+                owner_registry = getattr(getattr(self.owner, "meta", None), "registry", None)
+                owner_database = getattr(owner_registry, "database", None)
+
+        target = self.target
+        target_database = getattr(target, "database", None)
+        if target_database is None:
+            target_registry = getattr(getattr(target, "meta", None), "registry", None)
+            target_database = getattr(target_registry, "database", None)
+
+        if owner_database is None or target_database is None:
+            return False
+
+        return str(owner_database.url) != str(target_database.url)
+
+    def get_related_model_for_admin(self) -> typing.Any | None:
+        target = self.target
+        registry = getattr(getattr(target, "meta", None), "registry", None)
+        admin_models = getattr(registry, "admin_models", ())
+        if registry and target.__name__ in admin_models:
+            return target
+        return None
 
 
 class ManyToManyField(Field):
@@ -333,30 +1032,56 @@ class ManyToManyField(Field):
     Representation of a ManyToManyField based on a foreignkey.
     """
 
+    is_virtual: bool = True
+
     def __init__(
         self,
-        to: typing.Union[typing.Type["Model"], str],
-        through: typing.Optional[typing.Type["Model"]] = None,
+        to: type["Model"] | str,
+        through: type["Model"] | str | None = None,
+        through_tablename: str | type[NEW_M2M_NAMING] | None = NEW_M2M_NAMING,
+        embed_through: str | bool = False,
+        to_foreign_key: str = "",
+        from_foreign_key: str = "",
         **kwargs: typing.Any,
     ):
+        if through_tablename is not None and (
+            not isinstance(through_tablename, str) and through_tablename is not NEW_M2M_NAMING
+        ):
+            raise FieldDefinitionError(
+                '"through_tablename" must be NEW_M2M_NAMING or a non-empty string.'
+            )
+        if isinstance(through_tablename, str) and not through_tablename.strip():
+            raise FieldDefinitionError('"through_tablename" cannot be an empty string.')
+        if embed_through and isinstance(embed_through, str) and "__" in embed_through:
+            raise FieldDefinitionError('"embed_through" cannot contain "__".')
+
         if "null" in kwargs:
             terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
-        super().__init__(null=True)
+        related_name = kwargs.pop("related_name", None)
+        super().__init__(null=True, **kwargs)
         self.to = to
         self.through = through
-        self.related_name = kwargs.pop("related_name", None)
+        self.through_tablename = through_tablename
+        self.embed_through = embed_through
+        self.related_name = related_name
+        self.from_foreign_key = from_foreign_key
+        self.to_foreign_key = to_foreign_key
+        self.reverse_name = ""
 
-        if self.related_name:
+        if self.related_name not in (None, False):
             assert isinstance(self.related_name, str), "related_name must be a string."
 
-        self.related_name = self.related_name.lower() if self.related_name else None
+        if isinstance(self.related_name, str):
+            self.related_name = self.related_name.lower()
 
     @property
     def target(self) -> typing.Any:
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
+                self._target = (
+                    self.registry.models.get(self.to) or self.registry.reflected[self.to]
+                )
             else:
                 self._target = self.to
         return self._target
@@ -376,7 +1101,7 @@ class ManyToManyField(Field):
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
 
-    def add_model_to_register(self, model: typing.Type["Model"]) -> None:
+    def add_model_to_register(self, model: type["Model"]) -> None:
         """
         Adds the model to the registry to make sure it can be generated by the Migrations
         """
@@ -401,66 +1126,262 @@ class ManyToManyField(Field):
         Generates a middle model based on the owner of the field and the field itself and adds
         it to the main registry to make sure it generates the proper models and migrations.
         """
-        self.to = typing.cast(typing.Type["Model"], self.target)
+        self.to = typing.cast(type["Model"], self.target)
 
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.owner.meta.registry.models[self.through]  # type: ignore
+                registry = self.owner.meta.registry
+                self.through = (
+                    registry.models.get(self.through) or registry.reflected[self.through]
+                )
+
+            if not self.from_foreign_key:
+                candidates = [
+                    field_name
+                    for field_name, field in self.through.fields.items()
+                    if isinstance(field, ForeignKey) and field.target is self.owner
+                ]
+                if len(candidates) == 1:
+                    self.from_foreign_key = candidates[0]
+            if not self.to_foreign_key:
+                candidates = [
+                    field_name
+                    for field_name, field in self.through.fields.items()
+                    if isinstance(field, ForeignKey) and field.target is self.to
+                ]
+                if len(candidates) == 1:
+                    self.to_foreign_key = candidates[0]
+
+            # M2M through models in Saffier are always required to expose an
+            # auto-incrementing integer "id" primary key.
+            id_field = self.through.fields.get("id")
+            if id_field is None:
+                has_non_id_pk = any(
+                    field.primary_key
+                    for field_name, field in self.through.fields.items()
+                    if field_name != "id"
+                )
+                if has_non_id_pk:
+                    raise ImproperlyConfigured(
+                        "ManyToMany through models must use an auto-incrementing 'id' primary key."
+                    )
+                id_field = saffier.IntegerField(primary_key=True, autoincrement=True)
+                id_field.owner = self.through
+                id_field.registry = self.through.meta.registry
+                id_field.name = "id"
+                self.through.fields["id"] = id_field
+                self.through.meta.fields["id"] = id_field
+                self.through.meta.fields_mapping["id"] = id_field
+                self.through.meta.pk = id_field
+                self.through.meta.pk_attribute = "id"
+                self.through.pkname = "id"
+                self.through._table = None
+                self.through.__proxy_model__ = None
+            elif not id_field.primary_key:
+                raise ImproperlyConfigured(
+                    "ManyToMany through models must define 'id' as the primary key."
+                )
+            elif not isinstance(id_field, (IntegerField, SmallIntegerField, BigIntegerField)):
+                raise ImproperlyConfigured(
+                    "ManyToMany through model 'id' primary key must be an integer type."
+                )
+            else:
+                id_field.autoincrement = True
 
             self.through.meta.is_multi = True
-            self.through.meta.multi_related = [self.to.__name__.lower()]
+            if not self.from_foreign_key:
+                self.from_foreign_key = self.owner.__name__.lower()
+            if not self.to_foreign_key:
+                self.to_foreign_key = self.to.__name__.lower()
+            self.through.meta.multi_related = [self.to_foreign_key]
             return self.through
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__
-        class_name = f"{owner_name}{to_name}"
-        tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+        if not self.from_foreign_key:
+            self.from_foreign_key = owner_name.lower()
+        if not self.to_foreign_key:
+            self.to_foreign_key = to_name.lower()
+        class_name = f"{owner_name}{self.name.capitalize()}Through"
+        if self.through_tablename is None or self.through_tablename is NEW_M2M_NAMING:
+            tablename = class_name.lower()
+        else:
+            tablename = self.through_tablename.format(field=self).lower()
+        if self.owner.meta.table_prefix:
+            tablename = f"{self.owner.meta.table_prefix}_{tablename}"
 
         new_meta_namespace = {
             "tablename": tablename,
             "registry": self.owner.meta.registry,
             "is_multi": True,
-            "multi_related": [to_name.lower()],
+            "multi_related": [self.to_foreign_key],
+            "unique_together": [(self.from_foreign_key, self.to_foreign_key)],
         }
 
         new_meta = type("MetaInfo", (), new_meta_namespace)
 
-        # Define the related names
-        owner_related_name = (
-            f"{self.related_name}_{class_name.lower()}s_set"
-            if self.related_name
-            else f"{owner_name.lower()}_{class_name.lower()}s_set"
-        )
-
         to_related_name = (
             f"{self.related_name}"
             if self.related_name
-            else f"{to_name.lower()}_{class_name.lower()}s_set"
+            else (
+                f"{to_name.lower()}_{owner_name.lower()}{to_name.lower()}"
+                if self.unique
+                else f"{to_name.lower()}_{owner_name.lower()}{to_name.lower()}s_set"
+            )
         )
+        self.reverse_name = to_related_name if to_related_name is not False else ""
 
         through_model = type(
             class_name,
             (saffier.Model,),
             {
                 "Meta": new_meta,
-                "id": saffier.IntegerField(primary_key=True),
-                f"{owner_name.lower()}": ForeignKey(
+                "id": saffier.IntegerField(primary_key=True, autoincrement=True),
+                f"{self.from_foreign_key}": ForeignKey(
                     self.owner,
                     on_delete=saffier.CASCADE,
+                    index=self.index,
                     null=True,
-                    related_name=owner_related_name,
+                    related_name=False,
                 ),
-                f"{to_name.lower()}": ForeignKey(
-                    self.to, on_delete=saffier.CASCADE, null=True, related_name=to_related_name
+                f"{self.to_foreign_key}": ForeignKey(
+                    self.to,
+                    on_delete=saffier.CASCADE,
+                    unique=self.unique,
+                    index=self.index,
+                    null=True,
+                    embed_parent=(
+                        (self.from_foreign_key, self.embed_through or "")
+                        if self.embed_through is not False
+                        else None
+                    ),
+                    related_name=(False if self.related_name is False else to_related_name),
                 ),
             },
         )
-        self.through = typing.cast(typing.Type["Model"], through_model)
+        self.through = typing.cast(type["Model"], through_model)
 
         self.add_model_to_register(self.through)
+        tenant_models = getattr(self.registry, "tenant_models", None)
+        if tenant_models is not None and (
+            getattr(self.owner.meta, "is_tenant", False)
+            or getattr(self.to.meta, "is_tenant", False)
+        ):
+            tenant_models[self.through.__name__] = self.through
+            if getattr(self.owner.meta, "register_default", None) is False:
+                self.registry.models.pop(self.through.__name__, None)
 
 
 ManyToMany = ManyToManyField
+
+
+class RefForeignKey(ForeignKey):
+    """
+    ForeignKey variant used for explicit reference-style declarations.
+    """
+
+    def __init__(
+        self,
+        to: type["Model"] | str,
+        *,
+        ref_field: str | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        self.ref_field = ref_field
+        self.model_ref = None
+        if (
+            isinstance(to, type)
+            and hasattr(to, "__model_ref_fields__")
+            and hasattr(to, "__related_name__")
+        ):
+            if not getattr(to, "__related_name__", None):
+                raise ModelReferenceError(
+                    detail="'__related_name__' must be declared when subclassing ModelRef."
+                )
+            self.model_ref = to
+            self.is_virtual = True
+        super().__init__(to=to, **kwargs)
+
+    @property
+    def is_model_reference(self) -> bool:
+        return self.model_ref is not None
+
+    def has_column(self) -> bool:
+        return not self.is_model_reference and super().has_column()
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        if self.is_model_reference:
+            return Any(**kwargs)
+        return super().get_validator(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        if self.is_model_reference:
+            raise RuntimeError(f"Virtual field '{name}' does not map to a database column.")
+        return super().get_column(name)
+
+    def expand_relationship(self, value: typing.Any) -> typing.Any:
+        if self.is_model_reference:
+            return value
+        return super().expand_relationship(value)
+
+    def _normalize_model_ref(self, value: typing.Any) -> typing.Any:
+        if value is None:
+            return None
+        if isinstance(value, self.model_ref):
+            return value
+        if isinstance(value, dict):
+            return self.model_ref(**value)
+        raise ModelReferenceError(
+            detail=(
+                f"RefForeignKey '{self.name}' expects '{self.model_ref.__name__}' instances "
+                "or dictionaries."
+            )
+        )
+
+    def set_value(self, instance: typing.Any, field_name: str, value: typing.Any) -> None:
+        if not self.is_model_reference:
+            instance.__dict__[field_name] = value
+            return
+
+        if value is None:
+            instance.__dict__[field_name] = None
+            return
+
+        values: typing.Sequence[typing.Any]
+        if isinstance(value, typing.Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            values = value
+        else:
+            values = [value]
+
+        instance.__dict__[field_name] = [
+            model_ref
+            for item in values
+            if (model_ref := self._normalize_model_ref(item)) is not None
+        ]
+
+    def get_value(self, instance: typing.Any, field_name: str) -> list[typing.Any]:
+        value = instance.__dict__.get(field_name)
+        if value is None:
+            return []
+        return list(value)
+
+    async def persist_references(self, instance: typing.Any, value: typing.Any) -> None:
+        if not self.is_model_reference or not value:
+            return
+
+        related_name = self.model_ref.__related_name__
+        relation = getattr(instance, related_name)
+        references = value
+        if not isinstance(references, typing.Sequence) or isinstance(
+            references, (str, bytes, bytearray)
+        ):
+            references = [references]
+
+        for reference in references:
+            model_ref = self._normalize_model_ref(reference)
+            if model_ref is None:
+                continue
+            await relation.create(**model_ref.model_dump())
 
 
 class OneToOneField(ForeignKey):
@@ -468,23 +1389,12 @@ class OneToOneField(ForeignKey):
     Representation of a one to one field.
     """
 
-    def get_column(self, name: str) -> sqlalchemy.Column:
-        target = self.target
-        to_field = target.fields[target.pkname]
+    def __init__(self, to: type["Model"] | str, **kwargs: typing.Any):
+        kwargs["unique"] = True
+        super().__init__(to, **kwargs)
 
-        column_type = to_field.get_column_type()
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
-            )
-        ]
-        return sqlalchemy.Column(
-            name,
-            column_type,
-            *constraints,
-            nullable=self.null,
-            unique=True,
-        )
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        return super().get_column(name)
 
 
 OneToOne = OneToOneField
@@ -497,7 +1407,7 @@ class ChoiceField(Field):
 
     def __init__(
         self,
-        choices: typing.Sequence[typing.Union[typing.Tuple[str, str], typing.Tuple[str, int]]],
+        choices: type[enum.Enum] | typing.Sequence[tuple[str, str] | tuple[str, int] | str | int],
         **kwargs: typing.Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -506,8 +1416,46 @@ class ChoiceField(Field):
     def get_validator(self, **kwargs: typing.Any) -> Any:
         return Any(**kwargs)
 
+    def _enum_name(self) -> str | None:
+        owner = getattr(self, "owner", None)
+        if owner is None or not self.name:
+            return None
+
+        table_name = getattr(getattr(owner, "meta", None), "tablename", owner.__name__.lower())
+        return f"{table_name}_{self.name}_enum"
+
     def get_column_type(self) -> sqlalchemy.types.TypeEngine:
-        return sqlalchemy.Enum(self.choices)
+        if isinstance(self.choices, type) and issubclass(self.choices, enum.Enum):
+            return sqlalchemy.Enum(self.choices, name=self._enum_name())
+
+        enum_values = [
+            choice[0] if isinstance(choice, (tuple, list)) else choice for choice in self.choices
+        ]
+        return sqlalchemy.Enum(*[str(value) for value in enum_values], name=self._enum_name())
+
+
+class CharChoiceField(Field):
+    """
+    Choice field stored as character values.
+    """
+
+    def __init__(
+        self,
+        choices: type[enum.Enum] | typing.Sequence[typing.Any],
+        max_length: int | None = 30,
+        **kwargs: typing.Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.choices = choices
+        self.max_length = max_length
+
+    def get_validator(self, **kwargs: typing.Any) -> Any:
+        return Any(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        if self.max_length is None:
+            return sqlalchemy.Text()
+        return sqlalchemy.String(length=self.max_length)
 
 
 class DecimalField(Field):
@@ -527,6 +1475,9 @@ class DecimalField(Field):
 
     def get_column_type(self) -> sqlalchemy.Numeric:
         return sqlalchemy.Numeric(precision=self.max_digits, scale=self.decimal_places)
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == decimal.Decimal("0"))
 
 
 class UUIDField(Field):
@@ -579,3 +1530,202 @@ class URLField(CharField):
 
     def get_column_type(self) -> sqlalchemy.String:
         return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
+
+
+class BinaryField(Field):
+    """
+    Representation of bytes/binary data.
+    """
+
+    def __init__(self, max_length: int | None = None, **kwargs: typing.Any):
+        self.max_length = max_length
+        super().__init__(**kwargs)
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        kwargs["max_length"] = self.max_length
+        return Binary(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.LargeBinary:
+        return sqlalchemy.LargeBinary(length=self.max_length)
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == b"")
+
+
+class ExcludeField(Field):
+    """
+    Virtual field used to reserve an attribute name without creating a DB column.
+    """
+
+    is_virtual = True
+
+    def __init__(self, **kwargs: typing.Any) -> None:
+        kwargs.setdefault("null", True)
+        kwargs.setdefault("read_only", True)
+        kwargs.setdefault("exclude", True)
+        super().__init__(**kwargs)
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        raise RuntimeError(f"Virtual field '{name}' does not map to a database column.")
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        raise RuntimeError("ExcludeField does not expose a column type.")
+
+
+class PlaceholderField(ExcludeField):
+    """
+    Explicit alias for placeholders used by relation internals.
+    """
+
+
+class ComputedField(Field):
+    """
+    Virtual field whose value is resolved by getter/setter callbacks.
+    """
+
+    is_virtual = True
+    is_computed = True
+
+    def __init__(
+        self,
+        *,
+        getter: str | typing.Callable[..., typing.Any] | None = None,
+        setter: str | typing.Callable[..., typing.Any] | None = None,
+        fallback_getter: typing.Callable[..., typing.Any] | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        kwargs.setdefault("null", True)
+        kwargs.setdefault("read_only", setter is None)
+        kwargs.setdefault("exclude", True)
+        super().__init__(**kwargs)
+        self.getter = getter
+        self.setter = setter
+        self.fallback_getter = fallback_getter
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column(self, name: str) -> sqlalchemy.Column:
+        raise RuntimeError(f"Computed field '{name}' does not map to a database column.")
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        raise RuntimeError("ComputedField does not expose a column type.")
+
+    def _resolve_callable(
+        self,
+        instance: typing.Any,
+        func: str | typing.Callable[..., typing.Any] | None,
+    ) -> typing.Callable[..., typing.Any] | None:
+        if func is None:
+            return None
+        if isinstance(func, str):
+            return getattr(instance, func)
+        return func
+
+    @staticmethod
+    def _call_with_supported_signatures(
+        callback: typing.Callable[..., typing.Any],
+        field: "ComputedField",
+        instance: typing.Any,
+        owner: type["Model"],
+        value: typing.Any = None,
+        *,
+        include_value: bool = False,
+    ) -> typing.Any:
+        call_signatures = [
+            (field, instance, owner),
+            (field, instance),
+            (instance,),
+            (),
+        ]
+        if include_value:
+            call_signatures = [
+                (field, instance, value, owner),
+                (field, instance, value),
+                (instance, value),
+                (value,),
+            ]
+
+        for args in call_signatures:
+            try:
+                return callback(*args)
+            except TypeError:
+                continue
+        if include_value:
+            return callback(field, instance, value, owner)
+        return callback(field, instance, owner)
+
+    def get_value(self, instance: typing.Any, name: str) -> typing.Any:
+        if name in instance.__dict__:
+            return instance.__dict__[name]
+
+        owner = instance.__class__
+        getter = self._resolve_callable(instance, self.getter)
+        if getter is not None:
+            value = self._call_with_supported_signatures(getter, self, instance, owner)
+            if value is not None:
+                return value
+
+        fallback = self._resolve_callable(instance, self.fallback_getter)
+        if fallback is not None:
+            return self._call_with_supported_signatures(fallback, self, instance, owner)
+
+        raise AttributeError(name)
+
+    def set_value(self, instance: typing.Any, name: str, value: typing.Any) -> None:
+        owner = instance.__class__
+        setter = self._resolve_callable(instance, self.setter)
+        if setter is None:
+            instance.__dict__[name] = value
+            return
+
+        result = self._call_with_supported_signatures(
+            setter,
+            self,
+            instance,
+            owner,
+            value,
+            include_value=True,
+        )
+        if result is not None:
+            instance.__dict__[name] = result
+
+
+class FileField(CharField):
+    """
+    Lightweight file path/reference field stored as text.
+    """
+
+    def __init__(self, max_length: int = 255, **kwargs: typing.Any) -> None:
+        kwargs.setdefault("max_length", max_length)
+        super().__init__(**kwargs)
+
+
+class ImageField(FileField):
+    """
+    Lightweight image path/reference field stored as text.
+    """
+
+
+class PGArrayField(Field):
+    """
+    PostgreSQL ARRAY field with mutable list tracking.
+    """
+
+    def __init__(self, item_type: sqlalchemy.types.TypeEngine, **kwargs: typing.Any) -> None:
+        if not isinstance(item_type, sqlalchemy.types.TypeEngine):
+            raise AssertionError("item_type must be a SQLAlchemy TypeEngine instance.")
+        self.item_type = item_type
+        super().__init__(**kwargs)
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        return Any(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        return typing.cast(
+            sqlalchemy.types.TypeEngine,
+            MutableList.as_mutable(postgresql.ARRAY(self.item_type)),
+        )

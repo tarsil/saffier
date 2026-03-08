@@ -19,14 +19,14 @@ but [--app and environment variables](./migrations/discovery.md##environment-var
 is equally valid and works in the same way.
 
 !!! Tip
-    See the [extras](./extras.md) section after getting familiar with the previous. There offers
-    a way of using the shell without going through the **Migrate** object.
+    See [extras](./extras.md) for a shell-oriented bootstrap that does not rely
+    on the deprecated `Migrate(...)` compatibility wrapper.
 
 ## How does it work
 
-Saffier ecosystem is complex internally but simpler to the user. Saffier will use the application
-using the [migration](./migrations/migrations.md#migration) and automatically extract the
-[registry](./registry.md) from it.
+Saffier ecosystem is complex internally but simpler to the user. Saffier will use the active
+`Instance`, resolve the [registry](./registry.md) from it, and then load models and reflected
+models into the shell.
 
 From there it will automatically load the [models](./models.md) and [reflected models](./reflection.md)
 into the interactive python shell and load them for you with ease 🎉.
@@ -80,13 +80,13 @@ $ saffier shell --kernel ptpython
 **--app**
 
 ```shell
-$ saffier --app myproject.main:app shell
+$ saffier --app myproject.main shell
 ```
 
 **Environment variables**
 
 ```shell
-$ export SAFFIER_DEFAULT_APP=--app myproject.main:app
+$ export SAFFIER_DEFAULT_APP=myproject.main
 $ saffier shell --kernel ptpython
 ```
 
@@ -104,12 +104,12 @@ using.
 
 #### Example
 
-Let us see an example using example using Esmerald and we will have:
+Let us see an example using example using Ravyn and we will have:
 
 * Three [models](./models.md):
-    * User - From an [esmerald application][esmerald_application] `accounts`.
-    * Customer - From an [esmerald application][esmerald_application] `customers`.
-    * Product - From an [esmerald application][esmerald_application] `products`.
+    * User - From an [ravyn application][ravyn_application] `accounts`.
+    * Customer - From an [ravyn application][ravyn_application] `customers`.
+    * Product - From an [ravyn application][ravyn_application] `products`.
 * Two [reflected models](./reflection.md):
     * Payment - From a payments table reflected from the existing database.
     * RecordView - From a SQL View reflected from the existing database.
@@ -121,4 +121,4 @@ And it will look like this:
 Pretty cool, right? Then it is a normal python shell where you can import whatever you want and
 need as per normal python shell interaction.
 
-[esmerald_application]: https://esmerald.dev/management/directives/#create-app
+[ravyn_application]: https://ravyn.dymmond.com/management/directives/#create-app

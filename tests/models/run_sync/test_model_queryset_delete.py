@@ -40,8 +40,34 @@ async def test_queryset_delete():
     saffier.run_sync(Product.query.create(name="Belt", rating=5))
     saffier.run_sync(Product.query.create(name="Tie", rating=5))
 
-    saffier.run_sync(Product.query.filter(pk=shirt.id).delete())
+    deleted = saffier.run_sync(Product.query.filter(pk=shirt.id).delete())
+    assert deleted == 1
     assert saffier.run_sync(Product.query.count()) == 2
 
-    saffier.run_sync(Product.query.delete())
+    deleted = saffier.run_sync(Product.query.delete())
+    assert deleted == 2
+    assert saffier.run_sync(Product.query.count()) == 0
+
+
+async def test_raw_delete_respects_or_clauses():
+    saffier.run_sync(Product.query.create(name="Shirt", rating=5))
+    saffier.run_sync(Product.query.create(name="Belt", rating=5))
+    saffier.run_sync(Product.query.create(name="Tie", rating=5))
+
+    deleted = saffier.run_sync(
+        Product.query.local_or(name="Shirt").local_or(name="Belt").raw_delete()
+    )
+
+    assert deleted == 2
+    assert saffier.run_sync(Product.query.count()) == 1
+
+
+async def test_queryset_delete_use_models_returns_row_count():
+    saffier.run_sync(Product.query.create(name="Shirt", rating=5))
+    saffier.run_sync(Product.query.create(name="Belt", rating=5))
+    saffier.run_sync(Product.query.create(name="Tie", rating=5))
+
+    deleted = saffier.run_sync(Product.query.delete(use_models=True))
+
+    assert deleted == 3
     assert saffier.run_sync(Product.query.count()) == 0

@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 import saffier
 from saffier import Migrate
@@ -22,5 +22,5 @@ class AppUser(saffier.Model):
         registry = models
 
 
-app = Esmerald(routes=[])
+app = Ravyn(routes=[])
 Migrate(app, registry=models)

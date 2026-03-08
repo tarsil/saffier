@@ -1,0 +1,20 @@
+{% extends "admin/base.html.jinja" %}
+{% block content %}
+  <div class="card">
+    <h2>Models</h2>
+    <form method="get">
+      <input type="text" name="q" value="{{ query }}" placeholder="Search model names..." />
+    </form>
+    <table>
+      <thead><tr><th>Name</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for name, model in models.items() %}
+        <tr>
+          <td>{{ model.__name__ }}</td>
+          <td><a class="btn" href="{{ request.url_for('admin_model_detail', name=name) }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

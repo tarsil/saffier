@@ -48,7 +48,7 @@ class IPAddress(BaseFieldProtocol):
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any) -> Any:
-        if dialect.name not in DIALECTS.keys():
+        if dialect.name not in DIALECTS:
             return dialect.type_descriptor(sqlalchemy.CHAR(45))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.INET())
 
@@ -69,7 +69,10 @@ class List(BaseFieldProtocol):
     Representation of a List.
     """
 
-    def __init__(self, impl: str = sqlalchemy.TEXT, cache_ok: bool = True, **kwargs: Any) -> None:  # type: ignore
+    impl: Any = sqlalchemy.TEXT
+    cache_ok: bool = True
+
+    def __init__(self, impl: Any = sqlalchemy.TEXT, cache_ok: bool = True, **kwargs: Any) -> None:
         self.delimiter = kwargs.pop("delimiter", ",")
         super().__init__(**kwargs)
         self.impl = impl

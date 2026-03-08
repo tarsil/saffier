@@ -14,8 +14,6 @@ pytestmark = pytest.mark.anyio
 database = Database(DATABASE_URL)
 another_db = Database(DATABASE_ALTERNATIVE_URL)
 models = saffier.Registry(database=database, extra={"another": another_db})
-registry = copy.copy(models)
-registry.database = another_db
 
 
 def time():
@@ -37,41 +35,64 @@ class Product(saffier.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="module")
-async def create_test_database():
+registry = copy.copy(models)
+registry.database = another_db
+for model in registry.models.values():
+    model.database = another_db
+
+
+async def setup_databases() -> None:
     await models.create_all()
-    await registry.create_all()
-    yield
-    await models.drop_all()
+    registry.metadata_by_name = models.metadata_by_name.copy()
+    await registry.create_all(refresh_metadata=False)
+
+
+async def teardown_databases() -> None:
     await registry.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
-
-
-@pytest.fixture(autouse=True)
-async def rollback_another_db_transactions():
-    with another_db.force_rollback():
-        async with another_db:
-            yield
+    await models.drop_all()
+    for db in {database, another_db, registry.database}:
+        if db.is_connected:
+            await db.disconnect()
 
 
 async def test_bulk_create_another_tenant():
-    await Product.query.using_with_db("another").bulk_create(
-        [
-            {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
-            {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
-        ]
-    )
+    await setup_databases()
+    try:
+        await Product.query.using(database="another").bulk_create(
+            [
+                {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
+                {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
+            ]
+        )
 
-    products = await Product.query.all()
+        products = await Product.query.all()
+        assert len(products) == 0
 
-    assert len(products) == 0
+        others = await Product.query.using(database="another").all()
+        assert len(others) == 2
+    finally:
+        await teardown_databases()
 
-    others = await Product.query.using_with_db("another").all()
 
-    assert len(others) == 2
+async def test_bulk_create_another_schema_and_db():
+    await setup_databases()
+    try:
+        await registry.schema.create_schema("foo", init_models=True, if_not_exists=True)
+        await Product.query.using(database="another", schema="foo").bulk_create(
+            [
+                {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
+                {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
+            ]
+        )
+
+        products = await Product.query.all()
+        assert len(products) == 0
+
+        products = await Product.query.using(database="another").all()
+        assert len(products) == 0
+
+        others = await Product.query.using(database="another", schema="foo").all()
+        assert len(others) == 2
+    finally:
+        await registry.schema.drop_schema("foo", cascade=True, if_exists=True)
+        await teardown_databases()

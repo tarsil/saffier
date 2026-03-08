@@ -4,7 +4,7 @@ import httpx
 # by passing the tenant and email header.
 async with httpx.AsyncClient() as client:
     response = await client.get(
-        "/products", headers={"tenant": "saffier", "email": "saffier@esmerald.dev"}
+        "/products", headers={"tenant": "saffier", "email": "saffier@ravyn.dev"}
     )
     assert response.status_code == 200
     assert len(response.json()) == 10  # total inserted in the `saffier` schema.

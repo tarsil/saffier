@@ -1,5 +1,4 @@
 import pytest
-from pydantic import __version__
 
 from saffier import fields
 from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
@@ -12,7 +11,6 @@ models = TenantRegistry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class Tenant(TenantMixin):
@@ -64,7 +62,7 @@ async def test_select_related_tenant():
     user = await User.query.using(tenant.schema_name).create(name="user")
     product = await Product.query.using(tenant.schema_name).create(name="product-1", user=user)
 
-    prod = await Product.query.using(tenant.schema_name).select_related("user").get(pk=1)
+    prod = await Product.query.using(tenant.schema_name).select_related("user").get(pk=product.pk)
 
     assert prod.pk == product.pk
     assert prod.user.name == "user"

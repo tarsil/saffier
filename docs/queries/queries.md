@@ -108,6 +108,8 @@ The same special operators are also automatically added on every column.
 * **lte** - Filter instances having values `Less Than Equal`.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
+* **isempty** - Filter instances where a field holds its Edgy-style empty value.
+* **isnull** - Filter instances where a column is `NULL` or not `NULL`.
 
 ##### Example
 
@@ -115,6 +117,10 @@ The same special operators are also automatically added on every column.
 users = await User.query.filter(email__icontains="foo")
 
 users = await User.query.filter(id__in=[1, 2, 3])
+
+users = await User.query.filter(name__isempty=True)
+
+users = await User.query.filter(last_login__isnull=True)
 ```
 
 #### SQLAlchemy style
@@ -122,12 +128,33 @@ users = await User.query.filter(id__in=[1, 2, 3])
 Since Saffier uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
 The filter accepts also those.
 
+If you need direct class-attribute access such as `User.id` instead of
+`User.columns.id`, see [SQLAlchemy compatibility mode](./sqlalchemy-compatibility.md).
+
 ##### Example
 
 ```python
 users = await User.query.filter(User.columns.email.contains("foo"))
 
 users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
+```
+
+#### Q expressions
+
+For nested boolean predicates, use [`Q`](q.md).
+
+```python
+from saffier import Q
+
+users = await User.query.filter((Q(name="Adam") & Q(email__icontains="saffier")) | ~Q(id=1))
+```
+
+### Local OR
+
+Use `local_or()` to combine OR clauses with existing queryset filters:
+
+```python
+users = await User.query.filter(is_active=True).local_or(email__icontains="example.com")
 ```
 
 !!! Warning
@@ -160,6 +187,43 @@ go as well.
 await User.query.filter(email__icontains="foo").limit(5).order_by("id")
 ```
 
+### Batch size
+
+When iterating asynchronously, you can set a chunk size for database reads:
+
+```python
+async for user in User.query.order_by("id").batch_size(100):
+    ...
+```
+
+### Extra and reference selects
+
+`extra_select()` adds SQLAlchemy expressions to the `SELECT` list.
+`reference_select()` maps already-selected values back onto model attributes, including nested
+related objects.
+
+```python
+import sqlalchemy
+
+queryset = User.query.extra_select(sqlalchemy.literal(1).label("marker"))
+queryset = queryset.reference_select({"score": "marker"})
+```
+
+Reference paths can target related models:
+
+```python
+queryset = Profile.query.select_related("user").reference_select(
+    {"user": {"profile_name": "name"}, "user_name": "user__name"}
+)
+```
+
+If you need the raw SQLAlchemy statement for subqueries or aggregates, use `as_select()`:
+
+```python
+user_select = await User.query.filter(is_active=True).as_select()
+total = sqlalchemy.func.count().select().select_from(user_select.subquery())
+```
+
 ### Order by
 
 Classic SQL operation and you need to order results.
@@ -188,16 +252,88 @@ users = await User.query.lookup(term="gmail")
 
 ### Distinct
 
-Applies the SQL `DISTINCT ON` on a table.
+Applies SQL `DISTINCT` semantics to a queryset.
 
 ```python
+users = await User.query.distinct()
 users = await User.query.distinct("email")
 ```
 
+Use `distinct(False)` to clear a previously applied distinct clause on a cloned queryset.
+
 !!! Warning
-    Not all the SQL databases support the `DISTINCT ON` fields equally, for example, `mysql` has
-    has that limitation whereas `postgres` does not.
+    Not all SQL databases support `DISTINCT ON` fields equally. PostgreSQL does, but MySQL and
+    SQLite have limitations here.
     Be careful to know and understand where this should be applied.
+
+### Set operations
+
+Saffier supports SQL set operations between querysets of the same model.
+
+| Operation                   | Description                                 | SQL Equivalent |
+|----------------------------|---------------------------------------------|----------------|
+| `.union(qs2)`              | Combines both querysets, removing duplicates. | `UNION`        |
+| `.union_all(qs2)`          | Combines both querysets, keeping duplicates.   | `UNION ALL`    |
+| `.intersect(qs2)`          | Returns only rows appearing in both querysets. | `INTERSECT`    |
+| `.intersect_all(qs2)`      | Uses the `ALL` variant when the backend supports it. | `INTERSECT ALL` |
+| `.except_(qs2)`            | Returns rows from the first queryset that are not in the second. | `EXCEPT` |
+| `.except_all(qs2)`         | Uses the `ALL` variant when the backend supports it. | `EXCEPT ALL` |
+
+All set operations return a combined queryset, so outer queryset modifiers still apply to the
+merged result:
+
+```python
+combined = User.query.filter(is_active=True).union(
+    User.query.filter(is_staff=True)
+)
+
+rows = await combined.order_by("email").offset(5).limit(10)
+```
+
+The outer queryset supports the same result helpers you would use on a regular queryset:
+
+```python
+await combined.values(["id", "email"])
+await combined.exists()
+await combined.count()
+await combined.first()
+await combined.last()
+```
+
+The duplicate-preserving variants are also available directly:
+
+```python
+User.query.union_all(other_queryset)
+User.query.intersect_all(other_queryset)
+User.query.except_all(other_queryset)
+```
+
+!!! Warning
+    Set operations require both querysets to use the same model, the same database connection,
+    and the same selected column shape. If one side uses `only()` or `defer()`, the other side
+    must project the same columns.
+
+Deferred and reduced projections are preserved across combined querysets:
+
+```python
+q1 = User.query.filter(is_active=True).only("id", "email")
+q2 = User.query.filter(is_staff=True).defer("last_login")
+
+rows = await q1.union(q2).order_by("email").values(["id", "email"])
+```
+
+Like Edgy, Saffier applies ordering, offset, and limit to the outer combined result, not to the
+individual branch orderings. Add an explicit `order_by()` when you need deterministic pagination or
+comparison semantics.
+
+### Row locking
+
+Use `select_for_update()` to request row-level locking when running inside a transaction:
+
+```python
+async with database.transaction():
+    users = await User.query.select_for_update(nowait=True).all()
+```
 
 ### Select related
 
@@ -276,12 +412,34 @@ await User.query.create(is_active=False, email="bar@foo.com")
 await User.query.create(is_active=True, email="foo@bar.com", first_name="Foo", last_name="Bar")
 ```
 
-### Delete
+### Bulk get or create
 
-Used to delete an instance.
+Creates missing rows and reuses existing rows when matching `unique_fields`.
 
 ```python
-await User.query.filter(email="foo@bar.com").delete()
+users = await User.query.bulk_get_or_create(
+    [
+        {"name": "Alice", "language": "English"},
+        {"name": "Bob", "language": "Portuguese"},
+    ],
+    unique_fields=["name", "language"],
+)
+```
+
+Alias available: `bulk_select_or_insert`.
+
+### Delete
+
+Used to delete rows and return the number of deleted records.
+
+```python
+deleted = await User.query.filter(email="foo@bar.com").delete()
+```
+
+To execute per-instance delete hooks/signals during queryset deletion, use:
+
+```python
+deleted = await User.query.filter(is_active=False).delete(use_models=True)
 ```
 
 Or directly in the instance.
@@ -289,7 +447,13 @@ Or directly in the instance.
 ```python
 user = await User.query.get(email="foo@bar.com")
 
-await user.delete()
+deleted = await user.delete()
+```
+
+Use `raw_delete()` when you want database-level deletion without model-level delete hooks:
+
+```python
+deleted = await User.query.filter(is_active=False).raw_delete()
 ```
 
 ### Update
@@ -355,6 +519,7 @@ Returns a boolean confirming if a specific record exists.
 
 ```python
 exists = await User.query.filter(email="foo@bar.com").exists()
+exists = await User.query.exists(email__isnull=True)
 ```
 
 ### Count
@@ -363,6 +528,7 @@ Returns an integer with the total of records.
 
 ```python
 total = await User.query.count()
+total = await User.query.count(email__icontains="@example.com")
 ```
 
 ### Contains
@@ -770,6 +936,15 @@ from saffier import run_sync
 run_sync(User.query.all())
 run_sync(User.query.filter(name__icontains="example"))
 run_sync(User.query.create(name="Saffier"))
+```
+
+If synchronous code also needs to manage registry connection lifecycle, wrap it with
+`Registry.with_async_env()`:
+
+```python
+with models.with_async_env():
+    run_sync(models.create_all())
+    run_sync(User.query.create(name="Saffier"))
 ```
 
 [model]: ../models.md

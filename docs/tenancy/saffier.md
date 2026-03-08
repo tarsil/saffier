@@ -17,8 +17,8 @@ This is not so great for GDPR (Europe) or similar in different countries.
 
 Saffier has three different ways of achieving this in a simple and clean fashion.
 
-1. Using the [using](#using) in the queryset.
-2. Using the [using_with_db](#what-is-multi-tenancy) in the queryset.
+1. Using the [using](#using) queryset helper with explicit `schema=` and `database=`.
+2. Using the [using_with_db](#using-with-database) compatibility helper in older code.
 3. Using the [set_tenant](#set-tenant) as global.
 
 You can also use the [Saffier helpers for schemas][schemas] if you need to use it.
@@ -34,11 +34,12 @@ the default set in the [registry][registry].
 **Parameters**:
 
 * **schema** - A string parameter with the name of the schema to query.
+* **database** - Optional extra-connection name or `Database` instance to query against.
 
 The syntax is quite simple.
 
 ```python
-<Model>.query.using(<SCHEMA-NAME>).all()
+<Model>.query.using(schema=<SCHEMA-NAME>).all()
 ```
 
 This is not limited to the `all()` at all, you can use any of the available [query types](../queries/queries.md)
@@ -71,7 +72,7 @@ User.query.all()
 Query the users table from the `main` schema.
 
 ```python
-User.query.using('main').all()
+User.query.using(schema='main').all()
 ```
 
 And that is it, really. Using its a simple shortcut that allows querying different schemas
@@ -80,15 +81,34 @@ without a lot of boilerplate.
 ### Using with database
 
 Now here it is where the things get interesting. What if you need/want to query a schema but from
-a different database instead? Well, that is possible with the use of the `using_with_db`.
+a different database instead? The preferred form is `using(database=..., schema=...)`.
+
+```python
+User.query.using(database="analytics", schema="main").all()
+```
+
+`using_with_db(...)` remains available as a compatibility wrapper for older Edgy-style code.
 
 {!> ../docs_src/shared/extra.md !}
+
+### Using with `with_schema`
+
+The preferred context-based helper is `with_schema(...)`, which temporarily activates a schema for
+all queryset work inside the block and then restores the previous value.
+
+```python
+from saffier.core.db.querysets.mixins import with_schema
+
+with with_schema("main"):
+    User.query.all()
+    User.query.filter(email__icontains="user@example.com")
+```
 
 ### Using with `activate_schema`
 
 !!! Warning
-    This feature is experimental and might be inconsistent with the intended results. Use it at your
-    own discretion.
+    `activate_schema(...)` and `deactivate_schema()` are compatibility helpers and
+    deprecated in favor of `with_schema(...)`.
 
 This is an **alternative** to [using](#using) and serves solely as the purpose of avoiding
 writing all the time `Model.query.using(...)`.
@@ -100,7 +120,7 @@ write `using(...)`.
 Importing is as simple as this:
 
 ```python
-from saffier.core.db.querysets.mixins import activate_schema, deativate_schema
+from saffier.core.db.querysets.mixins import activate_schema, deactivate_schema
 ```
 
 Let us see an example:
@@ -110,9 +130,9 @@ Let us see an example:
 ```python
 # Using the 'main' schema
 
-User.query.using('main').all()
-User.query.using('main').filter(email__icontains="user@example.com")
-User.query.using('main').get(pk=1)
+User.query.using(schema='main').all()
+User.query.using(schema='main').filter(email__icontains="user@example.com")
+User.query.using(schema='main').get(pk=1)
 ```
 
 **Using the activate_schema**
@@ -127,7 +147,7 @@ User.query.filter(email__icontains="user@example.com")
 User.query.get(pk=1)
 
 # Deactivate the schema and default to the public
-deactivate_schema("main")
+deactivate_schema()
 ```
 
 ### Set tenant
@@ -153,7 +173,7 @@ from saffier.core.db import set_tenant
 
 The `set_tenant` can be somehow confusing without a proper example so let us run one 😁.
 
-As usual, for this example [Esmerald][esmerald] will be used. This can be applied to any framework
+As usual, for this example [Ravyn][ravyn] will be used. This can be applied to any framework
 of your choice of course.
 
 **What are we building**:
@@ -221,7 +241,7 @@ the tenant data, which means that **there is no need for `using` or `using_with_
 Now it is time to simply create the API that will read the [created products](#generate-example-data)
 from the database and assemble everything.
 
-This will create an [Esmerald][esmerald] application, assemble the `routes` and add the
+This will create an [Ravyn][ravyn] application, assemble the `routes` and add the
 [middleware](#middleware) created in the previous step.
 
 ```python hl_lines="25"
@@ -248,5 +268,5 @@ you can actually take advantage of this.
 [registry]: ../registry.md
 [schemas]: ../registry.md#schemas
 [using_with_db_registry]: ../registry.md#extra
-[esmerald]: https://esmerald.dev
-[middleware]: https://esmerald.dev/middleware
+[ravyn]: https://ravyn.dymmond.com
+[middleware]: https://ravyn.dymmond.com/middleware

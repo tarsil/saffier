@@ -1,8 +1,6 @@
 import datetime
 from collections import OrderedDict
-from typing import Any, Dict
-
-import pydantic
+from typing import Any
 
 import saffier
 from saffier import Registry
@@ -16,8 +14,7 @@ defaults.update(
     {
         "datetime": datetime.datetime,
         "timedelta": datetime.timedelta,
-        "BaseModel": pydantic.BaseModel,
-        "ConfigDict": pydantic.ConfigDict,
+        "Model": saffier.Model,
         "settings": saffier.settings,
     }
 )
@@ -38,7 +35,7 @@ def welcome_message(app: Any) -> None:
     printer.write_plain(application)
 
 
-def import_objects(app: Any, registry: Registry) -> Dict[Any, Any]:
+def import_objects(app: Any, registry: Registry) -> dict[Any, Any]:
     """
     Imports all the needed objects needed for the shell.
     """
@@ -53,7 +50,7 @@ def import_objects(app: Any, registry: Registry) -> Dict[Any, Any]:
             printer.write_success(directive, colour=OutputColour.CYAN3)
             imported_objects[name] = module
 
-    def _import_objects(lookup_dict: Dict[Any, Any]) -> None:
+    def _import_objects(lookup_dict: dict[Any, Any]) -> None:
         for _, model in sorted(lookup_dict.items()):
             directive = import_statement.format(module_path=model.__module__, model=model.__name__)
             printer.write_success(directive, colour=OutputColour.CYAN3)

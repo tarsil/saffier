@@ -15,8 +15,11 @@ dist/
 node_modules/
 results/
 site/
+docs-generated/
+.cache/
 target/
 venv
+appendix/
 
 # files
 **/*.so
@@ -27,3 +30,5 @@ venv
 .python-version
 coverage.*
 example.sqlite
+docs_internal/
+revamp_plan.md

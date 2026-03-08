@@ -37,9 +37,9 @@ construct representing the DDL DEFAULT value for the column.
 
 ## Available fields
 
-Saffier is built on the top of **pydantic** and inspired by `typesystem`. This means, for example,
-that migrating from the Encode ORM is almost direct as it was made sure the same patterns, names,
-and internal validation remained the same, intentionally.
+Saffier follows a Python-native field and validation layer inspired by `typesystem`. This means,
+for example, that migrating from Encode ORM is almost direct because core patterns, names,
+and validation semantics remain intentionally familiar.
 
 To make the interface even more familiar, the field names end with a `Field` at the end.
 
@@ -54,18 +54,27 @@ import saffier
 From `saffier` you can access all the available fields.
 
 ```python
-from saffier.db import fields
+from saffier.core.db import fields
 ```
 
 From `fields` you should be able to access the fields directly.
 
 ```python
-from saffier.db.fields import BigIntegerField
+from saffier.core.db.fields import BigIntegerField
 ```
 
 You can import directly the desired field.
 
 All the fields have specific parameters beisdes the ones [mentioned in data types](#data-types).
+
+Saffier also exposes dedicated field modules for import ergonomics:
+
+```python
+from saffier.core.db.fields.composite_field import CompositeField
+from saffier.core.db.fields.foreign_keys import ForeignKey, RefForeignKey
+from saffier.core.db.fields.many_to_many import ManyToManyField
+from saffier.core.db.fields.one_to_one_keys import OneToOneField
+```
 
 #### BigIntegerField
 
@@ -165,6 +174,25 @@ class MyModel(saffier.Model):
 
 * **choices** - An enum containing the choices for the field.
 
+#### CharChoiceField
+
+A character-backed choice field. Useful when you want enum-like semantics but explicit string
+storage.
+
+```python
+from enum import Enum
+import saffier
+
+
+class Status(Enum):
+    PENDING = "pending"
+    DONE = "done"
+
+
+class Job(saffier.Model):
+    status = saffier.CharChoiceField(choices=Status, max_length=20)
+```
+
 #### DateField
 
 ```python
@@ -248,6 +276,176 @@ class MyModel(saffier.Model):
 
 Derives from the same as [IntergerField](#integerfield) and validates the decimal float.
 
+#### SmallIntegerField
+
+```python
+import saffier
+
+
+class Counter(saffier.Model):
+    tiny_value = saffier.SmallIntegerField(default=0)
+```
+
+#### DurationField
+
+Stores `datetime.timedelta` using SQL `INTERVAL`.
+
+```python
+import datetime
+import saffier
+
+
+class Timer(saffier.Model):
+    elapsed = saffier.DurationField(default=datetime.timedelta)
+```
+
+#### BinaryField
+
+Stores bytes payloads using SQL `LargeBinary`.
+
+```python
+import saffier
+
+
+class Attachment(saffier.Model):
+    blob = saffier.BinaryField(max_length=4096, null=True)
+```
+
+#### ExcludeField
+
+Virtual field used to reserve an attribute name without creating a database column.
+
+```python
+import saffier
+
+
+class MyModel(saffier.Model):
+    transient = saffier.ExcludeField()
+```
+
+#### PlaceholderField
+
+Alias of `ExcludeField` used for placeholder semantics.
+
+```python
+import saffier
+
+
+class MyModel(saffier.Model):
+    placeholder = saffier.PlaceholderField()
+```
+
+#### ComputedField
+
+Virtual field whose value is resolved by getter/setter callbacks.
+
+Computed fields are excluded from `model_dump()` by default, matching Edgy's
+runtime serialization behavior. Set `exclude=False` when the computed value
+should be part of serialized model output.
+
+```python
+import saffier
+
+
+class Permission(saffier.Model):
+    name = saffier.CharField(max_length=100)
+    description = saffier.ComputedField(
+        getter="get_description",
+        setter="set_description",
+        exclude=False,
+    )
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def get_description(cls, field, instance, owner=None):
+        return instance.name.upper()
+```
+
+#### CompositeField
+
+Virtual grouping field that exposes multiple underlying fields as one structured attribute.
+
+```python
+import saffier
+
+
+class Customer(saffier.Model):
+    first_name = saffier.CharField(max_length=120)
+    last_name = saffier.CharField(max_length=120)
+
+    # Reads/writes both fields as one dictionary.
+    full_name = saffier.CompositeField(inner_fields=["first_name", "last_name"])
+
+    # Declares embedded real columns.
+    contact = saffier.CompositeField(
+        inner_fields=[
+            ("email", saffier.EmailField(max_length=255, null=True)),
+            ("phone", saffier.CharField(max_length=64, null=True)),
+        ],
+        prefix_embedded="contact_",
+    )
+```
+
+`CompositeField` itself is virtual and does not create a database column. Embedded inner fields do.
+
+Saffier also accepts an abstract model class on the model body and converts it into a prefixed
+`CompositeField` automatically, matching Edgy's embedded-model shorthand.
+
+```python
+class Address(saffier.Model):
+    street = saffier.CharField(max_length=100)
+    city = saffier.CharField(max_length=100)
+
+    class Meta:
+        abstract = True
+
+
+class ProfileHolder(saffier.Model):
+    address = Address
+```
+
+The generated columns are `address_street` and `address_city`, while `holder.address` reads and
+writes the embedded object as a single value.
+
+#### FileField
+
+String-backed field for file references/paths.
+
+```python
+import saffier
+
+
+class Asset(saffier.Model):
+    file_ref = saffier.FileField(null=True)
+```
+
+#### ImageField
+
+String-backed field for image references/paths.
+
+```python
+import saffier
+
+
+class Asset(saffier.Model):
+    image_ref = saffier.ImageField(null=True)
+```
+
+#### PGArrayField
+
+PostgreSQL `ARRAY` field with mutable list tracking.
+
+```python
+import sqlalchemy
+import saffier
+
+
+class User(saffier.Model):
+    tags = saffier.PGArrayField(sqlalchemy.String(), null=True)
+```
+
 #### ForeignKey
 
 ```python
@@ -273,16 +471,65 @@ class MyModel(saffier.Model):
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
 * **related_name** - The name to use for the relation from the related object back to this one.
+  Set it to `False` to disable the reverse relation entirely.
+  When omitted on `OneToOneField`, Saffier generates the singular reverse accessor instead of the
+  plural `*_set` name.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `saffier`.
+* **no_constraint** - Disable the database-level foreign key constraint while still keeping the
+  Saffier relation. This is useful for shared registries, cross-database links, and tenant models
+  that point at shared content type rows.
 
     ```python
     from saffier import CASCADE, SET_NULL, RESTRICT
     ```
+
+#### RefForeignKey
+
+`RefForeignKey` supports two modes in Saffier.
+
+If you pass a real Saffier model, it behaves like a regular `ForeignKey` and keeps the extra
+`ref_field` metadata for tooling or custom conventions.
+
+```python
+import saffier
+
+
+class Team(saffier.Model):
+    slug = saffier.CharField(max_length=120, unique=True)
+
+
+class Member(saffier.Model):
+    team = saffier.RefForeignKey(Team, ref_field="slug", on_delete=saffier.CASCADE)
+```
+
+If you pass a `ModelRef` subclass instead, `RefForeignKey` becomes a virtual nested-insert field.
+This is the Saffier-native pure Python adaptation of Edgy's reference workflow.
+
+```python
+class PostRef(saffier.ModelRef):
+    __related_name__ = "posts_set"
+    comment: str
+
+
+class User(saffier.StrictModel):
+    name = saffier.CharField(max_length=100, null=True)
+    posts = saffier.RefForeignKey(PostRef, null=True)
+```
+
+```python
+await User.query.create(
+    PostRef(comment="created from a positional ModelRef"),
+    name="Alice",
+    posts=[],
+)
+```
+
+See [Reference ForeignKey](./reference-foreignkey.md) for the full workflow.
 
 #### ManyToMany
 
@@ -313,6 +560,31 @@ class MyModel(saffier.Model):
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Saffier generates the model by default
 if none is provided.
+* **through_tablename** - Controls the table name used for the auto-generated through model.
+  Saffier uses the field-based naming scheme by default, which is the same
+  behavior as `saffier.NEW_M2M_NAMING`. You can still pass
+  `saffier.NEW_M2M_NAMING` explicitly or provide a non-empty string.
+  String values support `str.format(field=...)`.
+* **embed_through** - When set to a string, queryset results return the related model and attach
+  the intermediate through row on that attribute. This also enables query paths such as
+  `organisation.teams.filter(membership__team__name="Blue Team")` when
+  `embed_through="membership"`.
+* **unique** - Marks the target side of the generated through model as unique, producing a
+  reverse relation that behaves like Edgy's unique many-to-many variant.
+
+!!! Note
+    Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.
+    Auto-generated through models always include it, and custom through models must also expose
+    `id` as the primary key.
+
+!!! Warning
+    Saffier intentionally keeps `saffier.NEW_M2M_NAMING` as the single supported
+    auto-generated naming path unless you provide an explicit table name yourself.
+
+!!! Tip
+    String values for `through_tablename` are formatted with `field=self` before
+    being lowercased. This lets you derive stable names from the owner model and
+    field name when you need custom naming.
 
 #### IPAddressField
 

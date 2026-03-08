@@ -41,3 +41,12 @@ async def test_model_first():
     assert await User.query.first(name="Jane") == jane
     assert await User.query.filter(name="Jane").first() == jane
     assert await User.query.filter(name="Lucy").first() is None
+
+
+async def test_model_first_respects_existing_ordering():
+    await User.query.create(name="Zulu")
+    alpha = await User.query.create(name="Alpha")
+
+    first = await User.query.order_by("name").first()
+
+    assert first == alpha

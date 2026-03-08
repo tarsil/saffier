@@ -1,17 +1,11 @@
-import click
+from sayer import command
 
 from saffier.cli.base import current as _current
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, VerboseOption
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
-@click.command()
-def current(env: MigrationEnv, directory: str, verbose: bool) -> None:
+@command
+def current(verbose: VerboseOption, directory: DirectoryOption) -> None:
     """Display the current revision for each database."""
-    _current(env.app, directory, verbose)
+    _current(get_migration_app(), directory, verbose)

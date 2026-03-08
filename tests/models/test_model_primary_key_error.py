@@ -46,26 +46,22 @@ class StatusEnum(Enum):
         "ChoiceField",
     ],
 )
-async def test_model_custom_primary_key_raised_error_without_default(
+async def test_model_custom_primary_key_allowed_without_default(
     field, max_length, max_digits, decimal_places
 ):
-    with pytest.raises(ValueError) as raised:
-        kwargs = {
-            "max_length": max_length,
-            "max_digits": max_digits,
-            "decimal_places": decimal_places,
-            "choices": StatusEnum,
-        }
+    kwargs = {
+        "max_length": max_length,
+        "max_digits": max_digits,
+        "decimal_places": decimal_places,
+        "choices": StatusEnum,
+    }
 
-        class Profile(saffier.Model):
-            id = field(primary_key=True, **kwargs)
-            language = saffier.CharField(max_length=200, null=True)
-            age = saffier.IntegerField()
+    class Profile(saffier.Model):
+        id = field(primary_key=True, **kwargs)
+        language = saffier.CharField(max_length=200, null=True)
+        age = saffier.IntegerField()
 
-            class Meta:
-                registry = models
+        class Meta:
+            registry = models
 
-    assert (
-        raised.value.args[0]
-        == "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
-    )
+    assert Profile.pknames == ("id",)

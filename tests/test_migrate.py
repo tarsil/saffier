@@ -1,8 +1,8 @@
 import pytest
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 import saffier
-from saffier import Migrate, Registry
+from saffier import Instance, Migrate, Registry, get_migration_prepared_registry
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -54,15 +54,29 @@ class ReflectedContact(saffier.ReflectModel):
     ids=["dict", "tuple", "list"],
 )
 def test_migrate_with_model_apps(model_apps):
-    app = Esmerald()
+    app = Ravyn()
     models.models = {}
 
     assert len(models.models) == 0
 
-    migrate = Migrate(app=app, registry=models, model_apps=model_apps)
+    with pytest.warns(DeprecationWarning):
+        migrate = Migrate(app=app, registry=models, model_apps=model_apps)
 
     assert len(models.models) == 2
     assert len(migrate.registry.models) == 2
+    assert isinstance(saffier.monkay.instance, Instance)
+    assert saffier.monkay.instance.app is app
+
+
+def test_instance_without_app_uses_active_registry():
+    instance = Instance(registry=models)
+    saffier.monkay.set_instance(instance)
+
+    registry = get_migration_prepared_registry()
+
+    assert registry is models
+    assert registry.metadata_by_name[None] is registry.metadata
+    saffier.monkay.set_instance(None)
 
 
 @pytest.mark.parametrize(
@@ -71,10 +85,10 @@ def test_migrate_with_model_apps(model_apps):
     ids=["set", "fronzenset", "int", "float", "string"],
 )
 def test_raises_assertation_error_on_model_apps(model_apps):
-    app = Esmerald()
+    app = Ravyn()
     models.models = {}
 
     assert len(models.models) == 0
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError), pytest.warns(DeprecationWarning):
         Migrate(app=app, registry=models, model_apps=model_apps)

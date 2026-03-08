@@ -1,0 +1,27 @@
+{% extends "admin/base.html.jinja" %}
+{% block content %}
+  <div class="card">
+    <h2>Edit {{ model.__name__ }}</h2>
+    <form method="post">
+      {% for field in model_fields %}
+        <p>
+          <label for="{{ field.name }}">{{ field.name }}</label>
+          <input
+            id="{{ field.name }}"
+            name="{{ field.name }}"
+            value="{{ payload.get(field.name, '') }}"
+            {% if field.required %}required{% endif %}
+          />
+        </p>
+      {% endfor %}
+      <button type="submit">Save</button>
+    </form>
+    {% if errors %}
+      <div class="errors">
+        {% for key, value in errors.items() %}
+          <p>{{ key }}: {{ value }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

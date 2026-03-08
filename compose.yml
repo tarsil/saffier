@@ -1,0 +1,29 @@
+services:
+  db:
+    restart: always
+    image: postgres:16
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "passwsss*1348394#"
+      POSTGRES_DB: "saffier"
+    expose:
+      - "5432"
+      # - ./create_db.sh:/docker-entrypoint-initdb.d/create_db.sh
+    command: >-
+        --jit=false
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  saffier_alt:
+    restart: always
+    image: postgres:16
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "saffier_alt"
+    command: >-
+        --jit=false
+    ports:
+      - "127.0.0.1:5433:5432"

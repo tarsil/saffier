@@ -1,30 +1,19 @@
-from typing import Any
+from typing import Annotated
 
-import click
+from sayer import Argument, command
 
 from saffier.cli.base import downgrade as _downgrade
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption, ExtraArgOption, SQLOption, TagOption
+from saffier.cli.state import get_migration_app
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option(
-    "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
-)
-@click.option(
-    "--tag", default=None, help=('Arbitrary "tag" name - can be used by custom env.py ' "scripts")
-)
-@click.option(
-    "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
-)
-@click.command()
-@click.argument("revision", default="-1")
+@command(context_settings={"ignore_unknown_options": True})
 def downgrade(
-    env: MigrationEnv, directory: str, sql: bool, tag: str, arg: Any, revision: str
+    sql: SQLOption,
+    tag: TagOption,
+    arg: ExtraArgOption,
+    revision: Annotated[str, Argument("-1")],
+    directory: DirectoryOption,
 ) -> None:
     """Revert to a previous version"""
-    _downgrade(env.app, directory, revision, sql, tag, arg)
+    _downgrade(get_migration_app(), directory, revision, sql, tag, arg)

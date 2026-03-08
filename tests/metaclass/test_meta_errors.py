@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import pytest
 
 import saffier
@@ -30,8 +32,8 @@ async def test_improperly_configured_for_multiple_managers_on_abstract_class():
     with pytest.raises(ImproperlyConfigured) as raised:
 
         class BaseModel(saffier.Model):
-            query = ObjectsManager()
-            languages = ObjectsManager()
+            query: ClassVar[Manager] = ObjectsManager()
+            languages: ClassVar[Manager] = ObjectsManager()
 
             class Meta:
                 abstract = True
@@ -45,8 +47,8 @@ async def test_improperly_configured_for_primary_key():
 
         class BaseModel(saffier.Model):
             id = saffier.IntegerField(primary_key=False)
-            query = ObjectsManager()
-            languages = ObjectsManager()
+            query: ClassVar[Manager] = ObjectsManager()
+            languages: ClassVar[Manager] = ObjectsManager()
 
             class Meta:
                 registry = models
@@ -57,18 +59,18 @@ async def test_improperly_configured_for_primary_key():
     )
 
 
-async def test_improperly_configured_for_multiple_primary_keys():
-    with pytest.raises(ImproperlyConfigured) as raised:
+async def test_multiple_primary_keys_are_allowed():
+    class BaseModel(saffier.Model):
+        id = saffier.IntegerField(primary_key=True)
+        name = saffier.IntegerField(primary_key=True)
+        query: ClassVar[Manager] = ObjectsManager()
+        languages: ClassVar[Manager] = ObjectsManager()
 
-        class BaseModel(saffier.Model):
-            name = saffier.IntegerField(primary_key=True)
-            query = ObjectsManager()
-            languages = ObjectsManager()
+        class Meta:
+            registry = models
 
-            class Meta:
-                registry = models
-
-    assert raised.value.args[0] == "Cannot create model BaseModel with multiple primary keys."
+    assert BaseModel.pknames == ("id", "name")
+    assert BaseModel.pkcolumns == ("id", "name")
 
 
 @pytest.mark.parametrize("_type,value", [("int", 1), ("dict", {"name": "test"}), ("set", set())])
@@ -77,8 +79,8 @@ async def test_improperly_configured_for_unique_together(_type, value):
 
         class BaseModel(saffier.Model):
             name = saffier.IntegerField()
-            query = ObjectsManager()
-            languages = ObjectsManager()
+            query: ClassVar[Manager] = ObjectsManager()
+            languages: ClassVar[Manager] = ObjectsManager()
 
             class Meta:
                 registry = models
@@ -104,8 +106,8 @@ async def test_value_error_for_unique_together(value):
 
         class BaseModel(saffier.Model):
             name = saffier.IntegerField()
-            query = ObjectsManager()
-            languages = ObjectsManager()
+            query: ClassVar[Manager] = ObjectsManager()
+            languages: ClassVar[Manager] = ObjectsManager()
 
             class Meta:
                 registry = models

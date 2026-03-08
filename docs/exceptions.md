@@ -57,3 +57,50 @@ Or simply:
 ```python
 from saffier import ImproperlyConfigured
 ```
+
+## MarshallFieldDefinitionError
+
+Raised when a marshall declaration is incomplete or inconsistent.
+
+Examples:
+
+* missing `marshall_config`
+* using both `fields` and `exclude`
+* forgetting `ClassVar` on `marshall_config`
+* declaring a `MarshallMethodField` without its matching `get_<field>()`
+
+```python
+from saffier.exceptions import MarshallFieldDefinitionError
+```
+
+## SuspiciousFileOperation
+
+Raised when file/path utilities detect an unsafe filename or path traversal.
+
+```python
+from saffier.exceptions import SuspiciousFileOperation
+```
+
+## FileOperationError
+
+Raised when a file operation cannot be completed safely.
+
+```python
+from saffier.exceptions import FileOperationError
+```
+
+## InvalidStorageError
+
+Raised when a configured storage alias or backend cannot be loaded.
+
+```python
+from saffier.exceptions import InvalidStorageError
+```
+
+## DatabaseNotConnectedWarning
+
+Warning category for operations that require a connected database but run disconnected.
+
+```python
+from saffier.exceptions import DatabaseNotConnectedWarning
+```

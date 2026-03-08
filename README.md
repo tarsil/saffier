@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/tarsil/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
-    <img src="https://github.com/tarsil/saffier/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
-</a>
+<a href="https://github.com/tarsil/saffier/actions/workflows/test-suite.yml/badge.svg?event=push&branch=main" target="_blank">
+    <img src="https://github.com/tarsil/saffier/actions/workflows/test-suite.yml/badge.svg?event=push&branch=main" alt="Test Suite">
+  </a>
 
 <a href="https://pypi.org/project/saffier" target="_blank">
     <img src="https://img.shields.io/pypi/v/saffier?color=%2334D058&label=pypi%20package" alt="Package version">
@@ -28,28 +28,28 @@
 
 **Source Code**: [https://github.com/tarsil/saffier](https://github.com/tarsil/saffier)
 
+**The official supported version is always the latest released**.
 ---
 
-## Open to donate
+## Saffier 2.0+
 
-Saffier is and always will be a very important part of the open source in Python but with the maintaince of its sibling [Edgy](https://edgy.dymmond.com)
-Saffier no longer follows the same lines.
+Saffier is currently revamped, powered up and ready to be more powerful and flexible, while maintaining the same familiar interface.
+The new version will be released as **Saffier 2.0** and the versioning will grow from there. The supported version will always be the latest released,
+so if you are using Saffier, make sure to keep it updated to the latest version to get the best experience and all the new features.
 
-If you are interested in continuing maintaining it or would like to do something else and grow Saffier in another way, I am more than happy to
-donate this amaing ORM to you as well as the Python Pypi package.
+Why this now? Saffier plays an important role in the ecosystem of tools I am building and I want to make sure it is the best it can be for everyone.
+The new version will be more powerful, flexible and easier to use, while maintaining the same familiar interface.
 
-If you are interested, please get in touch with me. The contacts are inside the `pyproject.toml`.
+Saffier was never neglected, or at least intentionally neglected, but it was always a challenge to maintain
+it while also working on other projects and tools.
 
-## Announcement
+This will no longer be the case and Saffier will come to stay.
 
-Saffier is and always will be free and belongs to the community but due to the advancement of the [Dymmond](https://github.com/dymmond)
-ecosystem, it was decided to persue the continuation of a more customisable, versatile, modular and faster tool
-to maintain and grow, [Edgy](https://edgy.dymmond.com). This does not mean Saffier will be forgotten, quite the opposite but the main
-efforts are focused on the open source of the ecosystem of Dymmond as there is a lot of work to carry on and the community is driven
-by that.
+Saffier is intentionally Python-native and ORM-focused.
+It is designed to stay framework-agnostic, lightweight in validation concerns,
+and aligned with the developer ergonomics that made Saffier popular.
 
-**If you would like to continue with Saffier and also maintain it, I'm more than happy to pass it on to you as Saffier can grow in so many**
-other possible ways that we can't even quantify it here.
+Now, if you are interested in helping and maintaining Saffier, please don't hesitate to reach out and contribute, it is always welcome and appreciated.
 
 ## Motivation
 
@@ -65,29 +65,8 @@ are done into a more common and familiar interface.
 
 ## Before continuing
 
-If you are looking for something more **Pydantic** oriented where you can take literally advantage
-of everything that Pydantic can offer, then instead of continuing with Saffier, have a look at
-its ***data ORM brother***, [Edgy](https://edgy.tarsild.io).
-
-**Edgy** its extremely powerful as well with a key difference that its **100% Pydantic** which means
-you can leverage the technology if you already familiar with it.
-
-No worries, it is not completely different from Saffier, in fact, it was designed with the same principles and what it changes for you
-are essentially the ***imports***.
-
-### Thinking of moving to Edgy?
-
-If you are considering of moving to Edgy but you don't want to be bothered about learning a new
-tool and afraid of breaking changes, then fear not!
-
-Edgy was designed to also make your migration feel seemless, which means that essentially you would
-only need to install it and change the imports in your project from `saffier` to `edgy` and it should
-work automatically for you.
-
-Even the documentation structure its almost the same, intentionally, so what you already know with
-Saffier, you will know with **Edgy**.
-
-**This discards any custom code done by you, of course.**
+Saffier is built for teams that want a direct SQLAlchemy-core-powered ORM workflow
+without introducing a Pydantic-centric architecture in the model layer.
 
 ## Why this ORM
 

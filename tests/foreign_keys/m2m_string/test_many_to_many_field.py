@@ -6,6 +6,7 @@ from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
+TABLE_PREFIX = "msf"
 
 database = Database(DATABASE_URL)
 models = saffier.Registry(database=database)
@@ -16,6 +17,7 @@ class User(saffier.Model):
 
     class Meta:
         registry = models
+        table_prefix = TABLE_PREFIX
 
 
 class Track(saffier.Model):
@@ -25,6 +27,7 @@ class Track(saffier.Model):
 
     class Meta:
         registry = models
+        table_prefix = TABLE_PREFIX
 
 
 class Album(saffier.Model):
@@ -34,6 +37,7 @@ class Album(saffier.Model):
 
     class Meta:
         registry = models
+        table_prefix = TABLE_PREFIX
 
 
 class Studio(saffier.Model):
@@ -43,6 +47,7 @@ class Studio(saffier.Model):
 
     class Meta:
         registry = models
+        table_prefix = TABLE_PREFIX
 
 
 @pytest.fixture(autouse=True, scope="function")

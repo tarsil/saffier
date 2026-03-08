@@ -40,7 +40,12 @@ to the [related name][related_name] as per normal search.
 ManyToMany allows two different methods when using it.
 
 * `add()` - Adds a record to the ManyToMany.
+* `add_many()` - Adds multiple records to the ManyToMany in one call.
 * `remove()` - Removes a record to the ManyToMany.
+* `remove_many()` - Removes multiple records from the ManyToMany in one call.
+
+Reverse related names generated from the through model expose the same helpers, so you can mutate
+the relation from either side.
 
 Let us see how it looks by using the following example.
 
@@ -60,6 +65,23 @@ organisation = await Organisation.query.create(ident="Acme Ltd")
 # Add teams to the organisation
 organisation.teams.add(blue_team)
 organisation.teams.add(green_team)
+```
+
+#### add_many()
+
+When you already have multiple related instances, you can stage all of them in a single
+call and keep the result list for downstream assertions or prefetch flows.
+
+```python
+await organisation.teams.add_many(blue_team, green_team, red_team)
+```
+
+#### remove_many()
+
+You can also remove multiple related instances in one call.
+
+```python
+await organisation.teams.remove_many(blue_team, red_team)
 ```
 
 #### remove()
@@ -82,6 +104,29 @@ organisation.teams.remove(red_team)
 organisation.teams.remove(blue_team)
 ```
 
+If the reverse side is unique, `remove()` can omit the child and Saffier will remove the single
+linked row.
+
+```python
+await track.track_albumtrack.remove()
+```
+
+#### Querying through many-to-many paths
+
+Many-to-many paths can be used directly in queryset filters and `Q(...)` expressions.
+
+```python
+teams = await Organisation.query.filter(teams__name__icontains="blue").distinct("id")
+
+users = await User.query.filter(
+    saffier.Q(products__name__icontains="soap")
+    | saffier.Q(products__categories__name="food")
+).distinct("id")
+```
+
+The same traversal rules apply to reverse many-to-many paths and to longer mixed paths that
+cross foreign keys.
+
 
 #### Related name
 
@@ -95,17 +140,36 @@ format:
 <table-to-many2many>_<through-model-name>s_set
 ```
 
+If the many-to-many field is declared with `unique=True`, the generated reverse related name is
+singular and omits the trailing `s_set`.
+
 ##### Example without related name
 
-```python hl_lines="17"
+```python
 {!> ../docs_src/queries/manytomany/no_rel.py !}
 ```
 
-```python hl_lines="11"
+```python
 {!> ../docs_src/queries/manytomany/no_rel_query_example.py !}
 ```
 
 As you can see, because no `related_name` was provided, it defaulted to `team_organisationteams_set`.
+
+### Embedded through rows
+
+`ManyToManyField(..., embed_through="membership")` returns the related model instance and attaches
+the intermediate row on `membership`.
+
+```python
+team = await organisation.teams.get(name="Blue Team")
+assert team.membership.organisation.pk == organisation.pk
+```
+
+The embedded alias is also available in queryset filters.
+
+```python
+team = await organisation.teams.filter(membership__team__name="Blue Team").get()
+```
 
 
 ##### Example with related name

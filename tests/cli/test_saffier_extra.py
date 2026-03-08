@@ -1,4 +1,4 @@
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 from saffier import Registry
 from saffier.cli.constants import SAFFIER_DB, SAFFIER_EXTRA
@@ -10,9 +10,9 @@ def test_has_saffier_extra():
     assert hasattr(extra_app, SAFFIER_EXTRA)
 
 
-def test_extra_esmerald():
+def test_extra_ravyn():
     extra = getattr(extra_app, SAFFIER_EXTRA)["extra"]
-    assert isinstance(extra.app, Esmerald)
+    assert isinstance(extra.app, Ravyn)
 
 
 def test_has_saffier_migration():

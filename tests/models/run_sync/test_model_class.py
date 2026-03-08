@@ -64,7 +64,8 @@ async def test_model_crud():
     assert user.pk is not None
     assert users == [user]
 
-    saffier.run_sync(user.delete())
+    deleted = saffier.run_sync(user.delete())
+    assert deleted == 1
     users = saffier.run_sync(User.query.all())
     assert users == []
 

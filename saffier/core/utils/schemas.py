@@ -1,14 +1,15 @@
-from typing import Any, Dict, Mapping, Type
-
-from pydantic_core._pydantic_core import PydanticUndefined as Undefined
+from collections.abc import Mapping
+from typing import Any
 
 from saffier.core.db.fields._internal import SaffierField
 from saffier.core.utils.base import Message
 from saffier.exceptions import ValidationError
 
+Undefined = object()
+
 
 class Schema(SaffierField):
-    error_messages: Dict[str, str] = {
+    error_messages: dict[str, str] = {
         "type": "Must be an object.",
         "null": "May not be null.",
         "invalid_key": "All object keys must be strings.",
@@ -16,12 +17,14 @@ class Schema(SaffierField):
     }
 
     def __init__(
-        self, default: Any = Undefined, *, fields: Dict[str, Type[SaffierField]], **kwargs: Any
+        self, default: Any = Undefined, *, fields: dict[str, type[SaffierField]], **kwargs: Any
     ) -> None:
         super().__init__(default=default, **kwargs)
         self.fields = fields
         self.required = [
-            key for key, field in fields.items() if not (field.read_only or field.has_default())  # type: ignore
+            key
+            for key, field in fields.items()
+            if not (field.read_only or field.null or field.has_default())  # type: ignore
         ]
 
     def check(self, value: Any) -> Any:
@@ -38,7 +41,7 @@ class Schema(SaffierField):
         validated = {}
         error_messages = []
 
-        for key in value.keys():
+        for key in value:
             if not isinstance(key, str):
                 text = self.get_error_message("invalid_key")
                 message = Message(text=text, code="required", index=[key])

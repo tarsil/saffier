@@ -79,6 +79,10 @@ Did you notice that a `TenantRegistry` was used? Nothing to worry about, it is n
 new to you, it is just an inherited [registry](../registry.md) with extra properties specifically
 created for this purpose 😁.
 
+If you want a tenant model to exist only inside tenant schemas, set `register_default = False` on
+the model `Meta`. Saffier now applies that consistently to copied tenant models and to the
+auto-generated ManyToMany through models created from tenant models.
+
 ## TenantRegistry
 
 The `TenantRegistry` as mentioned above, it is just an inherited [registry](../registry.md) with extra properties specifically
@@ -225,7 +229,7 @@ Well with all the models and explanations covered, is time to create a practical
 of this is applied, this way it will make more sense to understand what is what and how everything
 works together 🔥.
 
-For this example we will be using [Esmerald][esmerald] and [Esmerald middleware][esmerald_middleware]
+For this example we will be using [Ravyn][ravyn] and [Ravyn middleware][ravyn_middleware]
 with Saffier. We will be also be creating:
 
 * [Tenant](#tenant)
@@ -233,7 +237,7 @@ with Saffier. We will be also be creating:
 * [TenantUser](#tenantuser)
 * [Settings](#tenancysettings)
 
-All of this will come together and in the end an [Esmerald][esmerald] API with middleware and an
+All of this will come together and in the end an [Ravyn][ravyn] API with middleware and an
 endpoint will be the final result.
 
 ### Create the initial models
@@ -265,7 +269,7 @@ The settings can be stored in a location like `myapp/configs/saffier/settings.py
 **Make the settings globally available to Saffier**.
 
 ```shell
-$ export SAFFIER_SETTINGS_MODULE=myapp.configs.saffier.settings.EdgySettings
+$ export SAFFIER_SETTINGS_MODULE=myapp.configs.saffier.settings.SaffierSettings
 ```
 
 Exporting as an environment variable will make sure Saffier will use your settings instead of the
@@ -287,7 +291,7 @@ The `TenantMiddleware` will be only reading from a given header `tenant` and mat
 against a `TenantUser`. If that tenant user exists, then sets the global application tenant
 to the found one, else ignores it.
 
-Because we won't be implementing any `authentication` system in this example where Esmerald has a lot
+Because we won't be implementing any `authentication` system in this example where Ravyn has a lot
 of examples that can be checked in the docs, we will be also passing an `email` in the header just
 to run some queries against.
 
@@ -324,7 +328,7 @@ the newly `saffier` generated schema.
 
 ### Create the API
 
-Now it is time to create the Esmerald API that will **only** read the products associated with
+Now it is time to create the Ravyn API that will **only** read the products associated with
 the user that it is querying it.
 
 ```python title="api.py"
@@ -365,7 +369,7 @@ be carefully managed by you from there on.
 
 
 [saffier]: ./saffier.md
-[esmerald]: https://esmerald.dev
-[esmerald_middleware]: https://esmerald.dev/middleware
+[ravyn]: https://ravyn.dymmond.com
+[ravyn_middleware]: https://ravyn.dymmond.com/middleware
 [django_tenants]: https://django-tenants.readthedocs.io/en/latest/
 [django_tenants_url]: https://django-tenants-url.tarsild.io/

@@ -8,7 +8,7 @@ class Uniqueness:
     FALSE = Empty()
     HASHABLE_TYPES = (int, bool, str, float, list, dict)
 
-    def __init__(self, items: typing.Optional[typing.List[typing.Any]] = None) -> None:
+    def __init__(self, items: list[typing.Any] | None = None) -> None:
         self._set: set = set()
         for item in items or []:
             self.add(item)

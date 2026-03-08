@@ -1,17 +1,39 @@
-from typing import TYPE_CHECKING, Dict, Type
+import logging
+import weakref
+from typing import TYPE_CHECKING
 
 import sqlalchemy
-from loguru import logger
 
 from saffier.core.terminal import Terminal
 
 terminal = Terminal()
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
 
 
-def table_schema(model_class: Type["TenantModel"], schema: str) -> sqlalchemy.Table:
+_SCHEMA_TABLE_CACHE: "weakref.WeakKeyDictionary[TenantRegistry, dict[str, dict[str, sqlalchemy.Table]]]" = weakref.WeakKeyDictionary()
+
+
+def _build_schema_tables(
+    registry: "TenantRegistry", schema: str, target_model: type["TenantModel"]
+) -> dict[str, sqlalchemy.Table]:
+    metadata = sqlalchemy.MetaData(schema=schema)
+    schema_tables: dict[str, sqlalchemy.Table] = {}
+
+    for model in registry.tenant_models.values():
+        schema_tables[model.table.name] = model.table.to_metadata(metadata, schema=schema)
+
+    # Ensure non-registered tenant models still get a table clone for this schema.
+    schema_tables.setdefault(
+        target_model.table.name,
+        target_model.table.to_metadata(metadata, schema=schema),
+    )
+    return schema_tables
+
+
+def table_schema(model_class: type["TenantModel"], schema: str) -> sqlalchemy.Table:
     """
     Making sure the tables on inheritance state, creates the new
     one properly.
@@ -19,11 +41,32 @@ def table_schema(model_class: Type["TenantModel"], schema: str) -> sqlalchemy.Ta
     The use of context vars instead of using the lru_cache comes from
     a warning from `ruff` where lru can lead to memory leaks.
     """
-    return model_class.build(schema)
+    registry = model_class.meta.registry
+    if registry not in _SCHEMA_TABLE_CACHE:
+        _SCHEMA_TABLE_CACHE[registry] = {}
+
+    table_name = model_class.table.name
+    registry_cache = _SCHEMA_TABLE_CACHE[registry]
+    if schema not in registry_cache:
+        registry_cache[schema] = _build_schema_tables(
+            registry=registry,
+            schema=schema,
+            target_model=model_class,
+        )
+    cached_tables = registry_cache[schema]
+    if table_name not in cached_tables:
+        registry_cache[schema] = _build_schema_tables(
+            registry=registry,
+            schema=schema,
+            target_model=model_class,
+        )
+        cached_tables = registry_cache[schema]
+
+    return cached_tables[table_name]
 
 
 async def create_tables(
-    registry: "TenantRegistry", tenant_models: Dict[str, Type["TenantModel"]], schema: str
+    registry: "TenantRegistry", tenant_models: dict[str, type["TenantModel"]], schema: str
 ) -> None:
     """
     Creates the table models for a specific schema just generated.
@@ -31,14 +74,16 @@ async def create_tables(
     Iterates through the tenant models and creates them in the schema.
     """
 
-    for name, model in tenant_models.items():
-        table = table_schema(model, schema)
+    metadata = sqlalchemy.MetaData(schema=schema)
 
+    for name, model in tenant_models.items():
         logger.info(f"Creating table '{name}' for schema: '{schema}'")
-        try:
-            async with registry.engine.begin() as connection:
-                await connection.run_sync(table.create)
-            await registry.engine.dispose()
-        except Exception as e:
-            logger.error(str(e))
-            ...
+        model.table.to_metadata(metadata, schema=schema)
+
+    try:
+        async with registry.engine.begin() as connection:
+            await connection.run_sync(metadata.create_all)
+    except Exception as e:
+        logger.error(str(e))
+    finally:
+        await registry.engine.dispose()

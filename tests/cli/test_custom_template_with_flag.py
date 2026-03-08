@@ -1,48 +1,37 @@
 import asyncio
 import os
 import shutil
+from contextlib import suppress
 
 import pytest
 import sqlalchemy
-from esmerald import Esmerald
+from ravyn import Ravyn
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.cli.utils import run_cmd
 from tests.settings import DATABASE_URL
 
-app = Esmerald(routes=[])
+app = Ravyn(routes=[])
 
 
 @pytest.fixture(scope="module")
 def create_folders():
     os.chdir(os.path.split(os.path.abspath(__file__))[0])
-    try:
+    with suppress(OSError):
         os.remove("app.db")
-    except OSError:
-        pass
-    try:
+    with suppress(OSError):
         shutil.rmtree("migrations")
-    except OSError:
-        pass
-    try:
+    with suppress(OSError):
         shutil.rmtree("temp_folder")
-    except OSError:
-        pass
 
     yield
 
-    try:
+    with suppress(OSError):
         os.remove("app.db")
-    except OSError:
-        pass
-    try:
+    with suppress(OSError):
         shutil.rmtree("migrations")
-    except OSError:
-        pass
-    try:
+    with suppress(OSError):
         shutil.rmtree("temp_folder")
-    except OSError:
-        pass
 
 
 def test_alembic_version():
@@ -70,17 +59,17 @@ def test_migrate_upgrade_with_app_flag(create_folders):
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app init -t ./custom", is_app=False
     )
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app makemigrations", is_app=False
     )
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     (o, e, ss) = run_cmd(
         "tests.cli.main:app", "saffier --app tests.cli.main:app migrate", is_app=False
     )
-    assert ss == 0
+    assert ss == 0, o.decode("utf-8") + e.decode("utf-8")
 
     with open("migrations/README") as f:
         assert f.readline().strip() == "Custom template"

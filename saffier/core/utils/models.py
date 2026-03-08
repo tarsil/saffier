@@ -1,6 +1,6 @@
 import typing
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any
 
 from orjson import (
     OPT_OMIT_MICROSECONDS,  # noqa
@@ -46,15 +46,14 @@ class DateParser:
 def create_saffier_model(
     __name__: str,
     __module__: str,
-    __definitions__: Optional[Dict[Any, Any]] = None,
-    __metadata__: Optional[Type["MetaInfo"]] = None,
-    __qualname__: Optional[str] = None,
-    __bases__: Optional[Tuple[Type["Model"]]] = None,
+    __definitions__: dict[Any, Any] | None = None,
+    __metadata__: type["MetaInfo"] | None = None,
+    __qualname__: str | None = None,
+    __bases__: tuple[type["Model"]] | None = None,
     __proxy__: bool = False,
-) -> Type["Model"]:
+) -> type["Model"]:
     """
-    Generates an `saffier.Model` with all the required definitions to generate the pydantic
-    like model.
+    Generates a dynamic `saffier.Model` using the provided metadata and definitions.
     """
 
     if not __bases__:
@@ -74,11 +73,11 @@ def create_saffier_model(
     if __metadata__:
         core_definitions.update(**{"Meta": __metadata__})
 
-    model: Type["Model"] = type(__name__, __bases__, core_definitions)
+    model: type[Model] = type(__name__, __bases__, core_definitions)
     return model
 
 
-def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
+def generify_model_fields(model: type["Model"]) -> dict[Any, Any]:
     """
     Makes all fields generic when a partial model is generated or used.
     This also removes any metadata for the field such as validations making

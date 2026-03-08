@@ -1,24 +1,26 @@
-import click
+from typing import Annotated
+
+from sayer import Option, command
 
 from saffier.cli.base import init as _init
-from saffier.cli.env import MigrationEnv
+from saffier.cli.common_params import DirectoryOption
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
-@click.option(
-    "-t", "--template", default=None, help=('Repository template to use (default is "flask")')
-)
-@click.option(
-    "--package",
-    is_flag=True,
-    help=("Write empty __init__.py files to the environment and " "version locations"),
-)
-@click.command(name="init")
-def init(env: MigrationEnv, directory: str, template: str, package: bool) -> None:
+@command
+def init(
+    template: Annotated[
+        str,
+        Option(None, "-t", help='Repository template to use (default is "default")'),
+    ],
+    package: Annotated[
+        bool,
+        Option(
+            False,
+            is_flag=True,
+            help="Write empty __init__.py files to the environment and version locations",
+        ),
+    ],
+    directory: DirectoryOption,
+) -> None:
     """Creates a new migration repository."""
-    _init(env.app, directory, template, package)
+    _init(None, directory, template, package)

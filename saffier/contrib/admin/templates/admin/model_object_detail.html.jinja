@@ -1,0 +1,19 @@
+{% extends "admin/base.html.jinja" %}
+{% block content %}
+  <div class="card">
+    <h2>{{ model.__name__ }} Object</h2>
+    <table>
+      <tbody>
+      {% for key, value in instance.model_dump().items() %}
+        <tr><th>{{ key }}</th><td>{{ value }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p>
+      <a class="btn" href="{{ request.url_for('admin_model_edit', name=model_name, pk=encoded_pk) }}">Edit</a>
+    </p>
+    <form method="post" action="{{ request.url_for('admin_model_delete', name=model_name, pk=encoded_pk) }}">
+      <button type="submit">Delete</button>
+    </form>
+  </div>
+{% endblock %}

@@ -135,3 +135,8 @@ the `ReflectModel` declaration, **the operation on that field will not happen**.
 !!! Warning
     If you are reflecting SQL views, you probably will not be able to write (create, update...) as
     the SQL view has that same limitation.
+
+## Auto reflection patterns
+
+For pattern-based reflection (regex include/exclude + naming templates), use
+[`AutoReflectModel`](./reflection/autoreflection.md) from `saffier.contrib.autoreflection`.
