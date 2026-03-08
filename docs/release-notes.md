@@ -1,6 +1,17 @@
 # Release Notes
 
-## 1.5.0
+## 2.0.0
+
+Saffier 2.0.0 marks the beginning of a new chapter for the project: a sharper,
+fully modernized ORM with a pure-Python core, stronger query and relationship
+capabilities, and a cleaner long-term foundation for framework-agnostic async applications.
+
+This release focuses on the areas that matter most in real projects: model behavior,
+queryset power, relation handling, migration tooling, tenancy support, compatibility,
+and documentation.
+
+Saffier became faster, better, cleaner. This is the same Saffier you know and love, but with a sharper edge and a stronger core
+and... a lot of new features and improvements but also... Faster!
 
 ### Added
 
@@ -13,18 +24,16 @@
 
 ### Changed
 
-- Documentation updated with Saffier-first naming and query set-operation guidance.
+- Saffier now ships with a fully pure-Python model/runtime layer and no longer depends on Pydantic internally (Like its sibling Edgy does).
 - Query and model `delete()` now return deleted row counts.
-- Saffier settings docs refreshed for current behavior and runtime helpers.
 - Documentation tooling now follows the Zensical workflow with Edgy-aligned Hatch/Taskfile docs commands (`docs_prepare`, `docs_build`, `docs_clean`, `serve`).
-- `NEW_M2M_NAMING` is now the only supported many-to-many naming marker; the old compatibility sentinel was removed from Saffier.
+- CLI, migration, and application-discovery flows were refreshed for the current runtime and template system.
 
 ### Fixed
 
 - Tenant schema table metadata now keeps foreign-key relationships consistent across related models in non-default schemas.
 - QuerySet `raw_delete()` added and delete filtering now respects accumulated OR clauses.
 - Removed `loguru`; Saffier now uses Python standard-library logging in core modules.
-- Removed core runtime dependence on Pydantic (`saffier/core/datastructures.py` and `saffier/core/db/models/model_proxy.py` are now Python-native).
 - QuerySet cache parity improved for `all(clear_cache=True)`, cached `get()`, SQL rendering, and `select_for_update(...)`.
 - Permission, pagination, lazy-import, and nested `exclude_secrets()` compatibility now align more closely with Edgy behavior.
 - Model save/create extraction now matches Edgy for nullable/default fields, explicit read-only primary-key values, and composite-key / related-field inserts.

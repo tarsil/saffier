@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any, ClassVar
 
 from saffier.core.datastructures import HashableBaseModel
@@ -27,7 +28,7 @@ class ModelRef(HashableBaseModel):
 
         field_names: list[str] = []
         for base in reversed(cls.__mro__):
-            annotations = getattr(base, "__dict__", {}).get("__annotations__", {})
+            annotations = inspect.get_annotations(base, eval_str=False)
             for field_name in annotations:
                 if field_name.startswith("_") or field_name == "__related_name__":
                     continue
