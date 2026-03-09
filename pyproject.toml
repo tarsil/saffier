@@ -77,7 +77,7 @@ saffier = "saffier.__main__:run_cli"
 test = [
     "asyncpg>=0.27.0,<1",
     "asyncmy>=0.2.7,<0.3.0",
-    "ravyn==0.3.9",
+    "ravyn==0.3.10",
     "httpx>=0.25.0,<0.30.0",
     "pytest>=8.3.5,<9.0.0",
     "pytest-cov>=6.0.0,<7.0.0",
