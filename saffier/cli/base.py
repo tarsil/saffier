@@ -16,6 +16,7 @@ from saffier.cli.constants import DEFAULT_TEMPLATE_NAME, SAFFIER_DB
 from saffier.cli.decorators import catch_errors
 from saffier.conf import _monkay, settings
 from saffier.core.extras.base import BaseExtra
+from saffier.core.utils.sync import run_sync
 from saffier.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
@@ -118,6 +119,25 @@ def _get_config(
     if migrate_wrapper is not None:
         return cast("Config", migrate_wrapper.get_config(directory, arg=arg, options=options))
     return Config.get_instance(directory=directory, args=arg, options=options, app=app)
+
+
+def _send_migration_signal(signal_name: str, sender: str, **payload: Any) -> None:
+    """Dispatch a migration lifecycle signal from a synchronous CLI command.
+
+    Saffier migration commands are synchronous wrappers around Alembic, while
+    Saffier's signal dispatcher is async-capable so receivers can perform ORM
+    work. Bridging through ``run_sync`` keeps the CLI public surface simple and
+    lets both synchronous and asynchronous receivers observe migration events.
+
+    Args:
+        signal_name: Name of the Saffier signal instance being dispatched.
+        sender: Migration command name such as ``revision`` or ``upgrade``.
+        **payload: Command-specific keyword arguments passed to receivers.
+    """
+    from saffier.core import signals as signals_module
+
+    signal = getattr(signals_module, signal_name)
+    run_sync(signal.send(sender, _async_wrapper=run_sync, **payload))
 
 
 class Migrate(BaseExtra):
@@ -338,6 +358,18 @@ def revision(
     options = ["autogenerate"] if autogenerate else None
     config = _get_config(app, directory, options=options)
 
+    signal_payload = {
+        "config": config,
+        "message": message,
+        "autogenerate": autogenerate,
+        "sql": sql,
+        "head": head,
+        "splice": splice,
+        "branch_label": branch_label,
+        "version_path": version_path,
+        "revision_id": revision_id,
+    }
+    _send_migration_signal("pre_migrate", "revision", **signal_payload)
     command.revision(
         config,
         message,
@@ -349,6 +381,7 @@ def revision(
         version_path=version_path,
         rev_id=revision_id,
     )
+    _send_migration_signal("post_migrate", "revision", **signal_payload)
 
 
 @catch_errors
@@ -370,6 +403,18 @@ def migrate(
     """
     config = _get_config(app, directory, options=["autogenerate"], arg=arg)
 
+    signal_payload = {
+        "config": config,
+        "message": message,
+        "autogenerate": True,
+        "sql": sql,
+        "head": head,
+        "splice": splice,
+        "branch_label": branch_label,
+        "version_path": version_path,
+        "revision_id": revision_id,
+    }
+    _send_migration_signal("pre_migrate", "revision", **signal_payload)
     command.revision(
         config,
         message,
@@ -381,6 +426,7 @@ def migrate(
         version_path=version_path,
         rev_id=revision_id,
     )
+    _send_migration_signal("post_migrate", "revision", **signal_payload)
 
 
 @catch_errors
@@ -429,7 +475,10 @@ def upgrade(
     The command respects SQL-output and custom Alembic tag arguments.
     """
     config = _get_config(app, directory, arg=arg)
+    signal_payload = {"config": config, "revision": revision, "sql": sql, "tag": tag}
+    _send_migration_signal("pre_migrate", "upgrade", **signal_payload)
     command.upgrade(config, revision, sql=sql, tag=tag)
+    _send_migration_signal("post_migrate", "upgrade", **signal_payload)
 
 
 @catch_errors
@@ -448,7 +497,10 @@ def downgrade(
     config = _get_config(app, directory, arg=arg)
     if sql and revision == "-1":
         revision = "head:-1"
+    signal_payload = {"config": config, "revision": revision, "sql": sql, "tag": tag}
+    _send_migration_signal("pre_migrate", "downgrade", **signal_payload)
     command.downgrade(config, revision, sql=sql, tag=tag)
+    _send_migration_signal("post_migrate", "downgrade", **signal_payload)
 
 
 @catch_errors

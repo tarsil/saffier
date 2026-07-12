@@ -303,7 +303,7 @@ Simple right?
 
 As mentioned in the comments of the middleware, it reads the `tenant` and `email` from the headers
 and uses it to run the queries against the database records and if there is a relationship between `User` and `Tenant` in the
-`TenantUser`, it will use the `set_tenant` to set the global tenant for the user calling the APIs.
+`TenantUser`, it will use `with_tenant` to scope the tenant for the user calling the APIs.
 
 ### Create some mock data
 

@@ -9,6 +9,7 @@ import pytest
 import saffier
 from saffier.cli import base as cli_base
 from saffier.conf import override_settings
+from saffier.core.signals import post_migrate, pre_migrate
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -121,3 +122,148 @@ def test_edit_exit_on_old_alembic(monkeypatch: pytest.MonkeyPatch):
     )
     cli_base.edit(app=app, directory="migrations", revision="head")
     assert called["rev"] == "head"
+
+
+def test_revision_dispatches_sender_filtered_migration_signals(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Verify revision commands emit migration lifecycle hooks.
+
+    Receivers are connected through the sender-filtered public signal API, then
+    the regular synchronous CLI helper is called with Alembic patched out. This
+    proves migration hooks run through the command surface rather than a private
+    helper alone.
+    """
+    migrate, app = _make_migrate()
+    events: list[tuple[str, str, bool, bool]] = []
+
+    @pre_migrate.connect_via("revision")
+    def before_revision(sender, sql, autogenerate, _async_wrapper, **kwargs):
+        """Record synchronous pre-revision signal payloads.
+
+        Args:
+            sender: Migration command name.
+            sql: Whether SQL output mode is active.
+            autogenerate: Whether Alembic autogeneration is active.
+            _async_wrapper: Synchronous bridge exposed to receivers.
+            **kwargs: Additional command metadata.
+        """
+        events.append(("pre", sender, sql, autogenerate))
+
+    @post_migrate.connect_via("revision")
+    async def after_revision(sender, sql, autogenerate, **kwargs):
+        """Record asynchronous post-revision signal payloads.
+
+        Args:
+            sender: Migration command name.
+            sql: Whether SQL output mode is active.
+            autogenerate: Whether Alembic autogeneration is active.
+            **kwargs: Additional command metadata.
+        """
+        events.append(("post", sender, sql, autogenerate))
+
+    @pre_migrate.connect_via("upgrade")
+    def wrong_sender(sender, **kwargs):
+        """Fail if sender filtering routes revision events to upgrade hooks.
+
+        Args:
+            sender: Migration command name.
+            **kwargs: Additional command metadata.
+        """
+        raise AssertionError(f"unexpected sender {sender}")
+
+    monkeypatch.setattr(cli_base.command, "revision", lambda *args, **kwargs: None)
+    try:
+        cli_base.revision(
+            app=app,
+            directory="migrations",
+            message="hooked",
+            autogenerate=True,
+            sql=True,
+        )
+    finally:
+        pre_migrate.disconnect(before_revision)
+        post_migrate.disconnect(after_revision)
+        pre_migrate.disconnect(wrong_sender)
+
+    assert events == [
+        ("pre", "revision", True, True),
+        ("post", "revision", True, True),
+    ]
+
+
+def test_upgrade_and_downgrade_dispatch_success_only_migration_signals(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Verify upgrade/downgrade hooks fire only around successful commands.
+
+    The command functions should emit pre hooks before Alembic, emit post hooks
+    after success, and avoid post hooks when Alembic raises. That distinction is
+    important for receivers that mutate data after a migration completes.
+    """
+    migrate, app = _make_migrate()
+    del migrate
+    events: list[tuple[str, str]] = []
+
+    @pre_migrate.connect_via("upgrade")
+    def before_upgrade(sender, **kwargs):
+        """Record pre-upgrade signal dispatch.
+
+        Args:
+            sender: Migration command name.
+            **kwargs: Additional command metadata.
+        """
+        events.append(("pre", sender))
+
+    @post_migrate.connect_via("upgrade")
+    def after_upgrade(sender, **kwargs):
+        """Record post-upgrade signal dispatch.
+
+        Args:
+            sender: Migration command name.
+            **kwargs: Additional command metadata.
+        """
+        events.append(("post", sender))
+
+    @pre_migrate.connect_via("downgrade")
+    def before_downgrade(sender, revision, **kwargs):
+        """Record downgrade signal dispatch and normalized SQL revision.
+
+        Args:
+            sender: Migration command name.
+            revision: Alembic revision passed to the command.
+            **kwargs: Additional command metadata.
+        """
+        events.append(("pre", f"{sender}:{revision}"))
+
+    @post_migrate.connect_via("downgrade")
+    def after_downgrade(sender, **kwargs):
+        """Fail if a failed downgrade emits a post hook.
+
+        Args:
+            sender: Migration command name.
+            **kwargs: Additional command metadata.
+        """
+        raise AssertionError(f"unexpected post sender {sender}")
+
+    monkeypatch.setattr(cli_base.command, "upgrade", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        cli_base.command,
+        "downgrade",
+        lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("boom")),
+    )
+    try:
+        cli_base.upgrade(app=app, directory="migrations", revision="head")
+        with pytest.raises(ValueError):
+            cli_base.downgrade(app=app, directory="migrations", revision="-1", sql=True)
+    finally:
+        pre_migrate.disconnect(before_upgrade)
+        post_migrate.disconnect(after_upgrade)
+        pre_migrate.disconnect(before_downgrade)
+        post_migrate.disconnect(after_downgrade)
+
+    assert events == [
+        ("pre", "upgrade"),
+        ("post", "upgrade"),
+        ("pre", "downgrade:head:-1"),
+    ]

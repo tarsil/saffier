@@ -11,7 +11,7 @@ from ravyn.core.protocols.middleware import MiddlewareProtocol
 
 from saffier.contrib.multi_tenancy import TenantModel, TenantRegistry
 from saffier.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
-from saffier.core.db import fields, set_tenant
+from saffier.core.db import fields, set_tenant, with_tenant
 from saffier.exceptions import ObjectNotFound
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -69,8 +69,8 @@ class TenantMiddleware(MiddlewareProtocol):
         except ObjectNotFound:
             tenant = None
 
-        set_tenant(tenant)
-        await self.app(scope, receive, send)
+        with with_tenant(tenant):
+            await self.app(scope, receive, send)
 
 
 @pytest.fixture(autouse=True)

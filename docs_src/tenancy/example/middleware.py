@@ -4,7 +4,7 @@ from ravyn import Request
 from ravyn.core.protocols.middleware import MiddlewareProtocol
 from lilya.types import ASGIApp, Receive, Scope, Send
 
-from saffier.core.db import set_tenant
+from saffier.core.db import with_tenant
 from saffier.exceptions import ObjectNotFound
 
 
@@ -20,7 +20,7 @@ class TenantMiddleware(MiddlewareProtocol):
         Receives a header with the tenant information and lookup in
         the database if exists.
 
-        Sets the tenant if true, or none otherwise.
+        Binds the tenant while the downstream application handles the request.
         """
         request = Request(scope=scope, receive=receive, send=send)
         tenant_header = request.headers.get("tenant", None)
@@ -31,5 +31,5 @@ class TenantMiddleware(MiddlewareProtocol):
         except ObjectNotFound:
             tenant = None
 
-        set_tenant(tenant)
-        await self.app(scope, receive, send)
+        with with_tenant(tenant):
+            await self.app(scope, receive, send)

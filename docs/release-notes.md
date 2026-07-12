@@ -19,6 +19,8 @@ flow through SQLAlchemy's public async APIs.
 - The admin HTML interface now includes the richer Tailwind, Font Awesome, and JSONEditor-powered pages for dashboard, model lists, object detail, create, and edit flows.
 - Admin model visibility now follows `Meta.in_admin`, while `Meta.no_admin_create` keeps models browsable but blocks creation through both UI and service paths.
 - Admin links, redirects, and the 404 page now honor `AdminConfig`, including `admin_prefix_url` for reverse-proxy deployments.
+- Tenant routing now includes `with_tenant`, a scoped context manager for request-level multi-tenancy.
+- Migration commands now emit `pre_migrate` and `post_migrate` lifecycle signals around revision, upgrade, and downgrade flows.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
 ### Fixed

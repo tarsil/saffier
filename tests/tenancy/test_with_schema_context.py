@@ -1,4 +1,5 @@
-from saffier.core.db.context_vars import get_schema
+from saffier.core.db import with_tenant
+from saffier.core.db.context_vars import get_schema, get_tenant, set_tenant
 from saffier.core.db.querysets.mixins import TenancyMixin, deactivate_schema, with_schema
 
 
@@ -37,6 +38,42 @@ def test_with_schema_restores_previous_value() -> None:
     with with_schema("tenant_a"):
         assert get_schema() == "tenant_a"
     assert get_schema() is None
+
+
+def test_with_tenant_restores_previous_value_and_overrides_schema() -> None:
+    """Verify tenant scoping is temporary and has schema precedence.
+
+    Tenant routing represents the request-level multi-tenancy decision and must
+    therefore win over a plain schema context while the tenant block is active.
+    Leaving the block should restore both the previous tenant and the lower
+    priority schema value.
+    """
+    set_tenant(None)
+
+    with with_schema("plain_schema"):
+        assert get_schema() == "plain_schema"
+        with with_tenant("tenant_schema"):
+            assert get_tenant() == "tenant_schema"
+            assert get_schema() == "tenant_schema"
+        assert get_tenant() is None
+        assert get_schema() == "plain_schema"
+
+
+def test_with_tenant_restores_outer_tenant() -> None:
+    """Verify nested tenant scopes restore the previous tenant binding.
+
+    Request middleware can be nested by test clients, mounted applications, or
+    custom dispatch layers. The inner tenant must not erase the outer tenant
+    when its block exits.
+    """
+    set_tenant(None)
+
+    with with_tenant("outer"):
+        assert get_schema() == "outer"
+        with with_tenant("inner"):
+            assert get_schema() == "inner"
+        assert get_schema() == "outer"
+    assert get_tenant() is None
 
 
 def test_deactivate_schema_resets_context() -> None:
