@@ -138,6 +138,7 @@ nav:
       - Schema: "references/schemas.md"
       - Database: "references/database.md"
   - About:
+      - Capability Convergence: "capability-convergence.md"
       - Saffier People: "saffier-people.md"
       - Contributing: "contributing.md"
       - Sponsorship: "sponsorship.md"

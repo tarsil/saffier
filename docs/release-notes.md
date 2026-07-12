@@ -28,6 +28,7 @@ flow through SQLAlchemy's public async APIs.
 - Factory documentation now covers model factories, relationship factories, and async persisted factory rows.
 - `FileField` and `ImageField` now use Saffier's storage subsystem directly, returning field-bound file objects with optional size, metadata, and approval columns.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
+- Added a Saffier-native architecture acceptance report for the 2.2.0 convergence campaign.
 
 ### Fixed
 
