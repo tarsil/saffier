@@ -1,3 +1,3 @@
-from .middleware import EdgyMiddleware
+from .middleware import SaffierMiddleware
 
-__all__ = ["EdgyMiddleware"]
+__all__ = ["SaffierMiddleware"]

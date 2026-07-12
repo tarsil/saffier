@@ -37,7 +37,7 @@ def test_raise_error_on_update_null():
         ForeignKey(to=MyModel, on_update=saffier.SET_NULL)
 
 
-def test_foreign_key_helper_methods_match_edgy_surface():
+def test_foreign_key_helper_methods_cover_admin_and_cross_db_surface():
     owner_db = type("OwnerDB", (), {"url": "postgresql://owner"})()
     target_db = type("TargetDB", (), {"url": "postgresql://target"})()
     target_registry = type(
@@ -69,7 +69,7 @@ def test_foreign_key_helper_methods_match_edgy_surface():
     assert field.get_related_model_for_admin() is target
 
 
-def test_related_field_helper_methods_match_edgy_surface():
+def test_related_field_helper_methods_cover_admin_and_cross_db_surface():
     owner_db = type("OwnerDB", (), {"url": "postgresql://owner"})()
     target_db = type("TargetDB", (), {"url": "postgresql://target"})()
     source_registry = type(

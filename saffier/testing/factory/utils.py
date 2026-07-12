@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .types import FactoryCallback, FactoryParameterCallback, ModelFactoryContext
 
 
-EDGY_FIELD_PARAMETERS: dict[
+SAFFIER_FIELD_PARAMETERS: dict[
     str, tuple[str, Callable[[BaseFieldType, str, ModelFactoryContext], Any]]
 ] = {
     "ge": ("min", lambda field, attr_name, context: getattr(field, attr_name)),
@@ -47,7 +47,7 @@ def remove_unparametrized_relationship_fields(
     kwargs["exclude"] = excluded
 
 
-def edgy_field_param_extractor(
+def saffier_field_param_extractor(
     factory_fn: FactoryCallback | str,
     *,
     remapping: dict[
@@ -57,8 +57,27 @@ def edgy_field_param_extractor(
     | None = None,
     defaults: dict[str, Any | FactoryParameterCallback] | None = None,
 ) -> FactoryCallback:
+    """Map Saffier field constraints into factory callback parameters.
+
+    Factory callbacks often use Faker-style keyword names such as ``min`` and
+    ``max`` while Saffier fields expose ORM-oriented attributes such as ``ge``
+    and ``le``. This helper builds a wrapper that copies supported field
+    attributes into the callback keyword payload and applies optional defaults
+    only when the caller has not already provided a value.
+
+    Args:
+        factory_fn: Factory callback or Faker method name to invoke after
+            parameters are mapped.
+        remapping: Optional mapping overrides. Set a field attribute to ``None``
+            to suppress the default mapping.
+        defaults: Parameter defaults or callbacks applied after field-derived
+            parameters.
+
+    Returns:
+        FactoryCallback: Wrapper suitable for ``FactoryField(callback=...)``.
+    """
     remapping = remapping or {}
-    remapping = {**EDGY_FIELD_PARAMETERS, **remapping}
+    remapping = {**SAFFIER_FIELD_PARAMETERS, **remapping}
 
     if isinstance(factory_fn, str):
         factory_name = factory_fn

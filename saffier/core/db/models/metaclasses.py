@@ -237,6 +237,14 @@ class MetaInfo:
         registry (Registry | None):
             Registry that owns the model, or `None` for detached/abstract
             models.
+        in_admin (bool | None):
+            Optional admin visibility flag. `False` excludes the model from
+            Saffier's registry-backed admin; `None` inherits from parent models
+            and otherwise keeps the default visible behavior.
+        no_admin_create (bool | None):
+            Optional admin create-flow flag. `True` keeps the model visible for
+            browsing and editing while disabling object creation through the
+            built-in admin.
         foreign_key_fields (dict[str, Field]):
             Foreign-key-like fields that require reverse relation wiring.
         related_fields (dict[str, Any]):
@@ -249,6 +257,8 @@ class MetaInfo:
 
     __slots__ = (
         "abstract",
+        "in_admin",
+        "no_admin_create",
         "fields",
         "fields_mapping",
         "registry",
@@ -287,6 +297,18 @@ class MetaInfo:
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
+        """Copy model ``Meta`` options into Saffier's runtime metadata object.
+
+        Model classes can define a lightweight inner ``Meta`` class, inherit
+        metadata from parents, or receive generated metadata while being copied.
+        The initializer normalizes those sources into mutable runtime state used
+        by registry registration, table generation, admin visibility, and query
+        behavior.
+
+        Args:
+            meta: Optional user or generated ``Meta`` object to copy from.
+            **kwargs: Extra base ``MetaInfo`` initialization options.
+        """
         super().__init__(**kwargs)
         self._fields_are_initialized = False
         self._field_stats_are_initialized = False
@@ -294,6 +316,8 @@ class MetaInfo:
         self.pk: Field | None = getattr(meta, "pk", None)
         self.pk_attribute: Field | str = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
+        self.in_admin: bool | None = getattr(meta, "in_admin", None)
+        self.no_admin_create: bool | None = getattr(meta, "no_admin_create", None)
         self.model: type[Model] | None = None
         fields = getattr(meta, "fields", None)
         if fields is None:
@@ -1171,6 +1195,11 @@ class BaseModelMeta(type):
             get_model_meta_attr("table_prefix", bases, meta_class),
         )
         meta.model_engine = get_model_meta_attr("model_engine", bases, meta_class)
+        meta.in_admin = cast("bool | None", get_model_meta_attr("in_admin", bases, meta_class))
+        meta.no_admin_create = cast(
+            "bool | None",
+            get_model_meta_attr("no_admin_create", bases, meta_class),
+        )
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if meta.abstract:
@@ -1409,7 +1438,7 @@ class BaseModelMeta(type):
         Returns:
             Any: The SQLAlchemy table object for the requested schema.
         """
-        del metadata  # metadata is accepted for API parity with Edgy.
+        del metadata  # accepted for call-signature compatibility with table helpers.
         if getattr(cls, "is_proxy_model", False):
             parent = getattr(cls, "parent", None)
             if parent is None:

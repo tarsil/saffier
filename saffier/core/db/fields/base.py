@@ -3,6 +3,7 @@
 import copy
 import decimal
 import enum
+import mimetypes
 import typing
 from datetime import date, datetime, timedelta
 
@@ -34,8 +35,16 @@ from saffier.core.db.fields._internal import (
     Time,
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
+from saffier.core.files.base import FieldFile, File, ImageFieldFile
+from saffier.core.files.storage import Storage, storages
 from saffier.core.terminal import Print
-from saffier.exceptions import FieldDefinitionError, ImproperlyConfigured, ModelReferenceError
+from saffier.core.utils.db import FORCE_FIELDS_NULLABLE
+from saffier.exceptions import (
+    FieldDefinitionError,
+    FileOperationError,
+    ImproperlyConfigured,
+    ModelReferenceError,
+)
 
 if typing.TYPE_CHECKING:
     from saffier import Model
@@ -106,7 +115,7 @@ class Field:
         constraints = self.get_constraints()
         column_kwargs = {
             "primary_key": self.primary_key,
-            "nullable": self.null and not self.primary_key,
+            "nullable": self.get_columns_nullable() and not self.primary_key,
             "index": self.index,
             "unique": self.unique,
             "default": self.default_value,
@@ -132,6 +141,27 @@ class Field:
 
     def get_constraints(self) -> typing.Any:
         return []
+
+    def get_columns_nullable(self) -> bool:
+        """Resolve SQLAlchemy nullability for this field during metadata build.
+
+        The model declaration remains the canonical field definition, but
+        migration generation can temporarily ask Saffier to render selected
+        columns as nullable. That temporary override makes it possible to add a
+        required field to a table that already has rows, then backfill defaults
+        in the generated online migration before the final model constraint is
+        enforced by later migrations.
+
+        Returns:
+            bool: ``True`` when the field declaration or active migration
+            override should make generated columns nullable.
+        """
+        if self.null:
+            return True
+
+        force_fields = FORCE_FIELDS_NULLABLE.get()
+        owner_name = self.owner.__name__ if self.owner is not None else ""
+        return (owner_name, self.name) in force_fields or ("", self.name) in force_fields
 
     def get_columns(self, name: str) -> typing.Sequence[sqlalchemy.Column]:
         return [self.get_column(name)]
@@ -864,7 +894,8 @@ class ForeignKey(Field):
                     key=self.get_fk_field_name(name, related_key),
                     name=self.get_fk_column_name(name, related_name),
                     type_=related_type,
-                    nullable=self.null or related_nullable,
+                    nullable=(self.get_columns_nullable() or related_nullable)
+                    and not self.primary_key,
                     primary_key=self.primary_key,
                     autoincrement=False,
                 )
@@ -1236,7 +1267,12 @@ class ManyToManyField(Field):
                 name=self.get_fk_name(name=name),
             )
         ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return sqlalchemy.Column(
+            name,
+            column_type,
+            *constraints,
+            nullable=self.get_columns_nullable(),
+        )
 
     def add_model_to_register(self, model: type["Model"]) -> None:
         """Register an auto-generated through model on the owning registry.
@@ -1887,23 +1923,640 @@ class ComputedField(Field):
             instance.__dict__[name] = result
 
 
-class FileField(CharField):
-    """Text field intended for file path or storage reference values.
+FileNameGenerator = typing.Callable[[typing.Any | None, File | typing.BinaryIO, str, bool], str]
 
-    It is a semantic alias of `CharField` with a file-oriented default length.
+
+class FileField(Field):
+    """
+    Storage-backed file field that persists a stored file name.
+
+    ``FileField`` stores the file reference in a normal SQL string column and
+    optionally adds embedded columns for size, metadata, and approval state. The
+    runtime model attribute is a ``FieldFile`` wrapper when a file value exists,
+    which gives callers direct access to storage operations while preserving the
+    previous string-oriented database representation and query behavior.
     """
 
-    def __init__(self, max_length: int = 255, **kwargs: typing.Any) -> None:
-        kwargs.setdefault("max_length", max_length)
+    def __init__(
+        self,
+        max_length: int = 255,
+        *,
+        storage: str | Storage | None = None,
+        with_size: bool = True,
+        with_metadata: bool = True,
+        with_approval: bool = False,
+        extract_mime: bool | typing.Literal["approved_only"] = True,
+        mime_use_magic: bool = False,
+        field_file_class: type[FieldFile] = FieldFile,
+        generate_name_fn: FileNameGenerator | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        """
+        Configure the file column, storage backend, and embedded metadata.
+
+        Args:
+            max_length: Maximum stored name length for the main SQL column.
+            storage: Storage alias or backend instance. ``None`` resolves the
+                configured ``default`` storage at runtime.
+            with_size: Whether to add a hidden ``<field>_size`` column and
+                persist the stored file size.
+            with_metadata: Whether to add a hidden ``<field>_metadata`` JSON
+                column and persist extracted/custom metadata.
+            with_approval: Whether to add a hidden ``<field>_approved`` column.
+                New files default to unapproved when this is enabled.
+            extract_mime: Whether MIME metadata should be collected. The special
+                ``"approved_only"`` mode waits until approval is true.
+            mime_use_magic: Prefer ``python-magic`` content sniffing when that
+                optional package is installed; otherwise filename guessing is
+                used.
+            field_file_class: Wrapper class used for runtime file attributes.
+            generate_name_fn: Optional callback that can rewrite the target
+                storage name before saving content.
+            **kwargs: Standard Saffier field options such as ``null``,
+                ``default``, ``index``, and ``column_name``.
+        """
+        self.max_length = max_length
+        self._storage = storage
+        self.with_size = with_size
+        self.with_metadata = with_metadata
+        self.with_approval = with_approval
+        self.extract_mime = extract_mime
+        self.mime_use_magic = mime_use_magic
+        self.field_file_class = field_file_class
+        self._generate_name_fn = generate_name_fn
         super().__init__(**kwargs)
+
+    @property
+    def storage(self) -> Storage:
+        """
+        Resolve the storage backend used by this field.
+
+        Storage aliases are intentionally resolved lazily because settings can
+        be configured after import time in Saffier applications. Concrete
+        storage instances are returned unchanged, which allows tests and custom
+        models to bind an isolated backend without touching global settings.
+        """
+        if self._storage is None:
+            return storages["default"]
+        if isinstance(self._storage, str):
+            return storages[self._storage]
+        return self._storage
+
+    def get_validator(self, **kwargs: typing.Any) -> SaffierField:
+        """
+        Return a permissive validator for file inputs.
+
+        The persisted column is still a string, but runtime values may be plain
+        names, ``File`` instances, ``FieldFile`` wrappers, dictionaries emitted
+        by embedded column grouping, or ``None``. Validation therefore accepts
+        any shape and leaves normalization to ``clean()`` where field context is
+        available.
+        """
+        return Any(**kwargs)
+
+    def get_column_type(self) -> sqlalchemy.types.TypeEngine:
+        """
+        Build the SQLAlchemy type for the stored file name column.
+
+        Returns:
+            sqlalchemy.types.TypeEngine: Variable-length string bounded by the
+            field's ``max_length`` option.
+        """
+        return sqlalchemy.String(length=self.max_length)
+
+    def get_is_empty_clause(self, column: typing.Any) -> typing.Any:
+        """
+        Treat both SQL ``NULL`` and an empty stored name as empty values.
+
+        This preserves the old ``CharField``-like behavior for ``isempty``
+        lookups while allowing nullable file fields to use real SQL nulls.
+        """
+        return sqlalchemy.or_(self.get_is_null_clause(column), column == "")
+
+    def _embedded_column_name(self, field_name: str, suffix: str) -> str:
+        """
+        Return the physical column name for one embedded file attribute.
+
+        Args:
+            field_name: Logical model field name.
+            suffix: Embedded attribute suffix such as ``"size"`` or
+                ``"metadata"``.
+
+        Returns:
+            str: Column name based on the main field's explicit ``column_name``
+            when provided, otherwise the logical field name.
+        """
+        base_name = self.column_name or field_name
+        return f"{base_name}_{suffix}"
+
+    def _embedded_field_names(self, field_name: str) -> list[str]:
+        """
+        List every concrete field name that belongs to this logical file field.
+
+        The main field always appears first. Optional embedded fields are added
+        according to the field switches so input grouping, hydration, and
+        database payload generation all use the same source of truth.
+        """
+        names = [field_name]
+        if self.with_size:
+            names.append(f"{field_name}_size")
+        if self.with_metadata:
+            names.append(f"{field_name}_metadata")
+        if self.with_approval:
+            names.append(f"{field_name}_approved")
+        return names
+
+    def get_embedded_fields(
+        self,
+        field_name: str,
+        existing_fields: dict[str, Field],
+    ) -> dict[str, Field]:
+        """
+        Create hidden fields that persist file size, metadata, and approval.
+
+        Embedded fields are normal Saffier fields owned by the same model, but
+        they are excluded from model dumps so users interact with the single
+        ``FieldFile`` value. Existing explicit declarations are respected, which
+        lets advanced models override column options when necessary.
+        """
+        embedded: dict[str, Field] = {}
+
+        if self.with_size:
+            size_name = f"{field_name}_size"
+            if size_name not in existing_fields:
+                embedded[size_name] = BigIntegerField(
+                    null=True,
+                    exclude=True,
+                    read_only=True,
+                    name=size_name,
+                    owner=self.owner,
+                    column_name=self._embedded_column_name(field_name, "size"),
+                )
+
+        if self.with_metadata:
+            metadata_name = f"{field_name}_metadata"
+            if metadata_name not in existing_fields:
+                embedded[metadata_name] = JSONField(
+                    default=dict,
+                    null=True,
+                    exclude=True,
+                    read_only=True,
+                    name=metadata_name,
+                    owner=self.owner,
+                    column_name=self._embedded_column_name(field_name, "metadata"),
+                )
+
+        if self.with_approval:
+            approval_name = f"{field_name}_approved"
+            if approval_name not in existing_fields:
+                embedded[approval_name] = BooleanField(
+                    default=False,
+                    null=False,
+                    exclude=True,
+                    read_only=True,
+                    server_default=sqlalchemy.text("false"),
+                    name=approval_name,
+                    owner=self.owner,
+                    column_name=self._embedded_column_name(field_name, "approved"),
+                )
+
+        return embedded
+
+    def modify_input(self, name: str, kwargs: dict[str, typing.Any]) -> None:
+        """
+        Group embedded file columns under the public file field key.
+
+        Row hydration and persistence reapplication may provide values as
+        separate concrete columns. Grouping them gives ``set_value()`` and
+        ``clean()`` a complete picture of the file value without exposing the
+        embedded implementation detail to user code.
+        """
+        embedded_names = self._embedded_field_names(name)
+        payload: dict[str, typing.Any] = {}
+
+        if name in kwargs:
+            current_value = kwargs.pop(name)
+            if isinstance(current_value, dict) and any(
+                field_name in current_value for field_name in embedded_names
+            ):
+                payload.update(current_value)
+            else:
+                payload[name] = current_value
+
+        for field_name in embedded_names:
+            if field_name in kwargs:
+                payload[field_name] = kwargs.pop(field_name)
+
+        if not payload:
+            return
+        if name not in payload:
+            payload[name] = None
+        kwargs[name] = payload
+
+    def generate_name(
+        self,
+        instance: typing.Any | None,
+        file: File | typing.BinaryIO,
+        name: str,
+        direct_name: bool = True,
+    ) -> str:
+        """
+        Resolve the storage name for uploaded content.
+
+        Args:
+            instance: Model instance currently being persisted, when available.
+            file: File object being stored.
+            name: Proposed file name from the assignment or upload object.
+            direct_name: Whether the proposed name came directly from caller
+                input rather than from the file object's existing name.
+
+        Returns:
+            str: Final candidate name passed to the storage backend.
+        """
+        candidate = name or getattr(file, "name", "")
+        if not candidate:
+            raise ValueError(f"File field '{self.name}' requires a file name.")
+        if self._generate_name_fn is None:
+            return candidate
+        return self._generate_name_fn(instance, file, candidate, direct_name)
+
+    def _metadata_from_payload(
+        self,
+        field_name: str,
+        value: typing.Mapping[str, typing.Any],
+    ) -> dict[str, typing.Any]:
+        """
+        Extract a metadata dictionary from grouped row or assignment payloads.
+
+        Args:
+            field_name: Logical model field name.
+            value: Grouped payload that may contain an embedded metadata key.
+
+        Returns:
+            dict[str, Any]: Copy of the metadata mapping, or an empty dictionary
+            when no metadata was stored.
+        """
+        metadata = value.get(f"{field_name}_metadata") or {}
+        if isinstance(metadata, dict):
+            return dict(metadata)
+        return {}
+
+    def _approval_from_payload(
+        self,
+        field_name: str,
+        value: typing.Mapping[str, typing.Any],
+    ) -> bool:
+        """
+        Extract the effective approval state from grouped payloads.
+
+        When approval tracking is disabled, files are always treated as approved
+        for metadata extraction. When it is enabled and the payload omits the
+        embedded approval column, the file remains unapproved by default.
+        """
+        if not self.with_approval:
+            return True
+        return bool(value.get(f"{field_name}_approved", False))
+
+    def extract_file_instance(
+        self,
+        field_name: str,
+        value: typing.Any,
+    ) -> FieldFile | None:
+        """
+        Convert user, row, or persisted payload values into ``FieldFile``.
+
+        Args:
+            field_name: Logical model field name.
+            value: Incoming value supplied by assignment, query hydration, or
+                ``clean()``. Supported values include strings, ``File`` objects,
+                ``FieldFile`` objects, grouped dictionaries, and ``None``.
+
+        Returns:
+            FieldFile | None: Runtime wrapper for file values, or ``None`` for a
+            database null.
+        """
+        if value is None:
+            return None
+
+        if isinstance(value, FieldFile):
+            if value.field is self:
+                return value
+            return self.field_file_class(
+                self,
+                file=value.file,
+                name=value.name,
+                storage=value.storage,
+                size=value.size if value.name else None,
+                metadata=value.metadata,
+                approved=value.approved,
+                committed=value.committed,
+            )
+
+        if isinstance(value, dict):
+            stored_value = value.get(field_name)
+            if stored_value is None:
+                return None
+            if isinstance(stored_value, FieldFile):
+                stored_value.metadata.update(self._metadata_from_payload(field_name, value))
+                stored_value.approved = self._approval_from_payload(field_name, value)
+                return stored_value
+            if isinstance(stored_value, File):
+                return self.field_file_class(
+                    self,
+                    file=stored_value,
+                    name=stored_value.name,
+                    storage=self.storage,
+                    metadata=self._metadata_from_payload(field_name, value),
+                    approved=self._approval_from_payload(field_name, value),
+                    committed=False,
+                )
+            return self.field_file_class(
+                self,
+                name=str(stored_value),
+                storage=self.storage,
+                size=value.get(f"{field_name}_size"),
+                metadata=self._metadata_from_payload(field_name, value),
+                approved=self._approval_from_payload(field_name, value),
+                committed=True,
+            )
+
+        if isinstance(value, File):
+            return self.field_file_class(
+                self,
+                file=value,
+                name=value.name,
+                storage=self.storage,
+                approved=not self.with_approval,
+                committed=False,
+            )
+
+        if isinstance(value, bytes):
+            return self.field_file_class(
+                self,
+                file=value,
+                storage=self.storage,
+                approved=not self.with_approval,
+                committed=False,
+            )
+
+        return self.field_file_class(
+            self,
+            name=str(value),
+            storage=self.storage,
+            approved=not self.with_approval,
+            committed=True,
+        )
+
+    def set_value(self, instance: typing.Any, name: str, value: typing.Any) -> None:
+        """
+        Store runtime assignments as ``FieldFile`` wrappers on the model.
+
+        Assignment-time wrapping means callers can inspect ``instance.file.url``
+        or ``instance.file.metadata`` immediately, while actual persistence still
+        flows through Saffier's normal validation and ``clean()`` pipeline.
+        """
+        instance.__dict__[name] = self.extract_file_instance(name, value)
+
+    def _read_mime_sample(self, field_file: FieldFile, amount: int = 2048) -> bytes:
+        """
+        Read a small content sample for optional MIME detection.
+
+        The method preserves the current file position when possible and falls
+        back to opening the stored file through the storage backend when the
+        wrapper only carries a committed name. Any storage or file-object
+        failure returns an empty sample so MIME guessing can gracefully fall back
+        to the filename.
+        """
+        file_obj = field_file.file
+        try:
+            if file_obj is None and field_file.name and field_file.storage.exists(field_file.name):
+                with field_file.storage.open(field_file.name, "rb") as opened:
+                    return opened.read(amount)
+            if file_obj is None:
+                return b""
+            position = file_obj.tell() if hasattr(file_obj, "tell") else None
+            sample = file_obj.read(amount)
+            if position is not None and hasattr(file_obj, "seek"):
+                file_obj.seek(position)
+            return sample
+        except Exception:
+            return b""
+
+    def _detect_mime(self, field_file: FieldFile) -> str | None:
+        """
+        Detect the MIME type for a stored or pending file.
+
+        ``python-magic`` is used only when explicitly requested and installed.
+        Filename-based detection remains the default because it is dependency
+        free and works for common storage backends that do not expose local
+        filesystem paths.
+        """
+        if self.mime_use_magic:
+            try:
+                import magic  # type: ignore
+
+                sample = self._read_mime_sample(field_file)
+                if sample:
+                    detected = magic.from_buffer(sample, mime=True)
+                    if isinstance(detected, str) and detected:
+                        return detected
+            except Exception:
+                pass
+
+        guessed, _ = mimetypes.guess_type(field_file.name)
+        return guessed
+
+    def extract_metadata(self, field_file: FieldFile) -> dict[str, typing.Any]:
+        """
+        Build metadata for the current file wrapper.
+
+        Existing metadata is preserved and augmented with a ``mime`` entry when
+        MIME extraction is enabled. Approval-gated extraction leaves metadata
+        unchanged until the file is explicitly approved.
+        """
+        metadata = dict(field_file.metadata or {})
+        if not field_file.name or not self.extract_mime:
+            return metadata
+        if self.extract_mime == "approved_only" and not field_file.approved:
+            return metadata
+        mime = self._detect_mime(field_file)
+        if mime:
+            metadata["mime"] = mime
+        return metadata
+
+    def _file_size(self, field_file: FieldFile | None) -> int | None:
+        """
+        Return the persisted size value for a file wrapper.
+
+        Size is optional and should never make persistence fail. Missing files,
+        storage backends without a size implementation, or empty file references
+        are represented as ``None`` in the embedded size column.
+        """
+        if field_file is None or not field_file.name:
+            return None
+        try:
+            return int(field_file.size)
+        except Exception:
+            return None
+
+    def _payload_from_file(
+        self,
+        field_name: str,
+        field_file: FieldFile | None,
+    ) -> dict[str, typing.Any]:
+        """
+        Convert a runtime file wrapper into concrete database column values.
+
+        Args:
+            field_name: Logical model field name.
+            field_file: Runtime file wrapper or ``None`` for SQL null.
+
+        Returns:
+            dict[str, Any]: Payload for the main file column and any enabled
+            embedded columns.
+        """
+        payload: dict[str, typing.Any] = {
+            field_name: None if field_file is None else field_file.name
+        }
+        if self.with_size:
+            payload[f"{field_name}_size"] = self._file_size(field_file)
+        if self.with_metadata:
+            payload[f"{field_name}_metadata"] = dict(field_file.metadata) if field_file else {}
+        if self.with_approval:
+            payload[f"{field_name}_approved"] = bool(field_file.approved) if field_file else False
+        return payload
+
+    def clean(
+        self, name: str, value: typing.Any, *, for_query: bool = False
+    ) -> dict[str, typing.Any]:
+        """
+        Normalize file values into SQL column payloads.
+
+        Query cleaning returns the stored name without saving content. Persistence
+        cleaning saves pending uploads through the configured storage backend,
+        refreshes metadata, and emits embedded column values alongside the main
+        file-name column.
+        """
+        field_file = self.extract_file_instance(name, value)
+        if for_query:
+            if field_file is None:
+                return {name: None}
+            return {name: field_file.name}
+
+        current_instance = CURRENT_INSTANCE.get()
+        if field_file is not None and not field_file.committed:
+            field_file.save(field_file, delete_old=False, instance=current_instance)
+        elif field_file is not None and self.with_metadata:
+            field_file.metadata = self.extract_metadata(field_file)
+
+        if current_instance is not None:
+            current_instance.__dict__[name] = field_file
+
+        return self._payload_from_file(name, field_file)
 
 
 class ImageField(FileField):
-    """File-like text field intended for image references.
-
-    The field does not inspect image contents; it simply signals image intent in
-    model definitions.
     """
+    Storage-backed file field that extracts image metadata when possible.
+
+    ``ImageField`` uses the same persistence model as ``FileField`` and defaults
+    to approval tracking. When Pillow is installed, it enriches metadata with
+    image dimensions and format while leaving non-image or unsupported files as
+    normal stored file references.
+    """
+
+    def __init__(
+        self,
+        max_length: int = 255,
+        *,
+        image_formats: typing.Sequence[str] | None = (),
+        approved_image_formats: typing.Sequence[str] | None = None,
+        field_file_class: type[ImageFieldFile] = ImageFieldFile,
+        **kwargs: typing.Any,
+    ) -> None:
+        """
+        Configure an image-aware file field.
+
+        Args:
+            max_length: Maximum stored name length for the main SQL column.
+            image_formats: Image formats allowed before approval. Use ``None``
+                to accept any Pillow-recognized format before approval.
+            approved_image_formats: Additional formats allowed once approval is
+                true. Use ``None`` to apply no extra approval-only restriction.
+            field_file_class: Runtime wrapper class for image file values.
+            **kwargs: File-field and standard Saffier field options.
+        """
+        kwargs.setdefault("with_approval", True)
+        self.image_formats = (
+            None if image_formats is None else {item.upper() for item in image_formats}
+        )
+        self.approved_image_formats = (
+            None
+            if approved_image_formats is None
+            else {item.upper() for item in approved_image_formats}
+        )
+        super().__init__(
+            max_length=max_length,
+            field_file_class=field_file_class,
+            **kwargs,
+        )
+
+    def _is_allowed_image_format(self, image_format: str | None, approved: bool) -> bool:
+        """
+        Decide whether metadata should be recorded for a Pillow image format.
+
+        Args:
+            image_format: Format name reported by Pillow, such as ``"PNG"``.
+            approved: Current approval state for the file.
+
+        Returns:
+            bool: ``True`` when the configured format gates allow metadata
+            extraction for this file.
+        """
+        if image_format is None:
+            return False
+        normalized = image_format.upper()
+        if self.image_formats is None:
+            return True
+        if normalized in self.image_formats:
+            return True
+        if approved:
+            if self.approved_image_formats is None:
+                return True
+            return normalized in self.approved_image_formats
+        return False
+
+    def extract_metadata(self, field_file: FieldFile) -> dict[str, typing.Any]:
+        """
+        Extend file metadata with image dimensions and format.
+
+        The method imports Pillow lazily and catches invalid-image errors so an
+        ``ImageField`` can still store arbitrary file values when an application
+        chooses to validate image content elsewhere.
+        """
+        metadata = super().extract_metadata(field_file)
+        if not field_file.name:
+            return metadata
+
+        try:
+            from PIL import UnidentifiedImageError
+        except ImportError:
+            return metadata
+
+        try:
+            image_file = typing.cast(ImageFieldFile, field_file).open_image()
+            try:
+                if not self._is_allowed_image_format(image_file.format, field_file.approved):
+                    return metadata
+                metadata["height"] = image_file.height
+                metadata["width"] = image_file.width
+                if image_file.format:
+                    metadata["format"] = image_file.format
+            finally:
+                image_file.close()
+        except (FileOperationError, OSError, UnidentifiedImageError):
+            return metadata
+        return metadata
 
 
 class PGArrayField(Field):

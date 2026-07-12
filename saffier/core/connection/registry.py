@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import copy
 import logging
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from functools import cached_property
 from typing import Any, ClassVar, cast
 
@@ -19,7 +19,15 @@ from saffier.conf import _monkay, settings
 from saffier.core.connection.database import Database
 from saffier.core.connection.schemas import Schema
 from saffier.core.db.constants import CASCADE
+from saffier.core.utils.concurrency import run_concurrently
+from saffier.core.utils.db import FORCE_FIELDS_NULLABLE
 from saffier.core.utils.sync import current_eventloop, run_sync
+
+try:
+    from monkay.asgi import ASGIApp, LifespanHook
+except Exception:  # pragma: no cover - optional integration import guard
+    ASGIApp = Any  # type: ignore[misc,assignment]
+    LifespanHook = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +142,7 @@ class Registry:
             database if isinstance(database, Database) else Database(database)
         )
         self.models: dict[str, Any] = {}
+        self.admin_models: set[str] = set()
         self.reflected: dict[str, Any] = {}
         self.pattern_models: dict[str, Any] = {}
         self.content_type: Any | None = None
@@ -159,6 +168,132 @@ class Registry:
 
         if with_content_type is not False:
             self._set_content_type(with_content_type)
+
+    async def apply_default_force_nullable_fields(
+        self,
+        *,
+        force_fields_nullable: Iterable[tuple[str, str]] | None = None,
+        model_defaults: dict[str, dict[str, Any]] | None = None,
+        filter_db_url: str | None = None,
+        filter_db_name: str | None = None,
+    ) -> None:
+        """Backfill defaults for fields made temporarily nullable by migrations.
+
+        Forced-nullable migration generation is a two-step safety mechanism.
+        Alembic first sees selected fields as nullable so it can add them to
+        populated tables without violating constraints. During online upgrade,
+        generated migration files call this method to find rows where those
+        fields are still ``NULL`` and update them with the model's declared
+        defaults or with explicit defaults supplied by the migration.
+
+        The method deliberately stays on Saffier's public ORM path. It filters
+        registered models, selects only primary-key data for matching rows, then
+        calls ``update()`` on each model instance with concrete default values.
+        That preserves field normalization, SQLAlchemy execution, and model
+        update signals while avoiding a second migration-specific persistence
+        layer.
+
+        Args:
+            force_fields_nullable: Iterable of ``(model_name, field_name)``
+                selectors. When omitted, selectors are read from the active
+                ``FORCE_FIELDS_NULLABLE`` context.
+            model_defaults: Optional per-model default overrides keyed by model
+                name and field name. Overrides are also treated as selectors so
+                migrations can backfill fields that do not declare a Python
+                default on the model.
+            filter_db_url: Optional database URL string. When provided, only
+                models using that database are processed.
+            filter_db_name: Optional registry database name. ``""`` targets the
+                primary database; any other value targets the matching
+                ``extra`` database and takes precedence over ``filter_db_url``.
+        """
+        if force_fields_nullable is None:
+            selected_fields = set(FORCE_FIELDS_NULLABLE.get())
+        else:
+            selected_fields = set(force_fields_nullable)
+        effective_model_defaults = model_defaults or {}
+        for model_name, defaults in effective_model_defaults.items():
+            for field_name in defaults:
+                selected_fields.add((model_name, field_name))
+
+        for model_name, field_name in tuple(selected_fields):
+            if model_name:
+                continue
+            selected_fields.discard((model_name, field_name))
+            for model_class in self.models.values():
+                if field_name in model_class.fields:
+                    selected_fields.add((model_class.__name__, field_name))
+
+        if not selected_fields:
+            return
+
+        if isinstance(filter_db_name, str):
+            filter_db_url = (
+                str(self.database.url)
+                if filter_db_name == ""
+                else str(self.extra[filter_db_name].url)
+            )
+
+        models_with_fields: dict[str, set[str]] = {}
+        for model_name, field_name in selected_fields:
+            model_class = self.models.get(model_name)
+            if model_class is None:
+                continue
+
+            field = model_class.fields.get(field_name)
+            if field is None:
+                continue
+
+            default_overrides = effective_model_defaults.get(model_name, {})
+            if not field.has_default() and field_name not in default_overrides:
+                continue
+
+            models_with_fields.setdefault(model_name, set()).add(field_name)
+
+        async def backfill_model(
+            model_name: str,
+            field_names: set[str],
+        ) -> None:
+            """Backfill one model's matching rows through normal ORM updates.
+
+            The closure is scheduled by ``run_concurrently`` for each model that
+            has at least one valid forced-nullable field. It keeps row selection
+            narrow by loading primary keys first, then computes default values
+            per object so callable defaults are evaluated for each updated row
+            rather than once for the whole migration.
+
+            Args:
+                model_name: Registered model class name to process.
+                field_names: Field names that were temporarily nullable and
+                    should now receive defaults where the database still stores
+                    ``NULL``.
+            """
+            model_class = self.models[model_name]
+            if filter_db_url and str(model_class.database.url) != filter_db_url:
+                return
+
+            query = model_class.query.filter(**dict.fromkeys(field_names)).only(
+                *model_class.pknames
+            )
+            objects = await query
+            default_overrides = effective_model_defaults.get(model_name, {})
+            for obj in objects:
+                values = {
+                    field_name: (
+                        default_overrides[field_name]
+                        if field_name in default_overrides
+                        else model_class.fields[field_name].get_default_value()
+                    )
+                    for field_name in field_names
+                }
+                await obj.update(**values)
+
+        await run_concurrently(
+            [
+                backfill_model(model_name, field_names)
+                for model_name, field_names in models_with_fields.items()
+            ]
+        )
 
     def _make_metadata(self) -> sqlalchemy.MetaData:
         """Create a fresh SQLAlchemy metadata container for this registry.
@@ -454,6 +589,11 @@ class Registry:
             )
 
         registry_copy.pattern_models = dict(self.pattern_models)
+        registry_copy.admin_models = {
+            name
+            for name in self.admin_models
+            if name in registry_copy.models or name in registry_copy.reflected
+        }
         if hasattr(self, "tenant_models") and hasattr(registry_copy, "tenant_models"):
             registry_copy.tenant_models = {
                 name: model
@@ -497,18 +637,26 @@ class Registry:
             raise TypeError("with_content_type must be True/False or a model type.")
 
         if getattr(content_type_model.meta, "abstract", False):
+            in_admin = getattr(content_type_model.meta, "in_admin", None)
+            no_admin_create = getattr(content_type_model.meta, "no_admin_create", None)
             meta = type(
                 "Meta",
                 (),
                 {
                     "registry": self,
                     "tablename": "contenttypes",
+                    "in_admin": True if in_admin is None else in_admin,
+                    "no_admin_create": True if no_admin_create is None else no_admin_create,
                 },
             )
             content_type_model = type("ContentType", (content_type_model,), {"Meta": meta})
         elif getattr(content_type_model.meta, "registry", None) in (None, False):
             if not getattr(content_type_model.meta, "tablename", None):
                 content_type_model.meta.tablename = "contenttypes"
+            if getattr(content_type_model.meta, "in_admin", None) is None:
+                content_type_model.meta.in_admin = True
+            if getattr(content_type_model.meta, "no_admin_create", None) is None:
+                content_type_model.meta.no_admin_create = True
             content_type_model = content_type_model.add_to_registry(self, name="ContentType")
 
         registered_content_type = self.models.get("ContentType")
@@ -530,6 +678,28 @@ class Registry:
             self._attach_content_type_to_model(model)
 
     def _handle_model_registration(self, model_class: type[Any]) -> None:
+        """Finalize registry-owned state for a newly registered model.
+
+        Model registration is responsible for more than adding the class to
+        ``registry.models``. The registry also owns the admin visibility index
+        and optional content-type wiring. Updating both concerns here keeps
+        dynamically registered, copied, and generated models consistent after
+        their concrete registry name is known.
+
+        Args:
+            model_class: Model class that has just been registered.
+        """
+        if not getattr(model_class, "is_proxy_model", False) and not getattr(
+            model_class.meta,
+            "abstract",
+            False,
+        ):
+            model_name = model_class.__name__
+            if getattr(model_class.meta, "in_admin", None) is not False:
+                self.admin_models.add(model_name)
+            else:
+                self.admin_models.discard(model_name)
+
         if self.content_type is None:
             return
         self._attach_content_type_to_model(model_class)
@@ -982,7 +1152,8 @@ class Registry:
 
         The helper checks concrete, reflected, and pattern-generated model
         collections. It is used by conflict-resolution code when copying or
-        re-registering models.
+        re-registering models. The admin model index is updated at the same time
+        so deleted models cannot remain visible in the built-in admin.
 
         Args:
             model_name: Name of the model to remove.
@@ -990,6 +1161,7 @@ class Registry:
         Returns:
             bool: `True` when a model entry was removed.
         """
+        self.admin_models.discard(model_name)
         for model_dict in (self.models, self.reflected, self.pattern_models):
             if model_name in model_dict:
                 del model_dict[model_name]
@@ -1307,6 +1479,50 @@ class Registry:
             if close:
                 loop.run_until_complete(loop.shutdown_asyncgens())
                 loop.close()
+
+    def asgi(
+        self,
+        app: ASGIApp | None = None,
+        handle_lifespan: bool = False,
+    ) -> ASGIApp | Callable[[ASGIApp], ASGIApp]:
+        """Wrap an ASGI application with registry lifecycle management.
+
+        The wrapper enters the registry async context during ASGI startup and
+        closes it during ASGI shutdown. Because the registry owns the primary
+        database, extra databases, automigration hooks, and reflected-pattern
+        metadata, this is the Saffier-native integration point for applications
+        that want the whole registry lifecycle instead of one database engine.
+
+        Args:
+            app: Optional ASGI application to wrap. When omitted, a
+                decorator-style wrapper factory is returned.
+            handle_lifespan: Whether the wrapper should fully answer lifespan
+                startup/shutdown messages instead of forwarding them to the
+                downstream application.
+
+        Returns:
+            ASGIApp | Callable[[ASGIApp], ASGIApp]: Wrapped ASGI application or
+            wrapper factory.
+
+        Raises:
+            RuntimeError: If the optional ``monkay.asgi`` integration is not
+                installed.
+        """
+        if LifespanHook is None:
+            raise RuntimeError("monkay.asgi is required for ASGI integration.")
+
+        async def lifespan() -> contextlib.AsyncExitStack:
+            """Enter the registry and return cleanup owned by the ASGI lifespan.
+
+            Returns:
+                contextlib.AsyncExitStack: Stack that exits the registry during
+                ASGI shutdown.
+            """
+            cleanup_stack = contextlib.AsyncExitStack()
+            await cleanup_stack.enter_async_context(self)
+            return cleanup_stack
+
+        return LifespanHook(app, setup=lifespan, do_forward=not handle_lifespan)
 
     def refresh_metadata(
         self,

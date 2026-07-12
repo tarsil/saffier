@@ -20,6 +20,18 @@ VerboseOption = Annotated[
         help="Use more verbose output",
     ),
 ]
+ForceNullFieldOption = Annotated[
+    list[str],
+    Option(
+        (),
+        "--nf",
+        multiple=True,
+        help=(
+            'Force a field nullable while generating migrations. Use "Model:field" '
+            'or ":field" to apply every model that declares the field.'
+        ),
+    ),
+]
 SQLOption = Annotated[
     bool,
     Option(

@@ -339,8 +339,8 @@ class MyModel(saffier.Model):
 
 Virtual field whose value is resolved by getter/setter callbacks.
 
-Computed fields are excluded from `model_dump()` by default, matching Edgy's
-runtime serialization behavior. Set `exclude=False` when the computed value
+Computed fields are excluded from `model_dump()` by default so derived values do not
+appear unless the model asks for them. Set `exclude=False` when the computed value
 should be part of serialized model output.
 
 ```python
@@ -391,7 +391,7 @@ class Customer(saffier.Model):
 `CompositeField` itself is virtual and does not create a database column. Embedded inner fields do.
 
 Saffier also accepts an abstract model class on the model body and converts it into a prefixed
-`CompositeField` automatically, matching Edgy's embedded-model shorthand.
+`CompositeField` automatically.
 
 ```python
 class Address(saffier.Model):
@@ -411,7 +411,13 @@ writes the embedded object as a single value.
 
 #### FileField
 
-String-backed field for file references/paths.
+Storage-backed field for uploaded or referenced files.
+
+The database stores the final file name in a string column. Runtime model
+attributes are `FieldFile` objects, so you can read the stored name, URL, size,
+metadata, and storage-backed content from the model instance. By default Saffier
+also adds hidden size and metadata columns; pass `with_size=False` or
+`with_metadata=False` when a model should remain a single path column.
 
 ```python
 import saffier
@@ -423,14 +429,18 @@ class Asset(saffier.Model):
 
 #### ImageField
 
-String-backed field for image references/paths.
+Storage-backed file field for images.
+
+`ImageField` behaves like `FileField`, enables approval tracking by default, and
+can record Pillow-derived image metadata such as format, width, and height when
+Pillow is installed.
 
 ```python
 import saffier
 
 
 class Asset(saffier.Model):
-    image_ref = saffier.ImageField(null=True)
+    image_ref = saffier.ImageField(null=True, image_formats=None)
 ```
 
 #### PGArrayField
@@ -508,7 +518,7 @@ class Member(saffier.Model):
 ```
 
 If you pass a `ModelRef` subclass instead, `RefForeignKey` becomes a virtual nested-insert field.
-This is the Saffier-native pure Python adaptation of Edgy's reference workflow.
+This is Saffier's pure-Python reference workflow for staged related rows.
 
 ```python
 class PostRef(saffier.ModelRef):
@@ -570,7 +580,7 @@ if none is provided.
   `organisation.teams.filter(membership__team__name="Blue Team")` when
   `embed_through="membership"`.
 * **unique** - Marks the target side of the generated through model as unique, producing a
-  reverse relation that behaves like Edgy's unique many-to-many variant.
+  singular reverse relation for that generated through model.
 
 !!! Note
     Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.

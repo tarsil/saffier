@@ -131,8 +131,7 @@ registry instead of leaving them attached to the original one.
 
 ### Automigration on connect
 
-Saffier also supports the current Edgy-style "migrate once on first connect" flow for managed
-runtimes:
+Saffier also supports a managed "migrate once on first connect" flow for application runtimes:
 
 ```python
 from saffier import Registry
@@ -184,12 +183,12 @@ application.
 {!> ../docs_src/migrations/fastapi.py !}
 ```
 
-#### Using Starlette
+#### Using Lilya
 
-The same goes for Starlette.
+The same goes for Lilya.
 
 ```python title="my_project/main.py"
-{!> ../docs_src/migrations/starlette.py !}
+{!> ../docs_src/migrations/lilya.py !}
 ```
 
 #### Using other frameworks
@@ -612,6 +611,26 @@ Options:
   -d, --directory TEXT  Migration script directory (default is "migrations")
   --help                Show this message and exit.
 ```
+
+### Adding Required Fields To Existing Tables
+
+When a migration adds a required field to a table that already contains rows, the database
+cannot immediately satisfy a `NOT NULL` constraint for the existing data. Saffier provides the
+`--nf` option on `revision` and `makemigrations` for that migration-generation step.
+
+```shell
+$ saffier makemigrations --nf "User:status" -m "Add user status"
+$ saffier revision --autogenerate --nf ":tenant_id" -m "Add tenant links"
+```
+
+The selector format is `Model:field` for a specific model or `:field` for every registered model
+with that field. During autogeneration, Saffier temporarily renders those fields as nullable in
+SQLAlchemy metadata. The generated online migration stores the selectors and calls the active
+registry after upgrade operations so model defaults are written back through the ORM.
+
+This is intended for fields that have model defaults or for migrations that provide explicit
+defaults in the generated `model_defaults` mapping. It keeps the database migration safe for
+existing rows without changing the model's declared field requirement.
 
 This is applied to any other available command via `saffier`.
 

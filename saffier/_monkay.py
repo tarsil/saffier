@@ -10,10 +10,11 @@ from saffier.conf import _monkay as configured_monkay
 
 def create_monkay(global_dict: dict[str, Any], all_var: list[str]) -> Monkay[Instance, Any]:
     """
-    Compatibility helper kept for Edgy-era imports.
+    Return Saffier's configured Monkay instance.
 
-    Saffier centralizes Monkay configuration in `saffier.conf._monkay`, so the
-    legacy factory simply returns that configured instance.
+    Saffier centralizes Monkay configuration in `saffier.conf._monkay`. This
+    helper exists for internal modules that need a factory-shaped entry point
+    while still sharing the single configured instance.
     """
     del global_dict, all_var
     return configured_monkay

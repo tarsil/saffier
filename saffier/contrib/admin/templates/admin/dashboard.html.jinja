@@ -1,21 +1,77 @@
 {% extends "admin/base.html.jinja" %}
+
+{% block header %}{{ dashboard_title }}{% endblock %}
+
 {% block content %}
-  <div class="card">
-    <h2>{{ dashboard_title }}</h2>
-    <p class="muted">Total records: {{ total_records }}. Top model: {{ top_model.name }} ({{ top_model.count }}).</p>
-    <table>
-      <thead>
-        <tr><th>Model</th><th>Records</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-      {% for item in model_stats %}
-        <tr>
-          <td>{{ item.name }}</td>
-          <td>{{ item.count }}</td>
-          <td><a class="btn" href="{{ request.url_for('admin_model_detail', name=item.name) }}">Open</a></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+<div class="space-y-10">
+  <div class="text-center">
+    <h1 class="text-3xl font-bold text-saffier-primary">{{ dashboard_title }}</h1>
+    <p class="text-gray-600 mt-1">Manage Saffier models efficiently and directly.</p>
   </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+    <div class="bg-white border rounded shadow p-4">
+      <div class="text-sm text-gray-500">Models</div>
+      <div class="text-2xl font-bold">{{ models|length }}</div>
+    </div>
+    <div class="bg-white border rounded shadow p-4">
+      <div class="text-sm text-gray-500">Total Records</div>
+      <div class="text-2xl font-bold">{{ total_records }}</div>
+    </div>
+    <div class="bg-white border rounded shadow p-4">
+      <div class="text-sm text-gray-500">Top Model</div>
+      {% if top_model.name != "N/A" %}
+        <a class="text-md font-semibold hover:underline" href="{{ admin_url('admin_model_detail', name=top_model.name) }}">{{ top_model.verbose }}</a>
+      {% else %}
+        <div class="text-md font-semibold">N/A</div>
+      {% endif %}
+    </div>
+    <div class="bg-white border rounded shadow p-4">
+      <div class="text-sm text-gray-500">Recently Accessed</div>
+      <div class="text-md font-semibold">
+        {% for model_name in recent_models %}
+          <a href="{{ admin_url('admin_model_detail', name=model_name) }}" class="hover:underline">{{ model_name }}</a>{% if not loop.last %}, {% endif %}
+        {% else %}
+          <span class="text-gray-400">None</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <h2 class="text-xl font-semibold text-gray-700">All Models</h2>
+    <div class="overflow-x-auto bg-white rounded-lg shadow border">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Verbose</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Count</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 bg-white">
+        {% for model in models %}
+          <tr class="hover:bg-gray-50 transition">
+            <td class="px-6 py-4 text-sm text-gray-800">
+              <a href="{{ admin_url('admin_model_detail', name=model.name) }}" class="hover:underline">{{ model.name }}</a>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-800">{{ model.verbose }}</td>
+            <td class="px-6 py-4 text-sm text-gray-800">{{ model.count }}</td>
+            <td class="px-6 py-4 text-sm">
+              <a href="{{ admin_url('admin_model_detail', name=model.name) }}" class="text-blue-600 hover:underline">View</a>
+              <span class="text-gray-400 mx-1">|</span>
+              {% if not model.no_admin_create %}
+                <a href="{{ admin_url('admin_model_create', name=model.name) }}" class="text-green-600 hover:underline">Add</a>
+              {% else %}
+                <span class="text-gray-400">Add</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

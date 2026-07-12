@@ -1,8 +1,10 @@
 from saffier.core.files import (
     ContentFile,
+    FieldFile,
     File,
     FileSystemStorage,
     FileUpload,
+    ImageFieldFile,
     Storage,
     StorageHandler,
     file_move_safe,
@@ -11,9 +13,11 @@ from saffier.core.files import (
 
 __all__ = [
     "ContentFile",
+    "FieldFile",
     "File",
     "FileSystemStorage",
     "FileUpload",
+    "ImageFieldFile",
     "Storage",
     "StorageHandler",
     "file_move_safe",

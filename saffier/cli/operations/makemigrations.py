@@ -7,7 +7,13 @@ from typing import Annotated
 from sayer import Option, command
 
 from saffier.cli.base import migrate as _migrate
-from saffier.cli.common_params import DirectoryOption, ExtraArgOption, MessageOption, SQLOption
+from saffier.cli.common_params import (
+    DirectoryOption,
+    ExtraArgOption,
+    ForceNullFieldOption,
+    MessageOption,
+    SQLOption,
+)
 from saffier.cli.state import get_migration_app
 
 
@@ -43,11 +49,15 @@ def makemigrations(
         Option(None, help="Specify a hardcoded revision id instead of generating one"),
     ],
     arg: ExtraArgOption,
+    null_fields: ForceNullFieldOption,
     directory: DirectoryOption,
 ) -> None:
     """Autogenerate a new revision file.
 
     This command is the user-facing alias for `revision --autogenerate`.
+    ``--nf`` selectors temporarily render chosen fields as nullable during
+    autogeneration so generated online migrations can backfill defaults before
+    later constraints are enforced.
     """
     _migrate(
         get_migration_app(),
@@ -60,4 +70,5 @@ def makemigrations(
         version_path,
         rev_id,
         arg,
+        null_fields,
     )

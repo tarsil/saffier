@@ -1,3 +1,5 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
@@ -34,11 +36,50 @@ def set_tenant(value: str | None) -> None:
     TENANT.set(value)
 
 
+@contextmanager
+def with_tenant(tenant: str | None) -> Generator[None, None, None]:
+    """Temporarily bind a tenant schema to the current context.
+
+    Multi-tenant request handling should prefer this context manager over a
+    plain ``set_tenant`` call because it restores the previous tenant
+    automatically when the request, job, or test block finishes. A tenant value
+    takes precedence over the plain schema context for the duration of the
+    block, matching how tenant-scoped querysets are resolved.
+
+    Args:
+        tenant: Tenant schema to make active, or ``None`` to temporarily clear
+            tenant routing inside the block.
+
+    Yields:
+        None: Control while the tenant binding is active.
+    """
+    token = TENANT.set(tenant)
+    try:
+        yield
+    finally:
+        TENANT.reset(token)
+
+
 def get_schema() -> str | None:
-    return SHEMA.get()
+    """Return the effective schema for the current context.
+
+    Tenant routing has priority over plain schema routing. This lets
+    ``with_tenant`` safely wrap request handling without leaking into the
+    lower-priority ``with_schema`` helper.
+
+    Returns:
+        str | None: Active tenant schema, active plain schema, or ``None``.
+    """
+    return TENANT.get() or SHEMA.get()
 
 
 def set_schema(value: str | None) -> None:
+    """Set the plain schema context for subsequent queryset construction.
+
+    Args:
+        value: Schema name to bind, or ``None`` to clear the plain schema
+            context. Tenant context, when present, still takes precedence.
+    """
     SHEMA.set(value)
 
 

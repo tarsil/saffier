@@ -19,7 +19,7 @@ Saffier has three different ways of achieving this in a simple and clean fashion
 
 1. Using the [using](#using) queryset helper with explicit `schema=` and `database=`.
 2. Using the [using_with_db](#using-with-database) compatibility helper in older code.
-3. Using the [set_tenant](#set-tenant) as global.
+3. Using [with_tenant](#with-tenant) as a scoped request context.
 
 You can also use the [Saffier helpers for schemas][schemas] if you need to use it.
 
@@ -87,7 +87,7 @@ a different database instead? The preferred form is `using(database=..., schema=
 User.query.using(database="analytics", schema="main").all()
 ```
 
-`using_with_db(...)` remains available as a compatibility wrapper for older Edgy-style code.
+`using_with_db(...)` remains available as a convenience wrapper for older multi-database call sites.
 
 {!> ../docs_src/shared/extra.md !}
 
@@ -150,28 +150,28 @@ User.query.get(pk=1)
 deactivate_schema()
 ```
 
-### Set tenant
+### With tenant
 
-This is another way to create a global `tenant` for your application. Instead if [using](#using) or
-[using_with_db](#using-with-database) you simply want to make sure that in your application you
-want every request for a specific `tenant` to always hit their corresponding tenant data.
+This is another way to bind a `tenant` for a limited block of application code. Instead of
+[using](#using) or [using_with_db](#using-with-database), use this when every query inside one
+request, job, or task should target the corresponding tenant data.
 
 This is specially useful for multi-tenant applications where your tenant users will only see their
 own data.
 
-To use the `set_tenant` you can import it via:
+To use `with_tenant` you can import it via:
 
 ```python
-from saffier.core.db import set_tenant
+from saffier.core.db import with_tenant
 ```
 
 !!! Tip
-    Use the `set_tenant` in things like application middlewares or interceptors, right before
-    reaching the API.
+    Use `with_tenant` in things like application middlewares or interceptors, wrapping the call to
+    the downstream application so the tenant is always restored afterwards.
 
 #### Practical case
 
-The `set_tenant` can be somehow confusing without a proper example so let us run one 😁.
+The `with_tenant` context can be easier to understand with a practical example, so let us run one.
 
 As usual, for this example [Ravyn][ravyn] will be used. This can be applied to any framework
 of your choice of course.
@@ -179,7 +179,7 @@ of your choice of course.
 **What are we building**:
 
 - [Models](#models) - Some models that will help us out mapping a user with a tenant.
-- [Middleware](#middleware) - Intercept the request and **set the corresponding tenant**.
+- [Middleware](#middleware) - Intercept the request and **bind the corresponding tenant**.
 - [API](#api) - The API that returns the data for a given tenant.
 
 ##### Models
@@ -217,7 +217,7 @@ We now have `models` and mock data for those. You will realise that we created a
 ##### Middleware
 
 It is time to create a [middleware][middleware] that will take advantage of our new models and
-tenants and **set the tenant** automatically.
+tenants and **bind the tenant** automatically.
 
 The middleware will receive some headers with the tenant information and it will lookup if the
 tenant exist.
@@ -230,8 +230,8 @@ tenant exist.
 {!> ../docs_src/tenancy/example/middleware.py !}
 ```
 
-Now this is getting somewhere! As you could now see, this is where we take advantage of the
-[set_tenant](#set-tenant).
+Now this is getting somewhere! As you could now see, this is where we take advantage of
+[with_tenant](#with-tenant).
 
 In the middleware, the tenant is intercepted and all the calls in the API will now query **only**
 the tenant data, which means that **there is no need for `using` or `using_with_db` anymore**.
@@ -261,9 +261,9 @@ the response total returned.
 
 ##### Notes
 
-As you could see in the previous step-by=step example, using the [set_tenant](#set-tenant) can be
-extremely useful mostrly for those large scale applications where multi-tenancy is a **must** so
-you can actually take advantage of this.
+As you could see in the previous step-by-step example, using [with_tenant](#with-tenant) can be
+extremely useful for large scale applications where multi-tenancy is a **must**. The context manager
+keeps tenant routing scoped to the current request and avoids leaking a tenant into later work.
 
 [registry]: ../registry.md
 [schemas]: ../registry.md#schemas

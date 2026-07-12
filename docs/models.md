@@ -96,8 +96,8 @@ class Product(saffier.StrictModel):
         registry = models
 ```
 
-Use `Model` when you want the looser Saffier behavior. Use `StrictModel` when you want Edgy-like
-runtime discipline without introducing Pydantic.
+Use `Model` when you want the looser Saffier behavior. Use `StrictModel` when you want
+immediate assignment validation and unknown-attribute protection without introducing Pydantic.
 
 ## Runtime schema selection
 

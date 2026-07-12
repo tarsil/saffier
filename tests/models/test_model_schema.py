@@ -15,7 +15,7 @@ class Product(saffier.Model):
         registry = models
 
 
-def test_model_json_schema_supports_edgy_style_kwargs() -> None:
+def test_model_json_schema_supports_admin_schema_kwargs() -> None:
     schema = Product.model_json_schema(mode="validation")
     assert schema["title"] == "ProductCreateAdminMarshall"
     assert schema["properties"]["name"]["type"] == "string"

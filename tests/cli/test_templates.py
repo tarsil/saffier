@@ -36,6 +36,13 @@ def test_list_templates_includes_builtin_variants():
 
 @pytest.mark.parametrize("template", ["default", "plain", "url", "sequencial"])
 def test_init_builtin_templates(template):
+    """Verify every built-in migration template includes Saffier runtime hooks.
+
+    Initializing a migration repository copies the selected template to disk.
+    This assertion keeps the generated script template aligned across all
+    variants so forced-nullable field handling is not accidentally present in
+    only one migration style.
+    """
     output, error, status = run_cmd(
         "tests.cli.main:app", f"saffier init -d migrations2 -t {template}"
     )
@@ -46,6 +53,9 @@ def test_init_builtin_templates(template):
     assert os.path.isfile("migrations2/env.py")
     assert os.path.isfile("migrations2/script.py.mako")
     assert "settings.alembic_ctx_kwargs" in open("migrations2/env.py").read()
+    script_template = open("migrations2/script.py.mako").read()
+    assert "force_fields_nullable" in script_template
+    assert "apply_default_force_nullable_fields" in script_template
 
     if template == "sequencial":
         assert os.path.isfile("migrations2/generator.py")

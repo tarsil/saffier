@@ -20,6 +20,33 @@ class User(saffier.Model):
         registry = models
 
 
+class CustomAdminUser(saffier.Model):
+    name = saffier.CharField(max_length=100)
+    secret = saffier.CharField(max_length=100, null=True)
+
+    class Meta:
+        registry = models
+        tablename = "custom_admin_users"
+
+    @classmethod
+    def get_admin_marshall_config(
+        cls,
+        *,
+        phase: str,
+        for_schema: bool,
+    ) -> dict[str, object]:
+        """Hide ``secret`` from admin create and update workflows.
+
+        This model-level hook is intentionally exercised through ``AdminSite``
+        rather than direct marshall construction. The admin must honor the same
+        phase-specific field policy in schemas and writes.
+        """
+        config = super().get_admin_marshall_config(phase=phase, for_schema=for_schema)
+        if phase in {"create", "update"}:
+            config["exclude"] = ["secret"]
+        return config
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -112,3 +139,25 @@ async def test_admin_site_filters_and_payload_errors():
 
     with pytest.raises(AdminValidationError):
         await site.update_object("User", encoded_pk, {"unknown": "value"})
+
+
+async def test_admin_site_uses_model_admin_marshall_hooks_for_writes():
+    site = AdminSite(registry=models)
+
+    schema = site.get_model_editor_schema("CustomAdminUser", phase="create")
+    assert "secret" not in schema["properties"]
+
+    with pytest.raises(AdminValidationError) as create_error:
+        await site.create_object("CustomAdminUser", {"name": "hidden", "secret": "blocked"})
+    assert create_error.value.errors["secret"] == "Field is not writable."
+
+    created = await CustomAdminUser.query.create(name="visible", secret="stored")
+    encoded_pk = site.create_object_pk(created)
+
+    with pytest.raises(AdminValidationError) as update_error:
+        await site.update_object("CustomAdminUser", encoded_pk, {"secret": "changed"})
+    assert update_error.value.errors["secret"] == "Field is not writable."
+
+    updated = await site.update_object("CustomAdminUser", encoded_pk, {"name": "renamed"})
+    assert updated.name == "renamed"
+    assert updated.secret == "stored"

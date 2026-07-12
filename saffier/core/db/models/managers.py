@@ -3,7 +3,7 @@
 import copy
 from typing import TYPE_CHECKING, Any, cast
 
-from saffier.core.db.context_vars import get_schema, get_tenant, set_tenant
+from saffier.core.db.context_vars import get_schema
 from saffier.core.db.querysets.base import QuerySet
 from saffier.exceptions import ImproperlyConfigured
 
@@ -107,12 +107,7 @@ class Manager(BaseManager):
                 schema = getattr(self.model_class, "__using_schema__", None)
 
         if schema is None:
-            tenant = get_tenant()
-            if tenant:
-                set_tenant(None)
-                schema = tenant
-            else:
-                schema = get_schema()
+            schema = get_schema()
 
         if schema is not None:
             return self.queryset_class(

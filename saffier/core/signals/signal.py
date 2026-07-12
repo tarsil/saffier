@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -6,7 +7,7 @@ from saffier.exceptions import SignalError
 from saffier.utils.inspect import func_accepts_kwargs
 
 if TYPE_CHECKING:
-    from saffier import Model
+    pass
 
 
 def make_id(target: Any) -> int | tuple[int, int]:
@@ -30,12 +31,15 @@ class Signal:
     def __init__(self) -> None:
         """Initialize an empty receiver registry for the signal."""
         self.receivers: dict[int | tuple[int, int], Callable] = {}
+        self.receiver_senders: dict[int | tuple[int, int], set[Any] | None] = {}
 
-    def connect(self, receiver: Callable) -> None:
+    def connect(self, receiver: Callable, *, sender: Any | None = None) -> None:
         """Connect one receiver to the signal.
 
         Args:
             receiver: Callable accepting `**kwargs`.
+            sender: Optional sender filter. When provided, the receiver is
+                called only when ``send`` uses the same sender value.
 
         Raises:
             SignalError: If the receiver is not callable or does not accept
@@ -50,6 +54,30 @@ class Signal:
         key = make_id(receiver)
         if key not in self.receivers:
             self.receivers[key] = receiver
+            self.receiver_senders[key] = set() if sender is not None else None
+        if sender is not None and self.receiver_senders[key] is not None:
+            self.receiver_senders[key].add(sender)
+
+    def connect_via(self, sender: Any) -> Callable[[Callable], Callable]:
+        """Return a decorator that connects a receiver for one sender.
+
+        The method mirrors Blinker's ``connect_via`` ergonomics for migration
+        signals while still using Saffier's own dispatcher. It is intentionally
+        sender-filtered, which lets one global signal handle ``revision``,
+        ``upgrade``, and ``downgrade`` receivers independently.
+
+        Args:
+            sender: Sender value that must match future ``send`` calls.
+
+        Returns:
+            Callable[[Callable], Callable]: Decorator registering the receiver.
+        """
+
+        def wrapper(receiver: Callable) -> Callable:
+            self.connect(receiver, sender=sender)
+            return receiver
+
+        return wrapper
 
     def disconnect(self, receiver: Callable) -> bool:
         """Disconnect one receiver from the signal.
@@ -59,17 +87,27 @@ class Signal:
         """
         key = make_id(receiver)
         func: Callable | None = self.receivers.pop(key, None)
+        self.receiver_senders.pop(key, None)
         return func is not None
 
-    async def send(self, sender: type["Model"], **kwargs: Any) -> None:
+    async def send(self, sender: Any, **kwargs: Any) -> None:
         """Dispatch the signal to all connected receivers concurrently.
 
         Args:
-            sender: Model class sending the signal.
+            sender: Model class, migration command name, or other sender value
+                dispatching the signal.
             **kwargs: Signal payload forwarded to every receiver.
         """
-        receivers = [func(sender=sender, **kwargs) for func in self.receivers.values()]
-        await asyncio.gather(*receivers)
+        receivers = []
+        for key, func in self.receivers.items():
+            allowed_senders = self.receiver_senders.get(key)
+            if allowed_senders is not None and sender not in allowed_senders:
+                continue
+            result = func(sender=sender, **kwargs)
+            if inspect.isawaitable(result):
+                receivers.append(result)
+        if receivers:
+            await asyncio.gather(*receivers)
 
 
 class Broadcaster(dict):
