@@ -112,7 +112,7 @@ specific queries and querysets at ease.
 * **Admin subsystem** - Python-native admin site and Lilya admin app with JSONEditor-powered forms.
 * **Python-native marshalls** - DTO/serializer layer with custom fields, context, schema output, and save support.
 * **Model engines** - Optional adapter layer for built-in Pydantic and msgspec support, plus custom future engines such as attrs.
-* **Standalone file storage API** - `saffier.files` now exposes file objects, storage backends, and safe filesystem handling.
+* **ORM-managed file storage** - `saffier.files`, `FileField`, and `ImageField` expose storage-backed file objects, metadata, and safe filesystem handling.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you
 need so we give you already one.

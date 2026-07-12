@@ -25,6 +25,7 @@ flow through SQLAlchemy's public async APIs.
 - Migration generation now supports `--nf` forced-nullable field selectors so required fields can be added safely to populated tables and backfilled through the registry.
 - Registries can now wrap ASGI applications directly with `Registry.asgi()` for whole-registry lifespan management.
 - Factory documentation now covers model factories, relationship factories, and async persisted factory rows.
+- `FileField` and `ImageField` now use Saffier's storage subsystem directly, returning field-bound file objects with optional size, metadata, and approval columns.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
 ### Fixed

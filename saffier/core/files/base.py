@@ -16,6 +16,20 @@ if TYPE_CHECKING:
 
 
 def _get_storage(storage: str) -> Storage:
+    """
+    Resolve a configured storage alias through Saffier's storage handler.
+
+    The file primitives live below the public settings object to avoid creating
+    storage backends at import time. Runtime resolution is therefore deferred
+    until a ``File`` or ``FieldFile`` receives a string alias and needs the
+    concrete backend for open, save, size, URL, or delete operations.
+
+    Args:
+        storage: Name of the storage backend configured in ``settings.storages``.
+
+    Returns:
+        Storage: Concrete storage backend associated with the alias.
+    """
     from .storage import storages
 
     return storages[storage]
@@ -107,6 +121,20 @@ class File:
 
     @cached_property
     def size(self) -> int:
+        """
+        Return the byte size of the active or stored file.
+
+        The value is resolved from the in-memory file object when one is open.
+        For wrappers that only carry a stored name, Saffier asks the configured
+        storage backend so database-loaded file references can still report a
+        size without reopening content manually. A missing in-memory object and
+        an unavailable stored object are treated as an empty file reference.
+        """
+        if self.file is None and self.name:
+            try:
+                return self.storage.size(self.name)
+            except (OSError, TypeError, SuspiciousFileOperation, FileOperationError):
+                return 0
         if self.file is None:
             return 0
         if hasattr(self.file, "size"):
@@ -242,4 +270,168 @@ class ContentFile(File):
             self.__dict__.pop("size", None)
 
 
-__all__ = ["ContentFile", "File", "FileUpload"]
+class FieldFile(File):
+    """File object bound to a Saffier model field.
+
+    A ``FieldFile`` carries the stored file name plus optional metadata tracked
+    by ``FileField`` columns. It deliberately remains string-comparable through
+    ``File.__eq__`` so existing code that compares a file field to the stored
+    path continues to behave naturally, while new code can open, save, delete,
+    approve, or inspect metadata through the object.
+    """
+
+    def __init__(
+        self,
+        field: Any,
+        file: BinaryIO | bytes | File | None = None,
+        name: str = "",
+        storage: Storage | str | None = None,
+        *,
+        size: int | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        approved: bool = True,
+        committed: bool | None = None,
+    ) -> None:
+        """Bind a file wrapper to its owning field configuration.
+
+        Args:
+            field: ``FileField`` instance that owns this file value.
+            file: Optional file content or another ``File`` wrapper.
+            name: Stored file name.
+            storage: Storage backend or storage alias.
+            size: Persisted size override when loaded from the database.
+            metadata: Persisted metadata mapping.
+            approved: Whether the file is approved when approval tracking is
+                enabled on the field.
+            committed: Whether the current name already represents content
+                saved in storage. When omitted, Saffier treats wrappers with
+                immediate file content as pending uploads and wrappers built
+                from stored names as committed values.
+        """
+        self.field = field
+        self.metadata = dict(metadata or {})
+        self.approved = approved
+        self._committed = bool(name) if committed is None else committed
+        if isinstance(file, File) and not name:
+            name = file.name
+        super().__init__(file=file, name=name, storage=storage or field.storage)
+        if size is not None:
+            self.size = size
+
+    @property
+    def committed(self) -> bool:
+        """
+        Report whether this wrapper already points at stored content.
+
+        File fields use the flag to distinguish two very different values that
+        both have a name: a database value such as ``"docs/report.pdf"`` and a
+        newly assigned upload whose original name should be used as the storage
+        target. The former can be written to the row unchanged, while the latter
+        must be saved through the storage backend before its name is persisted.
+        """
+        return self._committed
+
+    def save(
+        self,
+        content: File | BinaryIO | bytes,
+        *,
+        name: str | None = None,
+        delete_old: bool = True,
+        instance: Any | None = None,
+    ) -> None:
+        """Persist new content through the configured storage backend.
+
+        Args:
+            content: File content to store.
+            name: Optional storage name. When omitted, the content name or the
+                current ``FieldFile`` name is used.
+            delete_old: Whether a previously stored name should be deleted after
+                the new content is saved.
+            instance: Model instance currently being persisted. It is forwarded
+                to the field's name generator so applications can include model
+                state in storage paths when that state is already available.
+        """
+        old_name = self.name
+        if not isinstance(content, File):
+            content = File(content, name=name or getattr(content, "name", "") or old_name)
+        target_name = self.field.generate_name(instance, content, name or content.name or old_name)
+        self.name = self.storage.save(content, target_name)
+        self._committed = True
+        self.__dict__.pop("size", None)
+        self.metadata = self.field.extract_metadata(self)
+        if delete_old and old_name and old_name != self.name:
+            self.storage.delete(old_name)
+
+    def delete(self) -> None:
+        """
+        Remove the stored object and reset the wrapper to an empty value.
+
+        Deletion is intentionally local to the storage backend. Persisting the
+        cleared database value remains the model's responsibility, which lets
+        callers coordinate row updates and file deletion in the order that fits
+        their application.
+        """
+        if self.name:
+            self.storage.delete(self.name)
+        self.name = ""
+        self._committed = True
+        self.metadata = {}
+        self.__dict__.pop("size", None)
+
+    def set_approved(self, approved: bool) -> None:
+        """Update the approval flag and refresh approval-gated metadata.
+
+        Args:
+            approved: New approval state.
+        """
+        self.approved = approved
+        self.metadata = self.field.extract_metadata(self)
+
+    def to_file(self) -> File:
+        """
+        Create a plain file wrapper for storage-level APIs.
+
+        The returned object drops field metadata and approval state, making it
+        suitable for code that only needs the standard ``File`` interface while
+        still using the same storage backend and stored name.
+        """
+        return File(name=self.name, storage=self.storage)
+
+    def model_dump(self, **kwargs: Any) -> str:
+        """
+        Serialize the field-bound value as the stored file name.
+
+        Model dumping historically exposed ``FileField`` values as their string
+        path/reference value. Returning the name here preserves that public shape
+        while still allowing runtime model attributes to expose richer
+        ``FieldFile`` behavior. Extra keyword arguments are accepted so the
+        method can be called by Saffier's generic serializer.
+        """
+        del kwargs
+        return self.name
+
+
+class ImageFieldFile(FieldFile):
+    """
+    Field-bound file wrapper with optional Pillow image helpers.
+
+    Saffier keeps Pillow as an optional dependency. The wrapper therefore only
+    imports Pillow when an image operation is requested by an ``ImageField`` or
+    by user code, while all non-image file behavior remains available without
+    importing the imaging stack.
+    """
+
+    def open_image(self) -> Any:
+        """Open the stored file with Pillow.
+
+        Returns:
+            Any: Pillow image object. The return type is intentionally loose so
+            Pillow remains an optional runtime dependency outside image-field
+            usage.
+        """
+        from PIL import Image
+
+        return Image.open(self.open("rb").file)
+
+
+__all__ = ["ContentFile", "FieldFile", "File", "FileUpload", "ImageFieldFile"]

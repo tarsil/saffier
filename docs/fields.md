@@ -411,7 +411,13 @@ writes the embedded object as a single value.
 
 #### FileField
 
-String-backed field for file references/paths.
+Storage-backed field for uploaded or referenced files.
+
+The database stores the final file name in a string column. Runtime model
+attributes are `FieldFile` objects, so you can read the stored name, URL, size,
+metadata, and storage-backed content from the model instance. By default Saffier
+also adds hidden size and metadata columns; pass `with_size=False` or
+`with_metadata=False` when a model should remain a single path column.
 
 ```python
 import saffier
@@ -423,14 +429,18 @@ class Asset(saffier.Model):
 
 #### ImageField
 
-String-backed field for image references/paths.
+Storage-backed file field for images.
+
+`ImageField` behaves like `FileField`, enables approval tracking by default, and
+can record Pillow-derived image metadata such as format, width, and height when
+Pillow is installed.
 
 ```python
 import saffier
 
 
 class Asset(saffier.Model):
-    image_ref = saffier.ImageField(null=True)
+    image_ref = saffier.ImageField(null=True, image_formats=None)
 ```
 
 #### PGArrayField
