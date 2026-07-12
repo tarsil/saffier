@@ -3,8 +3,8 @@
 You will almost certainly need to be using a database migration tool to make sure you manage
 your incremental database changes properly.
 
-Saffier being on the top of SQLAlchemy core means that we can leverage that within the internal
-migration tool.
+Saffier owns SQLAlchemy metadata directly and runs on SQLAlchemy 2.x Async, which means the
+internal migration tool can inspect the same metadata the ORM uses at runtime.
 
 Saffier provides an internal migration tool that makes your life way easier when it comes to manage
 models and corresponding migrations.

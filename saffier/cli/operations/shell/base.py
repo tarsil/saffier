@@ -1,9 +1,10 @@
+import asyncio
+import contextlib
 import select
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from typing import Annotated, Any
 
-import nest_asyncio
 from sayer import Option, command, error
 
 from saffier import Registry
@@ -11,6 +12,7 @@ from saffier.cli.operations.shell.enums import ShellOption
 from saffier.cli.state import get_migration_app, get_migration_registry
 from saffier.core.events import AyncLifespanContextManager
 from saffier.core.sync import execsync
+from saffier.core.utils.sync import _temporary_loop_reentry
 
 
 @command
@@ -63,15 +65,14 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
     sees the same initialized state as the running application.
     """
     if lifespan is None:
-        nest_asyncio.apply()
         if kernel == ShellOption.IPYTHON:
             from saffier.cli.operations.shell.ipython import get_ipython
 
-            get_ipython(app=app, registry=registry)()
+            _run_shell_with_loop_reentry(get_ipython(app=app, registry=registry))
         else:
             from saffier.cli.operations.shell.ptpython import get_ptpython
 
-            get_ptpython(app=app, registry=registry)()
+            _run_shell_with_loop_reentry(get_ptpython(app=app, registry=registry))
         return
 
     async with lifespan(app):
@@ -79,14 +80,41 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
             from saffier.cli.operations.shell.ipython import get_ipython
 
             ipython_shell = get_ipython(app=app, registry=registry)
-            nest_asyncio.apply()
-            ipython_shell()
+            _run_shell_with_loop_reentry(ipython_shell)
         else:
             from saffier.cli.operations.shell.ptpython import get_ptpython
 
             ptpython = get_ptpython(app=app, registry=registry)
-            nest_asyncio.apply()
-            ptpython()
+            _run_shell_with_loop_reentry(ptpython)
+
+
+@contextlib.contextmanager
+def _shell_loop_reentry() -> Iterator[None]:
+    """Temporarily permit nested event-loop use while a shell is active.
+
+    Embedded IPython and ptpython sessions are synchronous callables launched
+    from Saffier's async lifespan runner. While the shell owns the thread, users
+    may still execute async ORM commands that need the already-initialized
+    SQLAlchemy event loop. This context uses the same scoped re-entry helper as
+    ``saffier.run_sync()`` so shell support does not leave global asyncio state
+    patched after the interactive session exits.
+
+    Yields:
+        None: Control while the active event loop can be re-entered.
+    """
+    with _temporary_loop_reentry(asyncio.get_running_loop()):
+        yield
+
+
+def _run_shell_with_loop_reentry(shell_runner: Callable[[], None]) -> None:
+    """Execute one interactive shell callable inside a scoped loop patch.
+
+    Args:
+        shell_runner: Callable returned by the selected shell backend. It owns
+            the terminal session until the user exits IPython or ptpython.
+    """
+    with _shell_loop_reentry():
+        shell_runner()
 
 
 def handle_lifespan_events(

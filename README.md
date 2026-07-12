@@ -61,13 +61,13 @@ programs and relational databases.
 Two of the most well known ORMs are from Django and SQLAlchemy. Both have their own strengths and
 weaknesses and specific use cases.
 
-This ORM is built on the top of SQLAlchemy core and aims to simplify the way the setup and queries
-are done into a more common and familiar interface.
+This ORM is built directly on SQLAlchemy 2.x Async and aims to simplify setup and queries into a
+more common and familiar interface.
 
 ## Before continuing
 
-Saffier is built for teams that want a direct SQLAlchemy-core-powered ORM workflow
-without introducing a Pydantic-centric architecture in the model layer.
+Saffier is built for teams that want a direct SQLAlchemy Async ORM workflow without introducing a
+Pydantic-centric architecture in the model layer.
 
 ## Why this ORM
 
@@ -75,14 +75,14 @@ When investigating for a project different types of ORMs and compared them to ea
 of use cases, SQLAlchemyalways took the win but had an issue, the async support (which now there
 are a few solutions). While doing the research I came across [Encode ORM](https://www.encode.io/orm/).
 
-The team is the same behind of Databases, Django Rest Framework, Starlette,
-httpx and a lot more tools used by millions.
+The team is the same behind Django Rest Framework, Starlette, httpx and a lot more tools used by
+millions.
 
 There was one issue though, although ORM was doing a great familiar interface with SQLAlchemy and
 providing the async solution needed, it was, by the time of this writing, incomplete and they
 even stated that in the documentation and that is how **Saffier** was born.
 
-Saffier uses some of the same concepts of ORM from Encode but rewritten in **Pydantic** but not all.
+Saffier uses some of the same concepts from Encode ORM but with its own Python-native model layer.
 
 ## Saffier
 
@@ -90,8 +90,8 @@ Saffier is some sort of a fork from [Encode ORM](https://www.encode.io/orm/) but
 core and with a complete set of tools with a familiar interface to work with.
 If you are familiar with Django, then you came for a treat 😄.
 
-Saffier leverages the power of **Pydantic** for its fields while offering a friendly, familiar and
-easy to use interface.
+Saffier provides a Python-native field system while offering a friendly, familiar and easy to use
+interface.
 
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
 [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
@@ -105,7 +105,7 @@ done by the amazing team behind it. For that reason, thank you!
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of
-SQLAlchemy core.
+SQLAlchemy 2.x Async.
 
 ### Key features
 
@@ -131,10 +131,11 @@ And a lot more you can do here.
 
 ## Migrations
 
-Since **Saffier**, like [Encode ORM](https://www.encode.io/orm/), is built on the top of
-[SQLAlchemy core](https://docs.sqlalchemy.org/en/20/core/), it brings its own native migration
-system running on the top of [Alembic](https://alembic.sqlalchemy.org/en/latest/) but making it a
-lot easier to use and more pleasant for you.
+Since **Saffier** owns SQLAlchemy metadata and runs directly on
+[SQLAlchemy 2.x Async](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html), it brings
+its own native migration system running on the top of
+[Alembic](https://alembic.sqlalchemy.org/en/latest/) but making it a lot easier to use and more
+pleasant for you.
 
 Have a look at the [migrations](https://saffier.tarsild.io/migrations.md) for more details.
 

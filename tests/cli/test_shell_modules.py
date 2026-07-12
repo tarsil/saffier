@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import types
 from types import SimpleNamespace
 
@@ -201,7 +202,20 @@ async def test_run_shell_branches(monkeypatch: pytest.MonkeyPatch):
 
         return _Ctx()
 
-    monkeypatch.setattr(shell_base.nest_asyncio, "apply", lambda: events.append("nest"))
+    @contextlib.contextmanager
+    def fake_shell_loop_reentry():
+        """Record shell loop re-entry without mutating asyncio in this unit test.
+
+        The production helper temporarily allows the active event loop to be
+        re-entered while IPython or ptpython owns the terminal. This fake keeps
+        the branch coverage focused on shell orchestration while still proving
+        the scoped helper is invoked.
+        """
+
+        events.append("reentry")
+        yield
+
+    monkeypatch.setattr(shell_base, "_shell_loop_reentry", fake_shell_loop_reentry)
     monkeypatch.setattr(
         shell_base,
         "get_ipython",
@@ -235,5 +249,6 @@ async def test_run_shell_branches(monkeypatch: pytest.MonkeyPatch):
         app=object(), lifespan=fake_lifespan, registry=_DummyRegistry(), kernel="ptpython"
     )
     assert events.count("enter") == 2
+    assert events.count("reentry") == 2
     assert "ipython" in events
     assert "ptpython" in events

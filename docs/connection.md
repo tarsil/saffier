@@ -1,10 +1,11 @@
 # Connection
 
-Using saffier is extremely simple and easy to do but there are some steps you might want to take
-into consideration like connections and what it can happen if this is not done properly.
+Using Saffier is extremely simple and easy to do, but there are some steps you might want to take
+into consideration around connections and what can happen if this is not done properly.
 
-Saffier is on SQLAlechemy core but is an `async` version of it and therefore what happens if you
-want to use it within your favourite frameworks like [Ravyn](https://ravyn.dymmond.com),
+Saffier runs directly on SQLAlchemy 2.x Async, using `AsyncEngine` and `AsyncConnection`
+under the ORM APIs. What happens if you want to use it within your favourite frameworks like
+[Ravyn](https://ravyn.dymmond.com),
 Starlette or even FastAPI?
 
 Well, Saffier is framework agnostic so it will fit in any framework you want, even in those that
@@ -37,7 +38,7 @@ framework.
 ```
 
 And that is pretty much this. Once the connection is hooked into your application lifecycle you
-won't have error like `AssertationError: DatabaseBackend is not running`.
+will have a live SQLAlchemy async engine available for ORM operations.
 
 You are now free to use the ORM anywhere in your application.
 

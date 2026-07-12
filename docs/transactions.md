@@ -1,7 +1,7 @@
 # Transactions
 
-Saffier using `databases` package allows also the use of transacations in a very familiar way for
-a lot of the users.
+Saffier uses SQLAlchemy 2.x Async transaction management directly, while keeping a familiar
+transaction API for application code.
 
 You can see a transaction as atomic, which means, when you need to save everything or fail all.
 
@@ -19,7 +19,7 @@ Let us also assume we want to create a `user` and a `profile` for that user in a
 
 !!! danger
     If you are trying to setup your connection within your application and have faced some errors
-    such as `AssertationError: DatabaseBackend is not running`, please see the [connection](./connection.md)
+    related to a disconnected SQLAlchemy async engine, please see the [connection](./connection.md)
     section for more details and how to make it properly.
 
 ```python
@@ -55,9 +55,9 @@ or an operation, you will need to make some transactions that need atomocity.
 
 ## Important notes
 
-Saffier although running on the top of [Databases](https://www.encode.io/databases/) it varies in
-many aspects and limits some of the unecessary `free-style` usage to make sure it keeps its
-consistance.
+Saffier transactions run directly on SQLAlchemy's async transaction objects.
+Nested transaction blocks use SQLAlchemy savepoints, and `force_rollback=True` keeps test writes
+inside a rollback-only SQLAlchemy transaction for isolation.
 
-If you are interested in knowing more about the low-level APIs of databases,
-[check out](https://www.encode.io/databases/) their [documentation](https://www.encode.io/databases/).
+If you need lower-level access, use the native SQLAlchemy async APIs exposed by
+`database.engine`, `database.connection()`, or `database.session()`.

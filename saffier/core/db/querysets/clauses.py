@@ -9,7 +9,7 @@ from saffier.core.db import fields as saffier_fields
 from saffier.core.db.relationships.related import RelatedField
 from saffier.core.db.relationships.utils import crawl_relationship
 from saffier.core.utils.db import hash_tablekey
-from saffier.core.utils.sync import run_sync
+from saffier.core.utils.sync import force_current_loop_for_sqlalchemy, run_sync
 
 DEFAULT_ESCAPE_CHARACTERS = ("%", "_")
 
@@ -104,16 +104,20 @@ def build_lookup_clauses(
                     **{crawl_result.cross_db_remainder: value}
                 )
                 if len(remote_fields) == 1:
-                    sub_results = run_sync(
-                        sub_queryset.values_list(fields=[remote_fields[0]], flat=True)
-                    )
+                    with force_current_loop_for_sqlalchemy():
+                        sub_results = run_sync(
+                            sub_queryset.values_list(fields=[remote_fields[0]], flat=True)
+                        )
                     clauses.append(
                         table.columns[
                             relation_field.get_column_names(crawl_result.field_name)[0]
                         ].in_(sub_results)
                     )
                 else:
-                    sub_results = run_sync(sub_queryset.values_list(fields=list(remote_fields)))
+                    with force_current_loop_for_sqlalchemy():
+                        sub_results = run_sync(
+                            sub_queryset.values_list(fields=list(remote_fields))
+                        )
                     clauses.append(
                         _build_composite_in_clause(
                             [

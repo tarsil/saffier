@@ -44,15 +44,14 @@ programs and relational databases.
 Two of the most well known ORMs are from Django and SQLAlchemy. Both have their own strenghts and
 weaknesses and specific use cases.
 
-This ORM is built on the top of SQLAlchemy core and aims to simplify the way the setup and queries
-are done into a more common and familiar interface.
+This ORM is built directly on SQLAlchemy 2.x Async and aims to simplify setup and queries into a
+more common and familiar interface.
 
 ## Before continuing
 
-Saffier is a Python-native ORM focused on query ergonomics, model expressiveness, and predictable async behavior.
-If your project also needs dedicated data validation or alternate model
-representations, you can integrate Saffier with the engine layer of your
-choice.
+Saffier is a Python-native ORM focused on query ergonomics, model expressiveness, and predictable
+async behavior. If your project also needs dedicated data validation or alternate model
+representations, you can integrate Saffier with the engine layer of your choice.
 
 ## Why this ORM
 
@@ -60,8 +59,8 @@ When investigating for a project different types of ORMs and compared them to ea
 for a lot of use cases, SQLAlchemy always took the win but had an issue, the async support
 (which now there are a few solutions). While doing the research I came across Encode ORM.
 
-The team is the same behind of Databases, Django Rest Framework, Starlette,
-httpx and a lot more tools used by millions.
+The team is the same behind Django Rest Framework, Starlette, httpx and a lot more tools used by
+millions.
 
 There was one issue though, although ORM was doing a great familiar interface with SQLAlchemy and
 providing the async solution needed, it was, by the time of this writting,
@@ -89,7 +88,7 @@ done by the amazing team behind it. For that reason, thank you!
 ## Features
 
 While adopting a familiar interface, it offers some cool and powerful features on the top of
-SQLAlchemy core.
+SQLAlchemy 2.x Async.
 
 ### Key features
 
@@ -124,10 +123,11 @@ And a lot more you can do here.
 
 ## Migrations
 
-Since **Saffier**, like [Encode ORM](https://www.encode.io/orm/), is built on the top of
-[SQLAlchemy core](https://docs.sqlalchemy.org/en/20/core/), it brings its own native migration
-system running on the top of [Alembic](https://alembic.sqlalchemy.org/en/latest/) but making it a
-lot easier to use and more pleasant for you.
+Since **Saffier** owns SQLAlchemy metadata and runs directly on
+[SQLAlchemy 2.x Async](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html), it brings
+its own native migration system running on the top of
+[Alembic](https://alembic.sqlalchemy.org/en/latest/) but making it a lot easier to use and more
+pleasant for you.
 
 Have a look at the [migrations](./migrations/migrations.md) for more details.
 

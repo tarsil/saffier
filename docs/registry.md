@@ -29,11 +29,11 @@ multi-database applications.
 
 ## Parameters
 
-* **database** - An instance of `saffier.core.db.Database` object.
+* **database** - An instance of the native `saffier.Database` runtime.
 
 !!! Warning
-    Using the `Database` from the `databases` package will raise an assertation error. You must
-    use the `saffier.Database` object instead.
+    Use `saffier.Database` for registry ownership. Plain SQLAlchemy engines, connections, and
+    third-party database objects are not Saffier registry runtimes.
 
 * **schema** - The schema to connect to. This can be very useful for multi-tenancy applications if
 you want to specify a specific schema or simply if you just want to connect to a different schema
