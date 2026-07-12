@@ -64,6 +64,19 @@ models = saffier.Registry(database=database)
 
 Then every model declares `registry = models` inside `Meta`.
 
+## ASGI lifespan integration
+
+When an ASGI framework supports lifespan messages, the registry can own startup
+and shutdown for the primary database, extra databases, automigration, and
+pattern reflection in one place.
+
+```python
+{!> ../docs_src/registry/asgi.py !}
+```
+
+Use `database.asgi(...)` when a single database runtime is all you need. Use
+`registry.asgi(...)` when the whole registry should enter and leave together.
+
 ## Registry-wide model engine defaults
 
 If most models in one application should expose the same engine-backed

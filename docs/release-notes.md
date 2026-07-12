@@ -21,6 +21,7 @@ flow through SQLAlchemy's public async APIs.
 - Admin links, redirects, and the 404 page now honor `AdminConfig`, including `admin_prefix_url` for reverse-proxy deployments.
 - Tenant routing now includes `with_tenant`, a scoped context manager for request-level multi-tenancy.
 - Migration commands now emit `pre_migrate` and `post_migrate` lifecycle signals around revision, upgrade, and downgrade flows.
+- Registries can now wrap ASGI applications directly with `Registry.asgi()` for whole-registry lifespan management.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
 ### Fixed

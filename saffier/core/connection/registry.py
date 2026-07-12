@@ -21,6 +21,12 @@ from saffier.core.connection.schemas import Schema
 from saffier.core.db.constants import CASCADE
 from saffier.core.utils.sync import current_eventloop, run_sync
 
+try:
+    from monkay.asgi import ASGIApp, LifespanHook
+except Exception:  # pragma: no cover - optional integration import guard
+    ASGIApp = Any  # type: ignore[misc,assignment]
+    LifespanHook = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -1345,6 +1351,50 @@ class Registry:
             if close:
                 loop.run_until_complete(loop.shutdown_asyncgens())
                 loop.close()
+
+    def asgi(
+        self,
+        app: ASGIApp | None = None,
+        handle_lifespan: bool = False,
+    ) -> ASGIApp | Callable[[ASGIApp], ASGIApp]:
+        """Wrap an ASGI application with registry lifecycle management.
+
+        The wrapper enters the registry async context during ASGI startup and
+        closes it during ASGI shutdown. Because the registry owns the primary
+        database, extra databases, automigration hooks, and reflected-pattern
+        metadata, this is the Saffier-native integration point for applications
+        that want the whole registry lifecycle instead of one database engine.
+
+        Args:
+            app: Optional ASGI application to wrap. When omitted, a
+                decorator-style wrapper factory is returned.
+            handle_lifespan: Whether the wrapper should fully answer lifespan
+                startup/shutdown messages instead of forwarding them to the
+                downstream application.
+
+        Returns:
+            ASGIApp | Callable[[ASGIApp], ASGIApp]: Wrapped ASGI application or
+            wrapper factory.
+
+        Raises:
+            RuntimeError: If the optional ``monkay.asgi`` integration is not
+                installed.
+        """
+        if LifespanHook is None:
+            raise RuntimeError("monkay.asgi is required for ASGI integration.")
+
+        async def lifespan() -> contextlib.AsyncExitStack:
+            """Enter the registry and return cleanup owned by the ASGI lifespan.
+
+            Returns:
+                contextlib.AsyncExitStack: Stack that exits the registry during
+                ASGI shutdown.
+            """
+            cleanup_stack = contextlib.AsyncExitStack()
+            await cleanup_stack.enter_async_context(self)
+            return cleanup_stack
+
+        return LifespanHook(app, setup=lifespan, do_forward=not handle_lifespan)
 
     def refresh_metadata(
         self,
