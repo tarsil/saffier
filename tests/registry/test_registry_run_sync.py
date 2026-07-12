@@ -5,7 +5,7 @@ import time
 import pytest
 
 import saffier
-from saffier.core.utils.sync import weak_subloop_map
+from saffier.core.utils.sync import force_current_loop_for_sqlalchemy, weak_subloop_map
 from saffier.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -86,3 +86,36 @@ def test_stack():
     gc.collect()
     time.sleep(1)
     assert len(weak_subloop_map) <= initial
+
+
+@pytest.mark.anyio
+async def test_run_sync_reentry_restores_asyncio_loop_state():
+    """Ensure loop re-entry does not poison later asyncio callbacks.
+
+    Python 3.14 requires ``asyncio.timeout()`` to run while
+    ``asyncio.current_task()`` is visible. The SQLAlchemy-bound sync bridge
+    temporarily re-enters the running loop for deferred ORM loads, and this
+    regression test proves that the loop is returned to normal before the next
+    regular async callback executes.
+    """
+
+    async def use_timeout() -> str:
+        """Exercise the asyncio timeout path used by asyncpg connections.
+
+        The coroutine intentionally does no database I/O. It isolates the
+        Python 3.14 event-loop invariant that failed after a permanent nested
+        loop patch had been installed.
+        """
+
+        async with asyncio.timeout(1):
+            await asyncio.sleep(0)
+        return "ready"
+
+    loop = asyncio.get_running_loop()
+
+    with force_current_loop_for_sqlalchemy():
+        assert saffier.run_sync(use_timeout()) == "ready"
+
+    assert not hasattr(loop.__class__, "_nest_patched")
+    async with asyncio.timeout(1):
+        await asyncio.sleep(0)

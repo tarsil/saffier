@@ -17,6 +17,11 @@ flow through SQLAlchemy's public async APIs.
 - Schema helpers now run through `AsyncConnection.run_sync()` and SQLAlchemy metadata APIs.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
+### Fixed
+
+- Scoped re-entered sync lazy loads so nested event-loop state is restored immediately,
+  preserving Python 3.14 asyncpg compatibility.
+
 ### Removed
 
 - Removed the external database runtime dependency from Saffier's runtime requirements.

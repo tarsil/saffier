@@ -11,10 +11,28 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import weakref
-from collections.abc import Awaitable, Iterator
+from collections.abc import Awaitable, Iterable, Iterator
 from contextvars import ContextVar, Token, copy_context
 from threading import Event, Thread
 from typing import Any
+
+_MISSING: Any = object()
+_LOOP_REENTRY_ATTRS = (
+    "run_forever",
+    "run_until_complete",
+    "_run_once",
+    "_check_running",
+    "_check_runnung",
+    "_num_runs_pending",
+    "_is_proactorloop",
+    "_nest_patched",
+)
+_ASYNCIO_REENTRY_ATTRS = (
+    (asyncio, ("Task", "Future", "run", "get_event_loop", "_nest_patched")),
+    (asyncio.tasks, ("Task", "_CTask", "_current_tasks")),
+    (asyncio.futures, ("Future", "_CFuture")),
+    (asyncio.events, ("get_event_loop", "_get_event_loop")),
+)
 
 current_eventloop: ContextVar[asyncio.AbstractEventLoop | None] = ContextVar(
     "current_eventloop", default=None
@@ -49,6 +67,85 @@ def should_force_current_loop_for_sqlalchemy() -> bool:
     async resources.
     """
     return _SQLALCHEMY_SYNC_BRIDGE_DEPTH.get() > 0
+
+
+def _snapshot_attrs(target: Any, names: Iterable[str]) -> tuple[tuple[Any, str, Any], ...]:
+    """Capture object attributes before a temporary asyncio re-entry patch.
+
+    ``nest_asyncio`` makes both module-level and event-loop-class changes. The
+    sync bridge only needs those changes while one SQLAlchemy-bound coroutine is
+    being driven to completion, so Saffier records every attribute that may be
+    touched before applying the patch.
+
+    Args:
+        target: Module, class, or object whose attributes should be captured.
+        names: Attribute names that may be replaced or created by the patch.
+
+    Returns:
+        tuple[tuple[Any, str, Any], ...]: Snapshot entries containing the target,
+        attribute name, and previous value. A private sentinel is stored when
+        the attribute did not exist so restoration can delete patch-created
+        attributes instead of leaving false state behind.
+    """
+    return tuple((target, name, getattr(target, name, _MISSING)) for name in names)
+
+
+def _restore_attrs(snapshot: Iterable[tuple[Any, str, Any]]) -> None:
+    """Restore attributes captured by ``_snapshot_attrs()``.
+
+    Restoration is deliberately value-based instead of assuming the unpatched
+    stdlib shape. That matters in embedded environments, test harnesses, and
+    interactive shells where another tool may already have installed a custom
+    event-loop policy or task implementation before Saffier enters the bridge.
+
+    Args:
+        snapshot: Entries returned by ``_snapshot_attrs()``.
+    """
+    for target, name, value in snapshot:
+        if value is _MISSING:
+            with contextlib.suppress(AttributeError):
+                delattr(target, name)
+        else:
+            setattr(target, name, value)
+
+
+@contextlib.contextmanager
+def _temporary_loop_reentry(loop: asyncio.AbstractEventLoop) -> Iterator[None]:
+    """Temporarily allow one running event loop to be re-entered.
+
+    SQLAlchemy async connections and asyncpg driver objects are tied to the
+    event loop that owns them. When synchronous ORM surfaces such as deferred
+    attribute access need to await work while a transaction-bound connection is
+    active, moving the coroutine to Saffier's helper loop would cross event-loop
+    ownership and fail.
+
+    ``nest_asyncio`` provides the required re-entry mechanics, but its public
+    ``apply()`` function also changes the event-loop policy and leaves all
+    mutations in place. Python 3.14 exposes that as a hard failure because
+    asyncpg uses ``asyncio.timeout()``, which now requires
+    ``asyncio.current_task()`` to remain visible while callbacks run. This
+    context manager uses only the patch pieces needed for one nested
+    ``run_until_complete()`` call and restores the previous loop, task, future,
+    and ``asyncio.run()`` state before normal async execution resumes.
+
+    Args:
+        loop: Running event loop that owns the SQLAlchemy resources being used
+            by the synchronous bridge.
+    """
+    import nest_asyncio
+
+    loop_snapshot = _snapshot_attrs(loop.__class__, _LOOP_REENTRY_ATTRS)
+    asyncio_snapshot: list[tuple[Any, str, Any]] = []
+    for target, names in _ASYNCIO_REENTRY_ATTRS:
+        asyncio_snapshot.extend(_snapshot_attrs(target, names))
+
+    try:
+        nest_asyncio._patch_asyncio()
+        nest_asyncio._patch_loop(loop)
+        yield
+    finally:
+        _restore_attrs(asyncio_snapshot)
+        _restore_attrs(loop_snapshot)
 
 
 async def _coro_helper(awaitable: Awaitable, timeout: float | None) -> Any:
@@ -169,10 +266,8 @@ def run_sync(
                 ctx.run(_coro_helper, awaitable, timeout), get_subloop(loop)
             ).result()
 
-        import nest_asyncio
-
-        nest_asyncio.apply(loop)
-        return loop.run_until_complete(_coro_helper(awaitable, timeout))
+        with _temporary_loop_reentry(loop):
+            return loop.run_until_complete(_coro_helper(awaitable, timeout))
 
     ctx = copy_context()
     return asyncio.run_coroutine_threadsafe(
