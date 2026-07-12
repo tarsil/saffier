@@ -24,6 +24,7 @@ flow through SQLAlchemy's public async APIs.
 - Migration commands now emit `pre_migrate` and `post_migrate` lifecycle signals around revision, upgrade, and downgrade flows.
 - Migration generation now supports `--nf` forced-nullable field selectors so required fields can be added safely to populated tables and backfilled through the registry.
 - Registries can now wrap ASGI applications directly with `Registry.asgi()` for whole-registry lifespan management.
+- Factory documentation now covers model factories, relationship factories, and async persisted factory rows.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
 ### Fixed
