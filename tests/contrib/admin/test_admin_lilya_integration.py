@@ -192,7 +192,7 @@ async def admin_client() -> AsyncGenerator[AsyncClient, None]:
 
 
 async def test_lilya_admin_renders_assets_and_schema(admin_client: AsyncClient) -> None:
-    """Verify the real admin pages render the Edgy-grade UI dependencies.
+    """Verify the real admin pages render the full UI dependency set.
 
     The dashboard and create page should include Tailwind, Font Awesome, and
     JSONEditor assets from the shared base templates. The schema endpoints must

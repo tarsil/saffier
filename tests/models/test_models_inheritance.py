@@ -19,7 +19,7 @@ def test_direct_descendant() -> None:
         objects: ClassVar[saffier.Manager] = saffier.RedirectManager(redirect_name="query")
 
     Cat.proxy_model  # noqa: B018
-    Cat.copy_edgy_model().proxy_model  # noqa: B018
+    Cat.copy_saffier_model().proxy_model  # noqa: B018
 
 
 def test_second_manager() -> None:
@@ -44,11 +44,11 @@ def test_second_manager() -> None:
         objects2: ClassVar[saffier.Manager] = saffier.RedirectManager(redirect_name="query")
 
     Cat.proxy_model  # noqa: B018
-    Cat.copy_edgy_model().proxy_model  # noqa: B018
+    Cat.copy_saffier_model().proxy_model  # noqa: B018
     Cat2.proxy_model  # noqa: B018
-    Cat2.copy_edgy_model().proxy_model  # noqa: B018
+    Cat2.copy_saffier_model().proxy_model  # noqa: B018
     DjangoBase.proxy_model  # noqa: B018
-    DjangoBase.copy_edgy_model().proxy_model  # noqa: B018
+    DjangoBase.copy_saffier_model().proxy_model  # noqa: B018
 
 
 def test_abstract_registry() -> None:
@@ -72,8 +72,8 @@ def test_abstract_registry() -> None:
     assert "Cat2" in registry_obj.models
 
     Cat.proxy_model  # noqa: B018
-    Cat.copy_edgy_model().proxy_model  # noqa: B018
+    Cat.copy_saffier_model().proxy_model  # noqa: B018
     Cat2.proxy_model  # noqa: B018
-    Cat2.copy_edgy_model().proxy_model  # noqa: B018
+    Cat2.copy_saffier_model().proxy_model  # noqa: B018
     DjangoBase.proxy_model  # noqa: B018
-    DjangoBase.copy_edgy_model().proxy_model  # noqa: B018
+    DjangoBase.copy_saffier_model().proxy_model  # noqa: B018

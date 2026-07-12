@@ -73,7 +73,8 @@ class _FakeRoutePath:
         Args:
             path: URL path pattern registered by the admin app.
             endpoint: Function-style route handler.
-            handler: Controller-style route handler accepted for Lilya parity.
+            handler: Controller-style route handler accepted by the fake Lilya
+                route implementation.
             methods: Optional HTTP methods allowed by the route.
             name: Route name used by admin URL generation.
         """

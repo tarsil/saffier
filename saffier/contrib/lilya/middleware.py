@@ -9,13 +9,14 @@ if TYPE_CHECKING:
     from saffier.core.connection.registry import Registry
 
 
-class EdgyMiddleware:
+class SaffierMiddleware:
     """Bind Saffier registry and settings state around Lilya requests.
 
-    The class name is retained for compatibility with the historical import
-    path, but the behavior is Saffier-native: requests can enter the registry's
-    async context manager and install a Monkay ``Instance`` so model/query code
-    resolves the active registry during Lilya dispatch.
+    Requests can enter the registry's async context manager and install a
+    Monkay ``Instance`` so model/query code resolves the active registry during
+    Lilya dispatch. The middleware is intentionally small: Lilya owns the ASGI
+    route stack, Saffier owns registry and settings context, and SQLAlchemy
+    remains the only database runtime.
     """
 
     def __init__(
@@ -78,4 +79,4 @@ class EdgyMiddleware:
             await self.app(scope, receive, send)
 
 
-__all__ = ["EdgyMiddleware"]
+__all__ = ["SaffierMiddleware"]

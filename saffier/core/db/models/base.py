@@ -839,7 +839,6 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
         return copied_model.add_to_registry(registry, on_conflict=on_conflict)
 
     copy_model = copy_saffier_model
-    copy_edgy_model = copy_saffier_model
 
     @classmethod
     def real_add_to_registry(

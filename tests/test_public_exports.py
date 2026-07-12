@@ -18,7 +18,7 @@ def test_database_url_is_exported_and_masks_passwords() -> None:
     assert escaped.password == "[password"
 
 
-def test_core_exports_cover_new_parity_surface() -> None:
+def test_core_exports_cover_current_public_surface() -> None:
     assert issubclass(saffier.PydanticModelEngine, saffier.ModelEngine)
     assert issubclass(saffier.MsgspecModelEngine, saffier.ModelEngine)
     assert saffier.get_model_engine("pydantic").name == "pydantic"

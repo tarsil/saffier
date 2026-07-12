@@ -1438,7 +1438,7 @@ class BaseModelMeta(type):
         Returns:
             Any: The SQLAlchemy table object for the requested schema.
         """
-        del metadata  # metadata is accepted for API parity with Edgy.
+        del metadata  # accepted for call-signature compatibility with table helpers.
         if getattr(cls, "is_proxy_model", False):
             parent = getattr(cls, "parent", None)
             if parent is None:

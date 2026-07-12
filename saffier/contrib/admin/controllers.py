@@ -41,8 +41,9 @@ async def admin_not_found(
 
     The helper is exported for applications that mount Saffier admin inside a
     larger Lilya application and want the admin-specific not-found page for
-    missing admin routes. It mirrors Edgy's public helper while using Saffier's
-    own template configuration and Lilya response layer.
+    missing admin routes. It uses Saffier's own template configuration and
+    Lilya response layer so branding and public-prefix behavior remain
+    centralized.
 
     Args:
         request: Current ASGI request object.

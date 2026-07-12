@@ -8,6 +8,7 @@ import orjson
 import saffier
 from saffier.contrib.pagination import NumberedPaginator, Page
 from saffier.core.db import fields as saffier_fields
+from saffier.exceptions import ValidationError
 
 from .config import AdminConfig
 from .exceptions import AdminModelNotFound, AdminValidationError
@@ -95,10 +96,10 @@ class AdminSite:
     def can_create_model(self, model_name: str) -> bool:
         """Return whether the admin may create objects for one model.
 
-        Edgy exposes ``Meta.no_admin_create`` as a way to keep infrastructure
-        models browsable while preventing direct creation. Saffier preserves the
-        capability as model metadata and applies it in the service layer so both
-        UI routes and programmatic admin calls share the same protection.
+        ``Meta.no_admin_create`` keeps infrastructure models browsable while
+        preventing direct creation. Saffier applies the flag in the service
+        layer so both UI routes and programmatic admin calls share the same
+        protection.
 
         Args:
             model_name: Admin-visible model name.
@@ -408,10 +409,10 @@ class AdminSite:
         """Return a page plus total counts for the richer admin UI.
 
         The generic paginator intentionally keeps ``Page`` small. The admin
-        table, however, needs total records and total pages to render the
-        Edgy-style pagination controls. This method calculates those values
-        from the same filtered queryset used for the page so the numbers match
-        what the operator is seeing.
+        table, however, needs total records and total pages to render its
+        pagination controls. This method calculates those values from the same
+        filtered queryset used for the page so the numbers match what the
+        operator is seeing.
 
         Args:
             model_name: Registry name for the model being listed.
@@ -546,6 +547,66 @@ class AdminSite:
             raise AdminValidationError(errors)
         return values
 
+    def _build_save_marshall(
+        self,
+        model: type[saffier.Model],
+        payload: dict[str, Any],
+        *,
+        instance: saffier.Model | None = None,
+    ) -> Any:
+        """Build the model-owned admin marshall for a create or update write.
+
+        The admin service still owns request-level concerns such as rejecting
+        unknown fields and converting empty form strings to ``None`` for
+        nullable model fields. Model-specific projection and validation,
+        however, belong to ``get_admin_marshall_for_save()`` so applications
+        that customize admin marshalling affect both schemas and writes.
+
+        Args:
+            model: Saffier model class being created or updated.
+            payload: Raw user payload keyed by model field name.
+            instance: Existing instance for update operations. ``None`` means a
+                create operation is being prepared.
+
+        Returns:
+            Any: Admin marshall instance ready to save.
+
+        Raises:
+            AdminValidationError: If a field is unknown, not writable in the
+            current admin phase, or rejected by the model marshall.
+        """
+        phase = "update" if instance is not None else "create"
+        marshall_class = model.get_admin_marshall_class(phase=phase, for_schema=False)
+        writable_fields = set(marshall_class.model_fields)
+        errors: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        for key, raw_value in payload.items():
+            field = model.fields.get(key)
+            if field is None:
+                errors[key] = "Unknown field."
+                continue
+            if isinstance(field, saffier_fields.ManyToManyField):
+                continue
+            if key not in writable_fields:
+                errors[key] = "Field is not writable."
+                continue
+            values[key] = None if raw_value == "" and field.null else raw_value
+
+        if errors:
+            raise AdminValidationError(errors)
+
+        try:
+            return model.get_admin_marshall_for_save(instance, **values)
+        except ValidationError as exc:
+            validation_errors: dict[str, str] = {}
+            for message in exc.messages():
+                key = str(message.index[0]) if message.index else "__all__"
+                validation_errors[key] = message.text
+            raise AdminValidationError(validation_errors) from exc
+        except Exception as exc:
+            raise AdminValidationError({"__all__": str(exc)}) from exc
+
     def form_to_payload(self, form_data: Any) -> dict[str, Any]:
         """Convert submitted admin form data into a model payload.
 
@@ -602,8 +663,9 @@ class AdminSite:
         model = self.get_model(model_name)
         if not self.can_create_model(model_name):
             raise AdminValidationError({"model": "Creation is disabled for this model."})
-        values = self._coerce_payload(model, payload)
-        return await model.query.create(**values)
+        marshall = self._build_save_marshall(model, payload)
+        await marshall.save()
+        return cast(saffier.Model, marshall.instance)
 
     async def update_object(
         self,
@@ -625,11 +687,12 @@ class AdminSite:
             AdminValidationError: If payload coercion fails.
         """
         model = self.get_model(model_name)
-        values = self._coerce_payload(model, payload, partial=True)
         instance = await self.get_object(model_name, encoded_pk)
-        if values:
-            await instance.update(**values)
-        return cast(saffier.Model, instance)
+        if not payload:
+            return cast(saffier.Model, instance)
+        marshall = self._build_save_marshall(model, payload, instance=instance)
+        await marshall.save()
+        return cast(saffier.Model, marshall.instance)
 
     async def delete_object(self, model_name: str, encoded_pk: str) -> int:
         """Delete one model instance through the admin service.

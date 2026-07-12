@@ -69,7 +69,7 @@ messaging systems where one model can play several roles in the same row:
 
 ### Reverse relation mutation helpers
 
-Reverse foreign-key relations expose the same mutation helpers as Edgy's current runtime:
+Reverse foreign-key relations expose mutation helpers for common collection operations:
 `add()`, `add_many()`, `create()`, `remove()`, and `remove_many()`.
 
 ```python
@@ -206,8 +206,8 @@ await Profile.query.create(user=user)
 
 ### Reverse one-to-one names
 
-When `related_name` is omitted on a one-to-one field, Saffier now follows Edgy's current behavior
-and generates the singular reverse name from the declaring model.
+When `related_name` is omitted on a one-to-one field, Saffier generates the singular reverse
+name from the declaring model.
 
 ```python
 class Profile(saffier.Model):

@@ -20,6 +20,7 @@ flow through SQLAlchemy's public async APIs.
 - Admin model visibility now follows `Meta.in_admin`, while `Meta.no_admin_create` keeps models browsable but blocks creation through both UI and service paths.
 - Admin links, redirects, and the 404 page now honor `AdminConfig`, including `admin_prefix_url` for reverse-proxy deployments.
 - Admin Basic auth is now available both as ASGI middleware and as a Lilya permission-protocol class.
+- Admin create and update flows now honor model-level admin marshalling hooks for schemas and writes.
 - Tenant routing now includes `with_tenant`, a scoped context manager for request-level multi-tenancy.
 - Migration commands now emit `pre_migrate` and `post_migrate` lifecycle signals around revision, upgrade, and downgrade flows.
 - Migration generation now supports `--nf` forced-nullable field selectors so required fields can be added safely to populated tables and backfilled through the registry.
@@ -39,6 +40,7 @@ flow through SQLAlchemy's public async APIs.
 - Removed the external database runtime dependency from Saffier's runtime requirements.
 - Removed extra database execution indirection from Saffier's runtime path.
 - The admin extra now depends on Lilya for the admin application runtime.
+- Removed old reference-named model-copy and factory utility aliases in favor of Saffier-native names.
 - Removed documentation language that pointed users at the previous database runtime model.
 
 ## 2.1.0

@@ -87,7 +87,7 @@ a different database instead? The preferred form is `using(database=..., schema=
 User.query.using(database="analytics", schema="main").all()
 ```
 
-`using_with_db(...)` remains available as a compatibility wrapper for older Edgy-style code.
+`using_with_db(...)` remains available as a convenience wrapper for older multi-database call sites.
 
 {!> ../docs_src/shared/extra.md !}
 

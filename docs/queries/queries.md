@@ -133,7 +133,7 @@ The same special operators are also automatically added on every column.
 * **lte** - Filter instances having values `Less Than Equal`.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
-* **isempty** - Filter instances where a field holds its Edgy-style empty value.
+* **isempty** - Filter instances where a field holds its Saffier-defined empty value.
 * **isnull** - Filter instances where a column is `NULL` or not `NULL`.
 
 ##### Example
@@ -347,9 +347,9 @@ q2 = User.query.filter(is_staff=True).defer("last_login")
 rows = await q1.union(q2).order_by("email").values(["id", "email"])
 ```
 
-Like Edgy, Saffier applies ordering, offset, and limit to the outer combined result, not to the
-individual branch orderings. Add an explicit `order_by()` when you need deterministic pagination or
-comparison semantics.
+Saffier applies ordering, offset, and limit to the outer combined result, not to the individual
+branch orderings. Add an explicit `order_by()` when you need deterministic pagination or comparison
+semantics.
 
 ### Row locking
 

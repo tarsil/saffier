@@ -339,8 +339,8 @@ class MyModel(saffier.Model):
 
 Virtual field whose value is resolved by getter/setter callbacks.
 
-Computed fields are excluded from `model_dump()` by default, matching Edgy's
-runtime serialization behavior. Set `exclude=False` when the computed value
+Computed fields are excluded from `model_dump()` by default so derived values do not
+appear unless the model asks for them. Set `exclude=False` when the computed value
 should be part of serialized model output.
 
 ```python
@@ -391,7 +391,7 @@ class Customer(saffier.Model):
 `CompositeField` itself is virtual and does not create a database column. Embedded inner fields do.
 
 Saffier also accepts an abstract model class on the model body and converts it into a prefixed
-`CompositeField` automatically, matching Edgy's embedded-model shorthand.
+`CompositeField` automatically.
 
 ```python
 class Address(saffier.Model):
@@ -518,7 +518,7 @@ class Member(saffier.Model):
 ```
 
 If you pass a `ModelRef` subclass instead, `RefForeignKey` becomes a virtual nested-insert field.
-This is the Saffier-native pure Python adaptation of Edgy's reference workflow.
+This is Saffier's pure-Python reference workflow for staged related rows.
 
 ```python
 class PostRef(saffier.ModelRef):
@@ -580,7 +580,7 @@ if none is provided.
   `organisation.teams.filter(membership__team__name="Blue Team")` when
   `embed_through="membership"`.
 * **unique** - Marks the target side of the generated through model as unique, producing a
-  reverse relation that behaves like Edgy's unique many-to-many variant.
+  singular reverse relation for that generated through model.
 
 !!! Note
     Saffier enforces an auto-incrementing integer `id` primary key on ManyToMany through models.

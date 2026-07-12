@@ -41,7 +41,7 @@ Then create related rows inline:
 await User.query.create(
     PostRef(comment="first"),
     PostRef(comment="second"),
-    name="Edgy-compatible",
+    name="Saffier-compatible",
     posts=[],
 )
 ```
@@ -70,4 +70,4 @@ class Member(saffier.Model):
     team = saffier.RefForeignKey(Team, ref_field="slug", on_delete=saffier.CASCADE)
 ```
 
-This keeps existing Saffier projects compatible while adding the richer Edgy-style reference flow.
+This keeps existing Saffier projects compatible while adding staged related-row creation.

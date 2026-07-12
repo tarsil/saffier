@@ -66,6 +66,39 @@ app = Lilya(
 
 `create_admin_app()` installs Saffier's Lilya registry middleware and Lilya session-context middleware. The parent mount must provide Lilya `SessionMiddleware`; `saffier admin_serve` does this automatically.
 
+## Multiple Admin Mounts
+
+Applications can mount more than one admin app. Pass a different `session_sub_path`
+when the mounted apps should keep flash messages and recent-model state separate while
+sharing the same Lilya session middleware.
+
+```python
+public_admin = create_admin_app(
+    registry=public_models,
+    config=AdminConfig(admin_prefix_url="/public-admin"),
+    session_sub_path="public-admin",
+)
+private_admin = create_admin_app(
+    registry=private_models,
+    config=AdminConfig(admin_prefix_url="/private-admin"),
+    session_sub_path="private-admin",
+)
+
+app = Lilya(
+    routes=[
+        Include("/public-admin", app=public_admin),
+        Include("/private-admin", app=private_admin),
+    ],
+    middleware=[
+        DefineMiddleware(SessionMiddleware, secret_key="change-me"),
+    ],
+)
+```
+
+If the registry lifecycle is already owned by an outer ASGI layer, use
+`saffier.contrib.lilya.SaffierMiddleware` directly with `wrap_asgi_app=False` so request-local
+settings and registry state are still available without opening a nested database context.
+
 ## Basic Auth Permissions
 
 `create_admin_app(auth_password=...)` protects the mounted admin with `BasicAuthMiddleware`.
@@ -145,6 +178,41 @@ class ContentType(saffier.Model):
 ```
 
 The create button is hidden, create routes redirect back to the model list, and direct service calls through `AdminSite.create_object()` are rejected.
+
+## Custom Model Admin Behaviour
+
+Models can customize their admin marshalling hooks. The same hooks drive JSONEditor
+schemas and create/update writes, so hiding a field from the admin schema also prevents
+direct `AdminSite` writes to that field.
+
+```python
+class Account(saffier.Model):
+    email = saffier.EmailField(max_length=255)
+    internal_note = saffier.TextField(null=True)
+
+    class Meta:
+        registry = models
+
+    @classmethod
+    def get_admin_marshall_config(cls, *, phase: str, for_schema: bool) -> dict[str, object]:
+        config = super().get_admin_marshall_config(phase=phase, for_schema=for_schema)
+        if phase in {"create", "update"}:
+            config["exclude"] = ["internal_note"]
+        return config
+```
+
+Available hooks:
+
+- `get_admin_marshall_config(cls, *, phase, for_schema)`: adjust the `ConfigMarshall`
+  options used for one admin phase.
+- `get_admin_marshall_class(cls, *, phase, for_schema=False)`: replace or extend the
+  generated marshall class.
+- `get_admin_marshall_for_save(cls, instance=None, **kwargs)`: customize the marshall
+  instance used for create or update writes.
+
+Common phases are `list`, `view`, `create`, and `update`. The `for_schema` flag is true
+when the admin is generating JSON schema for the editor rather than validating a submitted
+payload.
 
 ## Templates
 

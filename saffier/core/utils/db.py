@@ -22,7 +22,12 @@ FORCE_FIELDS_NULLABLE = ContextVar(
 
 def check_db_connection(db: Database, stacklevel: int = 3) -> None:
     """
-    Mirror Edgy's warning/error contract for disconnected databases.
+    Enforce Saffier's warning/error contract for disconnected databases.
+
+    Normal disconnected operations emit a warning so legacy startup patterns can
+    still be diagnosed without failing immediately. Forced rollback contexts are
+    stricter because they require an active connection to guarantee rollback
+    semantics.
     """
     from saffier.exceptions import DatabaseNotConnectedWarning
 

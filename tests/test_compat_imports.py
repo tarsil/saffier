@@ -35,6 +35,6 @@ MODULES = [
 ]
 
 
-def test_edgy_compat_modules_import_cleanly() -> None:
+def test_saffier_extension_modules_import_cleanly() -> None:
     for module_name in MODULES:
         import_module(module_name)

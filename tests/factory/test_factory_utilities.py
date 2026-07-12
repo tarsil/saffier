@@ -16,8 +16,8 @@ from saffier.testing.factory.mappings import DEFAULT_MAPPING
 from saffier.testing.factory.types import ModelFactoryContext
 from saffier.testing.factory.utils import (
     default_wrapper,
-    edgy_field_param_extractor,
     remove_unparametrized_relationship_fields,
+    saffier_field_param_extractor,
 )
 from tests.settings import DATABASE_URL
 
@@ -111,7 +111,7 @@ def test_factory_utils_wrappers():
     }
     field = _Field()
 
-    wrapped = edgy_field_param_extractor(
+    wrapped = saffier_field_param_extractor(
         lambda f, ctx, kwargs: kwargs,
         defaults={"seed": "value"},
     )

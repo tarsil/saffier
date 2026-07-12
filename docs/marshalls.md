@@ -10,9 +10,9 @@ They provide:
 * partial update workflows
 * a `save()` bridge back into Saffier models
 
-Unlike Edgy, Saffier marshalls are **not** Pydantic models. They are implemented directly on top
-of Saffier’s field and model system, which keeps the subsystem Python-native and avoids introducing
-Pydantic as a framework dependency.
+Saffier marshalls are **not** Pydantic models. They are implemented directly on top of Saffier’s
+field and model system, which keeps the subsystem Python-native and avoids introducing Pydantic as
+a framework dependency.
 
 ## Imports
 

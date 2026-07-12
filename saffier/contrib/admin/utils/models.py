@@ -23,9 +23,9 @@ class CallableDefaultJsonSchema:
     """Marker requesting callable defaults in generated admin JSON schema.
 
     Saffier's lightweight marshalling schema path does not depend on Pydantic's
-    schema generator classes, but Edgy-compatible callers still pass generator
-    classes to choose callable-default behavior. This marker preserves that API
-    without importing Pydantic at runtime.
+    schema generator classes, but callers may still pass generator-like marker
+    classes to choose callable-default behavior. This marker preserves that
+    public switch without importing Pydantic at runtime.
     """
 
     include_callable_defaults = True
@@ -105,9 +105,8 @@ def get_model_json_schema(
     """Generate the admin JSON schema for a model.
 
     This function is intentionally thin over ``Model.model_json_schema``. Saffier
-    models own their admin marshalling schema, while this utility keeps the
-    Edgy-compatible call signature used by tests, docs, and optional admin
-    tooling.
+    models own their admin marshalling schema, while this utility keeps a
+    flexible call signature for tests, docs, and optional admin tooling.
 
     Args:
         model: Model class or registry name.

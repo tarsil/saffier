@@ -62,7 +62,7 @@ def create_admin_app(
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("lilya and jinja2 are required to run saffier.contrib.admin.") from exc
 
-    from saffier.contrib.lilya.middleware import EdgyMiddleware
+    from saffier.contrib.lilya.middleware import SaffierMiddleware
 
     if site is None:
         if registry is None:
@@ -482,7 +482,9 @@ def create_admin_app(
 
     middleware = []
     if registry is not None or settings is not None:
-        middleware.append(DefineMiddleware(EdgyMiddleware, registry=registry, settings=settings))
+        middleware.append(
+            DefineMiddleware(SaffierMiddleware, registry=registry, settings=settings)
+        )
     middleware.append(DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path))
     if auth_password is not None:
         middleware.append(
