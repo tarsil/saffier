@@ -9,17 +9,29 @@ if TYPE_CHECKING:
 
 
 def get_templates(config: AdminConfig | None = None):
+    """Create the Lilya Jinja template engine for the admin UI.
+
+    Saffier admin templates are owned by the Lilya integration layer. Extra
+    template directories are loaded before the built-in templates so
+    applications can override individual pages without replacing the whole
+    admin application.
+
+    Args:
+        config: Optional admin configuration. When omitted, a default
+            ``AdminConfig`` is created.
+
+    Returns:
+        Any: Configured Lilya ``Jinja2Template`` instance.
+    """
     try:
-        from starlette.templating import Jinja2Templates
+        from lilya.templating import Jinja2Template
     except ImportError as exc:  # pragma: no cover
-        raise RuntimeError(
-            "starlette and jinja2 are required to run saffier.contrib.admin."
-        ) from exc
+        raise RuntimeError("lilya and jinja2 are required to run saffier.contrib.admin.") from exc
 
     from saffier.contrib.admin.config import AdminConfig as RuntimeAdminConfig
 
     active_config = config or RuntimeAdminConfig()
-    templates = Jinja2Templates(directory=active_config.template_directories())
+    templates = Jinja2Template(directory=active_config.template_directories())
     templates.env.globals["getattr"] = getattr
     return templates
 

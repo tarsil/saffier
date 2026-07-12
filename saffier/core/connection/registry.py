@@ -134,6 +134,7 @@ class Registry:
             database if isinstance(database, Database) else Database(database)
         )
         self.models: dict[str, Any] = {}
+        self.admin_models: set[str] = set()
         self.reflected: dict[str, Any] = {}
         self.pattern_models: dict[str, Any] = {}
         self.content_type: Any | None = None
@@ -454,6 +455,11 @@ class Registry:
             )
 
         registry_copy.pattern_models = dict(self.pattern_models)
+        registry_copy.admin_models = {
+            name
+            for name in self.admin_models
+            if name in registry_copy.models or name in registry_copy.reflected
+        }
         if hasattr(self, "tenant_models") and hasattr(registry_copy, "tenant_models"):
             registry_copy.tenant_models = {
                 name: model
@@ -497,18 +503,26 @@ class Registry:
             raise TypeError("with_content_type must be True/False or a model type.")
 
         if getattr(content_type_model.meta, "abstract", False):
+            in_admin = getattr(content_type_model.meta, "in_admin", None)
+            no_admin_create = getattr(content_type_model.meta, "no_admin_create", None)
             meta = type(
                 "Meta",
                 (),
                 {
                     "registry": self,
                     "tablename": "contenttypes",
+                    "in_admin": True if in_admin is None else in_admin,
+                    "no_admin_create": True if no_admin_create is None else no_admin_create,
                 },
             )
             content_type_model = type("ContentType", (content_type_model,), {"Meta": meta})
         elif getattr(content_type_model.meta, "registry", None) in (None, False):
             if not getattr(content_type_model.meta, "tablename", None):
                 content_type_model.meta.tablename = "contenttypes"
+            if getattr(content_type_model.meta, "in_admin", None) is None:
+                content_type_model.meta.in_admin = True
+            if getattr(content_type_model.meta, "no_admin_create", None) is None:
+                content_type_model.meta.no_admin_create = True
             content_type_model = content_type_model.add_to_registry(self, name="ContentType")
 
         registered_content_type = self.models.get("ContentType")
@@ -530,6 +544,28 @@ class Registry:
             self._attach_content_type_to_model(model)
 
     def _handle_model_registration(self, model_class: type[Any]) -> None:
+        """Finalize registry-owned state for a newly registered model.
+
+        Model registration is responsible for more than adding the class to
+        ``registry.models``. The registry also owns the admin visibility index
+        and optional content-type wiring. Updating both concerns here keeps
+        dynamically registered, copied, and generated models consistent after
+        their concrete registry name is known.
+
+        Args:
+            model_class: Model class that has just been registered.
+        """
+        if not getattr(model_class, "is_proxy_model", False) and not getattr(
+            model_class.meta,
+            "abstract",
+            False,
+        ):
+            model_name = model_class.__name__
+            if getattr(model_class.meta, "in_admin", None) is not False:
+                self.admin_models.add(model_name)
+            else:
+                self.admin_models.discard(model_name)
+
         if self.content_type is None:
             return
         self._attach_content_type_to_model(model_class)
@@ -982,7 +1018,8 @@ class Registry:
 
         The helper checks concrete, reflected, and pattern-generated model
         collections. It is used by conflict-resolution code when copying or
-        re-registering models.
+        re-registering models. The admin model index is updated at the same time
+        so deleted models cannot remain visible in the built-in admin.
 
         Args:
             model_name: Name of the model to remove.
@@ -990,6 +1027,7 @@ class Registry:
         Returns:
             bool: `True` when a model entry was removed.
         """
+        self.admin_models.discard(model_name)
         for model_dict in (self.models, self.reflected, self.pattern_models):
             if model_name in model_dict:
                 del model_dict[model_name]

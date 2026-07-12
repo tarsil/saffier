@@ -1,20 +1,38 @@
 {% extends "admin/base.html.jinja" %}
+
+{% block header %}Search Registered Models{% endblock %}
+
 {% block content %}
-  <div class="card">
-    <h2>Models</h2>
-    <form method="get">
-      <input type="text" name="q" value="{{ query }}" placeholder="Search model names..." />
-    </form>
-    <table>
-      <thead><tr><th>Name</th><th>Actions</th></tr></thead>
-      <tbody>
-      {% for name, model in models.items() %}
-        <tr>
-          <td>{{ model.__name__ }}</td>
-          <td><a class="btn" href="{{ request.url_for('admin_model_detail', name=name) }}">Open</a></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+<form method="get" class="flex gap-2 w-full max-w-md mb-8">
+  <input type="text" name="q" value="{{ query or '' }}" placeholder="Search..."
+         class="flex-grow px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring focus:ring-blue-200 text-sm" />
+  <button type="submit"
+          class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
+    Search
+  </button>
+</form>
+
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+  {% for name, model in models.items() %}
+  <div class="bg-white rounded-lg shadow hover:shadow-md transition p-5 flex flex-col justify-between h-full">
+    <div>
+      <h2 class="text-lg font-semibold text-saffier-primary capitalize">
+        <a href="{{ admin_url('admin_model_detail', name=name) }}" class="hover:underline">{{ name }}</a>
+      </h2>
+      <p class="text-sm text-gray-500">{{ model.__module__ }}.{{ model.__name__ }}</p>
+    </div>
+    <div class="mt-4 flex justify-between items-center">
+      <a href="{{ admin_url('admin_model_detail', name=name) }}" class="text-blue-600 text-sm font-medium hover:underline">
+        View Records
+      </a>
+      {% if model.meta.no_admin_create is not true %}
+      <a href="{{ admin_url('admin_model_create', name=name) }}" class="inline-flex items-center gap-1 text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+        <i class="fa-solid fa-plus h-4 w-4"></i>
+        Create
+      </a>
+      {% endif %}
+    </div>
   </div>
+  {% endfor %}
+</div>
 {% endblock %}

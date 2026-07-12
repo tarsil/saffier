@@ -1,38 +1,97 @@
 {% extends "admin/base.html.jinja" %}
+
+{% block header %}{{ model_name | replace('_', ' ') | title }} Details{% endblock %}
+
 {% block content %}
-  <div class="card">
-    <h2>{{ model.__name__ }}</h2>
-    <p class="muted">Page {{ page.current_page }}{% if page.next_page %} / next {{ page.next_page }}{% endif %}</p>
-    <form method="get">
-      <input type="text" name="q" value="{{ query }}" placeholder="Search..." />
-      <input type="hidden" name="per_page" value="{{ per_page }}" />
-    </form>
-    <p>
-      <a class="btn" href="{{ request.url_for('admin_model_create', name=model_name) }}">Create</a>
-      <a class="btn" href="{{ request.url_for('admin_model_schema', name=model_name) }}">JSON Schema</a>
-    </p>
-    <table>
-      <thead>
-        <tr>
-          {% for field in model_fields %}
-            <th>{{ field.name }}</th>
-          {% endfor %}
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for row in objects %}
-        <tr>
-          {% for field in model_fields %}
-            <td>{{ getattr(row.instance, field.name, "") }}</td>
-          {% endfor %}
-          <td>
-            <a class="btn" href="{{ request.url_for('admin_model_object', name=model_name, pk=row.pk) }}">View</a>
-            <a class="btn" href="{{ request.url_for('admin_model_edit', name=model_name, pk=row.pk) }}">Edit</a>
-          </td>
-        </tr>
+<div class="mb-2 text-sm text-gray-600">
+  {{ total_records }} {{ model_name | replace('_', ' ') | title }} records
+  {% if query %} matching "<strong>{{ query }}</strong>"{% endif %}
+</div>
+
+<div class="bg-white border rounded-md shadow-sm p-4 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center mb-6">
+  <form method="get" class="flex gap-2 w-full max-w-md">
+    <input type="text" name="q" value="{{ query or '' }}" placeholder="Search..."
+           class="flex-grow px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring focus:ring-blue-200 text-sm" />
+    <button type="submit"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
+      Search
+    </button>
+  </form>
+
+  <form method="get" class="flex items-center gap-2">
+    <label for="per_page" class="text-sm text-gray-600">Show</label>
+    <select name="per_page" id="per_page" onchange="this.form.submit()"
+            class="text-sm border border-gray-300 rounded px-2 py-1">
+      {% for option in [10, 25, 50, 100] %}
+        <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
       {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    </select>
+    <span class="text-sm text-gray-600">per page</span>
+    <input type="hidden" name="q" value="{{ query or '' }}" />
+  </form>
+
+  <a href="{{ admin_url('admin_model_schema', name=model_name) }}"
+     class="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-md hover:bg-gray-300 transition">
+    <i class="fa-solid fa-code"></i>
+    JSON Schema
+  </a>
+
+  {% if can_create %}
+  <a href="{{ admin_url('admin_model_create', name=model_name) }}"
+     class="inline-flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition">
+    <i class="fa-solid fa-plus h-4 w-4"></i>
+    Create {{ model_name | replace('_', ' ') | title }}
+  </a>
+  {% endif %}
+</div>
+
+{% if objects %}
+<div class="overflow-x-auto bg-white rounded-lg shadow border">
+  <table class="min-w-full divide-y divide-gray-200">
+    <thead class="bg-gray-50">
+      <tr>
+        {% for field in model_fields %}
+        <th scope="col" class="px-6 py-3 text-left text-xs {% if field.primary_key %}font-extrabold text-gray-800{% else %}font-semibold text-gray-600{% endif %} uppercase tracking-wider">
+          {{ field.name.replace('_', ' ') | title }}
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100 bg-white">
+      {% for row in objects %}
+      <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ admin_url('admin_model_object', name=model_name, pk=row.pk) }}'">
+        {% for field in model_fields %}
+        <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
+          {{ getattr(row.instance, field.name, "") }}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center text-gray-500 py-12">
+  No {{ model_name | replace('_', ' ') | title }} records found.
+</div>
+{% endif %}
+
+{% if page and total_pages %}
+<div class="mt-6 flex justify-center space-x-2 text-sm">
+  {% if not page.is_first %}
+  <a href="?page={{ page.previous_page }}&per_page={{ per_page }}{% if query %}&q={{ query }}{% endif %}"
+     class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Previous</a>
+  {% endif %}
+
+  {% for p in range(1, total_pages + 1) %}
+  <a href="?page={{ p }}&per_page={{ per_page }}{% if query %}&q={{ query }}{% endif %}"
+     class="px-3 py-1 {{ 'bg-blue-600 text-white' if p == page.current_page else 'bg-gray-100 text-gray-800' }} rounded hover:bg-gray-200">{{ p }}</a>
+  {% endfor %}
+
+  {% if not page.is_last %}
+  <a href="?page={{ page.next_page }}&per_page={{ per_page }}{% if query %}&q={{ query }}{% endif %}"
+     class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Next</a>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

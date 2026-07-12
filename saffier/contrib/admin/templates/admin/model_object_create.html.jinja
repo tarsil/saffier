@@ -1,27 +1,63 @@
 {% extends "admin/base.html.jinja" %}
+
+{% block header %}
+  Create {{ model_name | replace('_', ' ') | title }}
+{% endblock %}
+
 {% block content %}
-  <div class="card">
-    <h2>Create {{ model.__name__ }}</h2>
-    <form method="post">
-      {% for field in model_fields %}
-        <p>
-          <label for="{{ field.name }}">{{ field.name }}</label>
-          <input
-            id="{{ field.name }}"
-            name="{{ field.name }}"
-            value="{{ payload.get(field.name, '') }}"
-            {% if field.required %}required{% endif %}
-          />
-        </p>
-      {% endfor %}
-      <button type="submit">Create</button>
-    </form>
-    {% if errors %}
-      <div class="errors">
-        {% for key, value in errors.items() %}
-          <p>{{ key }}: {{ value }}</p>
-        {% endfor %}
-      </div>
-    {% endif %}
+{% if errors %}
+  <div class="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    {% for key, value in errors.items() %}
+      <div><strong>{{ key }}</strong>: {{ value }}</div>
+    {% endfor %}
   </div>
+{% endif %}
+
+<div id="editor_holder"></div>
+<div class="pt-6 flex gap-4">
+  <form method="post" id="submit_form">
+    <button type="submit" id="submit_button"
+            class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:not-disabled:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+      Create
+    </button>
+    <input type="hidden" name="editor_data" id="editor_data" value="">
+  </form>
+  <a href="{{ admin_url('admin_model_detail', name=model_name) }}"
+     class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+    Cancel
+  </a>
+</div>
+
+<script>
+  var schema = JSON.parse('{{ schema | safe }}')
+  const submitForm = document.getElementById("submit_form")
+  const submitButton = document.getElementById("submit_button")
+  const editorData = document.getElementById("editor_data")
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var editor = new JSONEditor(document.getElementById("editor_holder"), {
+      required_by_default: false,
+      enable_array_copy: true,
+      collapsed: true,
+      disable_properties: false,
+      object_layout: "table",
+      schema: schema,
+    })
+
+    editor.on("change", function () {
+      if (!editor.validate().length) {
+        editorData.value = JSON.stringify(editor.getValue())
+        submitButton.removeAttribute("disabled")
+      } else {
+        submitButton.setAttribute("disabled", "disabled")
+      }
+    })
+
+    submitForm.addEventListener("submit", async function (ev) {
+      if (editor.validate().length) {
+        ev.preventDefault()
+      }
+    })
+  })
+</script>
 {% endblock %}

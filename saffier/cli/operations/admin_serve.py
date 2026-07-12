@@ -77,6 +77,14 @@ def admin_serve(
             show_default=True,
         ),
     ],
+    admin_prefix_url: Annotated[
+        str | None,
+        Option(
+            None,
+            help="Public URL prefix used by admin links and redirects.",
+            show_default=False,
+        ),
+    ],
 ) -> None:
     """Run the built-in Saffier admin application.
 
@@ -94,24 +102,34 @@ def admin_serve(
         auth_pw = secrets.token_urlsafe(24)
         print(f"Saffier admin password: {auth_pw}")
 
+    admin_config = AdminConfig(admin_prefix_url=admin_prefix_url or admin_path)
     admin_app = create_admin_app(
         registry=registry,
-        config=AdminConfig(admin_prefix_url=admin_path),
+        config=admin_config,
         debug=debug,
         auth_username=auth_name,
         auth_password=auth_pw,
     )
 
     try:
-        from starlette.applications import Starlette
-        from starlette.routing import Mount
+        from lilya.apps import Lilya
+        from lilya.middleware import DefineMiddleware
+        from lilya.middleware.sessions import SessionMiddleware
+        from lilya.routing import Include
     except ImportError:
         final_app: Any = admin_app
     else:
-        routes = [Mount(admin_path, app=admin_app)]
+        admin_middleware = [
+            DefineMiddleware(
+                SessionMiddleware,
+                secret_key=admin_config.secret_key,
+                session_cookie="admin_session",
+            )
+        ]
+        routes = [Include(admin_path, app=admin_app, middleware=admin_middleware)]
         if app is not None:
-            routes.append(Mount("/", app=app))
-        final_app = Starlette(debug=debug, routes=routes)
+            routes.append(Include("/", app=app))
+        final_app = Lilya(debug=debug, routes=routes)
 
     if create_all:
         saffier.run_sync(registry.create_all())

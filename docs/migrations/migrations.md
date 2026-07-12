@@ -184,12 +184,12 @@ application.
 {!> ../docs_src/migrations/fastapi.py !}
 ```
 
-#### Using Starlette
+#### Using Lilya
 
-The same goes for Starlette.
+The same goes for Lilya.
 
 ```python title="my_project/main.py"
-{!> ../docs_src/migrations/starlette.py !}
+{!> ../docs_src/migrations/lilya.py !}
 ```
 
 #### Using other frameworks

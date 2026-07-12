@@ -121,6 +121,7 @@ specific queries and querysets at ease.
 * **Model operators** - Classic operations such as `update`, `get`, `get_or_none`, `bulk_create`,
 `bulk_update` and a lot more.
 * **Relationships made it easy** - Support for `OneToOne` and `ForeignKey` in the same Django style.
+* **Admin subsystem** - Python-native admin site and Lilya admin app with JSONEditor-powered forms.
 * **Constraints** - Unique constraints through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you
 need so we give you already one.

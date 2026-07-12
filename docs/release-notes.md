@@ -15,17 +15,23 @@ flow through SQLAlchemy's public async APIs.
 - Database URLs now normalize common plain dialects to SQLAlchemy async drivers while preserving the public `DatabaseURL` helper.
 - Transactions now use SQLAlchemy async transaction objects and savepoints directly, including forced rollback scopes.
 - Schema helpers now run through `AsyncConnection.run_sync()` and SQLAlchemy metadata APIs.
+- The built-in admin app is now Lilya-native and uses Saffier's registry and SQLAlchemy Async runtime directly.
+- The admin HTML interface now includes the richer Tailwind, Font Awesome, and JSONEditor-powered pages for dashboard, model lists, object detail, create, and edit flows.
+- Admin model visibility now follows `Meta.in_admin`, while `Meta.no_admin_create` keeps models browsable but blocks creation through both UI and service paths.
+- Admin links, redirects, and the 404 page now honor `AdminConfig`, including `admin_prefix_url` for reverse-proxy deployments.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
 ### Fixed
 
 - Scoped re-entered sync lazy loads so nested event-loop state is restored immediately,
   preserving Python 3.14 asyncpg compatibility.
+- `saffier admin_serve` now mounts the Lilya session middleware required by the admin session context.
 
 ### Removed
 
 - Removed the external database runtime dependency from Saffier's runtime requirements.
 - Removed extra database execution indirection from Saffier's runtime path.
+- The admin extra now depends on Lilya for the admin application runtime.
 - Removed documentation language that pointed users at the previous database runtime model.
 
 ## 2.1.0

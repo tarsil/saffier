@@ -932,6 +932,10 @@ class SaffierBaseModel(DateParser, metaclass=BaseModelMeta):
             cls.__proxy_model__ = proxy_model
             cls.__proxy_model__.parent = cls
             registry.models[model_name] = cls
+            if getattr(cls.meta, "in_admin", None) is not False:
+                registry.admin_models.add(model_name)
+            else:
+                registry.admin_models.discard(model_name)
 
         if hasattr(registry, "_handle_model_registration"):
             registry._handle_model_registration(cls)

@@ -160,11 +160,12 @@ $ saffier inspectdb --database "postgres+asyncpg://user:pass@localhost:5432/my_d
 
 ### `saffier admin_serve`
 
-Run the Saffier admin ASGI app.
+Run the Saffier Lilya admin app.
 
 ```shell
 $ saffier admin_serve --admin-path /admin
 $ saffier admin_serve --host 0.0.0.0 --port 9000 --create-all
+$ saffier admin_serve --admin-path /internal-admin --admin-prefix-url /proxy/saffier/admin
 ```
 
 To enable the optional admin dependencies:

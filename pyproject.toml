@@ -54,7 +54,7 @@ keywords = [
     "rest",
     "http",
     "asgi",
-    "starlette",
+    "lilya",
     "fastapi",
     "framework",
     "websocket",
@@ -119,7 +119,7 @@ sqlite = ["aiosqlite>=0.19.0,<1"]
 ptpython = ["ptpython>=3.0.23,<4.0.0"]
 ipython = ["ipython>=8.10.0,<9.0.0"]
 admin = [
-    "starlette>=0.37.0,<2.0.0",
+    "lilya>=0.27.0,<1.0.0",
     "jinja2>=3.1.0,<4.0.0",
     "uvicorn>=0.23.0,<1.0.0",
     "itsdangerous>=2.1.0,<3.0.0",
@@ -133,7 +133,7 @@ all = [
     "orjson>=3.8.5,<4.0.0",
     "ptpython>=3.0.23,<4.0.0",
     "ipython>=8.10.0,<9.0.0",
-    "starlette>=0.37.0,<2.0.0",
+    "lilya>=0.27.0,<1.0.0",
     "jinja2>=3.1.0,<4.0.0",
     "uvicorn>=0.23.0,<1.0.0",
     "itsdangerous>=2.1.0,<3.0.0",
@@ -163,7 +163,7 @@ serve = "scripts/docs.py serve {args}"
 dev = "scripts/docs.py serve {args}"
 
 [tool.hatch.envs.test]
-features = ["test", "postgres", "mysql", "sqlite", "testing"]
+features = ["test", "admin", "postgres", "mysql", "sqlite", "testing"]
 
 [tool.hatch.envs.test.env-vars]
 SAFFIER_TESTCLIENT_USE_EXISTING = "true"
@@ -183,7 +183,7 @@ fix = true
 
 [tool.isort]
 profile = "black"
-known_third_party = ["ravyn", "starlette", "saffier"]
+known_third_party = ["ravyn", "lilya", "saffier"]
 
 [tool.ty]
 

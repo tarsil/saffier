@@ -10,8 +10,11 @@ from saffier import Instance, monkay
 
 
 def build_path():
-    """
-    Builds the path of the project and project root.
+    """Add the project and application directories to ``sys.path``.
+
+    Migration discovery often runs from a command process rather than the ASGI
+    server process. This helper makes the project package and its ``apps``
+    directory importable before Saffier loads the registry.
     """
     Path(__file__).resolve().parent.parent
     SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
@@ -22,8 +25,11 @@ def build_path():
 
 
 def get_application():
-    """
-    This is optional. The function is only used for organisation purposes.
+    """Create the Lilya application and bind Saffier's active instance.
+
+    The migration CLI can receive this app through ``--app``. Binding the
+    registry to ``saffier.monkay`` gives Saffier one place to discover metadata,
+    migrations, and runtime settings for the project.
     """
     build_path()
     database, registry = get_db_connection()

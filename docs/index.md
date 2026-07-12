@@ -109,7 +109,7 @@ specific queries and querysets at ease.
 * **Auto reflection patterns** - Pattern-driven reflected models via `AutoReflectModel`.
 * **Content types** - Generic content type support via `Registry(..., with_content_type=True)`.
 * **Permissions contrib** - Reusable permission model and permission manager helpers.
-* **Admin subsystem** - Python-native admin site and optional ASGI admin app.
+* **Admin subsystem** - Python-native admin site and Lilya admin app with JSONEditor-powered forms.
 * **Python-native marshalls** - DTO/serializer layer with custom fields, context, schema output, and save support.
 * **Model engines** - Optional adapter layer for built-in Pydantic and msgspec support, plus custom future engines such as attrs.
 * **Standalone file storage API** - `saffier.files` now exposes file objects, storage backends, and safe filesystem handling.

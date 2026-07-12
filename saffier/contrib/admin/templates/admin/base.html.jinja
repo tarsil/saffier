@@ -1,48 +1,110 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ title }}</title>
-    <style>
-      :root {
-        --sidebar: {{ sidebar_bg_colour }};
-        --bg: #f5f7fb;
-        --text: #0f172a;
-        --muted: #475569;
-        --card: #ffffff;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif; color: var(--text); background: var(--bg); }
-      .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
-      .sidebar { background: var(--sidebar); color: #fff; padding: 24px 16px; }
-      .sidebar h1 { font-size: 20px; margin: 0 0 20px 0; }
-      .sidebar a { color: #fff; text-decoration: none; display: block; padding: 8px 0; opacity: 0.9; }
-      .content { padding: 24px; }
-      .card { background: var(--card); border-radius: 12px; padding: 18px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05); }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border-bottom: 1px solid #e2e8f0; text-align: left; padding: 10px 8px; vertical-align: top; }
-      th { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
-      input, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; }
-      button, .btn { background: #0f172a; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; text-decoration: none; display: inline-block; }
-      .muted { color: var(--muted); font-size: 13px; }
-      .errors { color: #991b1b; font-size: 13px; margin-top: 8px; }
-      @media (max-width: 900px) {
-        .layout { grid-template-columns: 1fr; }
-        .sidebar { position: sticky; top: 0; z-index: 2; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="layout">
-      <aside class="sidebar">
-        <h1>{{ menu_title }}</h1>
-        <a href="{{ request.url_for('admin_dashboard') }}">Dashboard</a>
-        <a href="{{ request.url_for('admin_models') }}">Models</a>
-      </aside>
-      <main class="content">
-        {% block content %}{% endblock %}
-      </main>
+<head>
+  {% block head %}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" href="{{ favicon }}"/>
+  <title>{% block title %}{{ menu_title }} | {{ title }}{% endblock %}</title>
+  {% include 'admin/base_definitions.html.jinja' %}
+  {% include 'admin/base_head.html.jinja' %}
+  {% endblock %}
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center hidden">
+    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+  </div>
+
+  {% if messages %}
+    <div class="w-full">
+      <div class="space-y-2">
+        {% for message in messages %}
+          <div class="flex items-start gap-3 px-4 py-3 rounded-md shadow-sm text-sm font-medium w-full relative
+                      {% if message.level == 'success' %}bg-green-100 text-green-800
+                      {% elif message.level == 'error' %}bg-red-100 text-red-800
+                      {% elif message.level == 'warning' %}bg-yellow-100 text-yellow-800
+                      {% elif message.level == 'info' %}bg-blue-100 text-blue-800
+                      {% endif %}">
+            <i class="w-5 h-5 mt-0.5 shrink-0 {% if message.level == 'success' %}fa-solid fa-circle-check
+                            {% elif message.level == 'error' %}fa-solid fa-circle-xmark
+                            {% elif message.level == 'warning' %}fa-solid fa-triangle-exclamation
+                            {% elif message.level == 'info' %}fa-solid fa-circle-info
+                            {% endif %}"></i>
+
+            <div class="text-base leading-snug flex-1">
+              {{ message.text }}
+            </div>
+
+            <button type="button"
+                    class="absolute px-4 top-3 right-2 text-base text-inherit hover:opacity-70 focus:outline-none"
+                    onclick="this.parentElement.remove()"
+                    title="Dismiss">
+              x
+            </button>
+          </div>
+        {% endfor %}
+      </div>
     </div>
-  </body>
+  {% endif %}
+
+  <div class="flex min-h-screen">
+    <aside class="w-64 bg-saffier-primary shadow-md flex flex-col text-white">
+      <div class="p-4 text-2xl font-bold text-center border-b border-white/20">{{ menu_title }}</div>
+      <nav class="flex-1 p-4 overflow-y-auto">
+        <ul class="space-y-2 text-sm">
+          <li>
+            <a href="{{ admin_url('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-white/20 transition">
+              <i class="fa-solid fa-chart-bar w-5 h-5"></i>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="{{ admin_url('admin_models') }}" class="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-white/20 transition">
+              <i class="fa-solid fa-database w-5 h-5"></i>
+              <span class="capitalize">Models</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
+        <h1 class="text-2xl font-semibold text-saffier-primary">{% block header %}Dashboard{% endblock %}</h1>
+        {% if user %}<div class="text-sm text-gray-500">Welcome, {{ user.display_name }}</div>{% endif %}
+      </header>
+
+      <section class="p-6 flex-1 overflow-y-auto">
+        {% block content %}
+        <p class="text-gray-700">Welcome to {{ menu_title }}.</p>
+        {% endblock %}
+      </section>
+    </main>
+  </div>
+
+  {% block endscripts %}
+  <script>
+    const loadingOverlay = document.getElementById("loading-overlay")
+
+    document.addEventListener("DOMContentLoaded", function () {
+      loadingOverlay.classList.add("hidden")
+
+      document.querySelectorAll("form").forEach((form) => {
+        form.addEventListener("submit", function () {
+          loadingOverlay.classList.remove("hidden")
+        })
+      })
+
+      document.querySelectorAll("a").forEach((link) => {
+        link.addEventListener("click", function () {
+          const href = link.getAttribute("href")
+          if (href && !href.startsWith("#")) {
+            loadingOverlay.classList.remove("hidden")
+          }
+        })
+      })
+    })
+  </script>
+  {% endblock %}
+</body>
 </html>
