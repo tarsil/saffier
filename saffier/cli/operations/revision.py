@@ -3,7 +3,12 @@ from typing import Annotated
 from sayer import Option, command
 
 from saffier.cli.base import revision as _revision
-from saffier.cli.common_params import DirectoryOption, MessageOption, SQLOption
+from saffier.cli.common_params import (
+    DirectoryOption,
+    ForceNullFieldOption,
+    MessageOption,
+    SQLOption,
+)
 from saffier.cli.state import get_migration_app
 
 
@@ -49,11 +54,14 @@ def revision(
         str,
         Option(None, help="Specify a hardcoded revision id instead of generating one"),
     ],
+    null_fields: ForceNullFieldOption,
     directory: DirectoryOption,
 ) -> None:
     """Create a new migration revision file.
 
     Optional autogeneration compares registered models against the database.
+    ``--nf`` selectors temporarily render chosen fields as nullable during that
+    comparison so existing rows can be backfilled by the generated migration.
     """
     _revision(
         get_migration_app(),
@@ -66,4 +74,5 @@ def revision(
         branch_label,
         version_path,
         rev_id,
+        null_fields,
     )

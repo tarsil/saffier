@@ -35,6 +35,7 @@ from saffier.core.db.fields._internal import (
 )
 from saffier.core.db.fields._internal import IPAddress as CoreIPAddress
 from saffier.core.terminal import Print
+from saffier.core.utils.db import FORCE_FIELDS_NULLABLE
 from saffier.exceptions import FieldDefinitionError, ImproperlyConfigured, ModelReferenceError
 
 if typing.TYPE_CHECKING:
@@ -106,7 +107,7 @@ class Field:
         constraints = self.get_constraints()
         column_kwargs = {
             "primary_key": self.primary_key,
-            "nullable": self.null and not self.primary_key,
+            "nullable": self.get_columns_nullable() and not self.primary_key,
             "index": self.index,
             "unique": self.unique,
             "default": self.default_value,
@@ -132,6 +133,27 @@ class Field:
 
     def get_constraints(self) -> typing.Any:
         return []
+
+    def get_columns_nullable(self) -> bool:
+        """Resolve SQLAlchemy nullability for this field during metadata build.
+
+        The model declaration remains the canonical field definition, but
+        migration generation can temporarily ask Saffier to render selected
+        columns as nullable. That temporary override makes it possible to add a
+        required field to a table that already has rows, then backfill defaults
+        in the generated online migration before the final model constraint is
+        enforced by later migrations.
+
+        Returns:
+            bool: ``True`` when the field declaration or active migration
+            override should make generated columns nullable.
+        """
+        if self.null:
+            return True
+
+        force_fields = FORCE_FIELDS_NULLABLE.get()
+        owner_name = self.owner.__name__ if self.owner is not None else ""
+        return (owner_name, self.name) in force_fields or ("", self.name) in force_fields
 
     def get_columns(self, name: str) -> typing.Sequence[sqlalchemy.Column]:
         return [self.get_column(name)]
@@ -864,7 +886,8 @@ class ForeignKey(Field):
                     key=self.get_fk_field_name(name, related_key),
                     name=self.get_fk_column_name(name, related_name),
                     type_=related_type,
-                    nullable=self.null or related_nullable,
+                    nullable=(self.get_columns_nullable() or related_nullable)
+                    and not self.primary_key,
                     primary_key=self.primary_key,
                     autoincrement=False,
                 )
@@ -1236,7 +1259,12 @@ class ManyToManyField(Field):
                 name=self.get_fk_name(name=name),
             )
         ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return sqlalchemy.Column(
+            name,
+            column_type,
+            *constraints,
+            nullable=self.get_columns_nullable(),
+        )
 
     def add_model_to_register(self, model: type["Model"]) -> None:
         """Register an auto-generated through model on the owning registry.

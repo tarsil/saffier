@@ -73,6 +73,7 @@ Create a new revision script.
 ```shell
 $ saffier revision -m "Add status column"
 $ saffier revision --autogenerate -m "Sync models"
+$ saffier revision --autogenerate --nf "User:status" -m "Add status"
 ```
 
 ### `saffier makemigrations`
@@ -82,7 +83,16 @@ Alias for `saffier revision --autogenerate`.
 ```shell
 $ saffier makemigrations
 $ saffier makemigrations -m "Initial schema"
+$ saffier makemigrations --nf "User:status"
 ```
+
+Use `--nf` when a migration adds a required field to a table that already has rows.
+The option temporarily renders the selected field as nullable while Alembic reads Saffier's
+metadata. Generated online migrations record the selector and ask the active registry to
+backfill model defaults after upgrade operations run.
+
+Selectors use `Model:field` for one model or `:field` for every registered model that declares
+that field.
 
 ### `saffier merge`
 

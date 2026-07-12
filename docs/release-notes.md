@@ -21,6 +21,7 @@ flow through SQLAlchemy's public async APIs.
 - Admin links, redirects, and the 404 page now honor `AdminConfig`, including `admin_prefix_url` for reverse-proxy deployments.
 - Tenant routing now includes `with_tenant`, a scoped context manager for request-level multi-tenancy.
 - Migration commands now emit `pre_migrate` and `post_migrate` lifecycle signals around revision, upgrade, and downgrade flows.
+- Migration generation now supports `--nf` forced-nullable field selectors so required fields can be added safely to populated tables and backfilled through the registry.
 - Registries can now wrap ASGI applications directly with `Registry.asgi()` for whole-registry lifespan management.
 - Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
 
@@ -83,14 +84,14 @@ and... a lot of new features and improvements but also... Faster!
 - QuerySet `bulk_get_or_create` with `bulk_select_or_insert` alias.
 - QuerySet `local_or`, `batch_size`, `extra_select`, and `reference_select` APIs.
 - Settings runtime helpers: `configure_settings`, `reload_settings`, and `override_settings`.
-- Edgy compatibility modules for legacy imports across queryset, tenancy, admin, Lilya middleware, and model helpers.
+- Compatibility modules for legacy imports across queryset, tenancy, admin, Lilya middleware, and model helpers.
 - Pure-Python `Model.model_json_schema(...)` compatibility and richer tenancy helpers such as `with_schema(...)` and `using(database=..., schema=...)`.
 
 ### Changed
 
-- Saffier now ships with a fully pure-Python model/runtime layer and no longer depends on Pydantic internally (Like its sibling Edgy does).
+- Saffier now ships with a fully pure-Python model/runtime layer and no longer depends on Pydantic internally.
 - Query and model `delete()` now return deleted row counts.
-- Documentation tooling now follows the Zensical workflow with Edgy-aligned Hatch/Taskfile docs commands (`docs_prepare`, `docs_build`, `docs_clean`, `serve`).
+- Documentation tooling now follows the Zensical workflow with Hatch/Taskfile docs commands (`docs_prepare`, `docs_build`, `docs_clean`, `serve`).
 - CLI, migration, and application-discovery flows were refreshed for the current runtime and template system.
 
 ### Fixed
@@ -98,9 +99,9 @@ and... a lot of new features and improvements but also... Faster!
 - Tenant schema table metadata now keeps foreign-key relationships consistent across related models in non-default schemas.
 - QuerySet `raw_delete()` added and delete filtering now respects accumulated OR clauses.
 - Removed `loguru`; Saffier now uses Python standard-library logging in core modules.
-- QuerySet cache parity improved for `all(clear_cache=True)`, cached `get()`, SQL rendering, and `select_for_update(...)`.
-- Permission, pagination, lazy-import, and nested `exclude_secrets()` compatibility now align more closely with Edgy behavior.
-- Model save/create extraction now matches Edgy for nullable/default fields, explicit read-only primary-key values, and composite-key / related-field inserts.
+- QuerySet cache behavior improved for `all(clear_cache=True)`, cached `get()`, SQL rendering, and `select_for_update(...)`.
+- Permission, pagination, lazy-import, and nested `exclude_secrets()` compatibility are more complete and consistent.
+- Model save/create extraction now preserves nullable/default fields, explicit read-only primary-key values, and composite-key / related-field inserts.
 
 ## 1.4.2
 

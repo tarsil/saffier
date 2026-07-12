@@ -2,6 +2,7 @@ import warnings
 
 import pytest
 
+import saffier
 from saffier.core.utils.db import (
     CHECK_DB_CONNECTION_SILENCED,
     FORCE_FIELDS_NULLABLE,
@@ -9,6 +10,7 @@ from saffier.core.utils.db import (
     force_fields_nullable_as_list_string,
     hash_names,
     hash_tablekey,
+    with_force_fields_nullable,
 )
 from saffier.exceptions import DatabaseNotConnectedWarning
 
@@ -39,6 +41,49 @@ def test_force_fields_nullable_string_formats_context_items() -> None:
         FORCE_FIELDS_NULLABLE.reset(token)
 
     assert result == '[("public", "users.name"), ("tenant", "groups.slug")]'
+
+
+def test_with_force_fields_nullable_scopes_and_validates_selectors() -> None:
+    """Verify scoped forced-nullable selector parsing and cleanup.
+
+    The migration CLI passes raw strings into the context manager, while
+    generated templates consume normalized tuple values. This test proves both
+    explicit model selectors and wildcard selectors are normalized during the
+    context and that the previous empty state is restored afterwards.
+    """
+    with with_force_fields_nullable(("User:name", ":slug")):
+        assert force_fields_nullable_as_list_string() == '[("", "slug"), ("User", "name")]'
+
+    assert force_fields_nullable_as_list_string() == "[]"
+
+    with pytest.raises(ValueError, match="model:field"), with_force_fields_nullable(("broken",)):
+        pass
+
+
+def test_force_fields_nullable_changes_generated_column_nullability() -> None:
+    """Verify field metadata honors the migration-only nullable override.
+
+    Saffier models keep their declared ``null=False`` semantics, but Alembic
+    autogeneration reads SQLAlchemy columns from model metadata. This test
+    confirms selected fields render nullable only while the migration context is
+    active, including wildcard selectors that apply by field name.
+    """
+    test_registry = saffier.Registry(database="sqlite+aiosqlite:///force-nullable.db")
+
+    class ForceNullableUser(saffier.Model):
+        id = saffier.IntegerField(primary_key=True)
+        name = saffier.CharField(max_length=50)
+
+        class Meta:
+            registry = test_registry
+
+    assert ForceNullableUser.fields["name"].get_column("name").nullable is False
+
+    with with_force_fields_nullable((("ForceNullableUser", "name"),)):
+        assert ForceNullableUser.fields["name"].get_column("name").nullable is True
+
+    with with_force_fields_nullable((":name",)):
+        assert ForceNullableUser.fields["name"].get_column("name").nullable is True
 
 
 def test_check_db_connection_warns_and_can_be_silenced() -> None:

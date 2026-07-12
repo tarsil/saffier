@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import copy
 import logging
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from functools import cached_property
 from typing import Any, ClassVar, cast
 
@@ -19,6 +19,8 @@ from saffier.conf import _monkay, settings
 from saffier.core.connection.database import Database
 from saffier.core.connection.schemas import Schema
 from saffier.core.db.constants import CASCADE
+from saffier.core.utils.concurrency import run_concurrently
+from saffier.core.utils.db import FORCE_FIELDS_NULLABLE
 from saffier.core.utils.sync import current_eventloop, run_sync
 
 try:
@@ -166,6 +168,132 @@ class Registry:
 
         if with_content_type is not False:
             self._set_content_type(with_content_type)
+
+    async def apply_default_force_nullable_fields(
+        self,
+        *,
+        force_fields_nullable: Iterable[tuple[str, str]] | None = None,
+        model_defaults: dict[str, dict[str, Any]] | None = None,
+        filter_db_url: str | None = None,
+        filter_db_name: str | None = None,
+    ) -> None:
+        """Backfill defaults for fields made temporarily nullable by migrations.
+
+        Forced-nullable migration generation is a two-step safety mechanism.
+        Alembic first sees selected fields as nullable so it can add them to
+        populated tables without violating constraints. During online upgrade,
+        generated migration files call this method to find rows where those
+        fields are still ``NULL`` and update them with the model's declared
+        defaults or with explicit defaults supplied by the migration.
+
+        The method deliberately stays on Saffier's public ORM path. It filters
+        registered models, selects only primary-key data for matching rows, then
+        calls ``update()`` on each model instance with concrete default values.
+        That preserves field normalization, SQLAlchemy execution, and model
+        update signals while avoiding a second migration-specific persistence
+        layer.
+
+        Args:
+            force_fields_nullable: Iterable of ``(model_name, field_name)``
+                selectors. When omitted, selectors are read from the active
+                ``FORCE_FIELDS_NULLABLE`` context.
+            model_defaults: Optional per-model default overrides keyed by model
+                name and field name. Overrides are also treated as selectors so
+                migrations can backfill fields that do not declare a Python
+                default on the model.
+            filter_db_url: Optional database URL string. When provided, only
+                models using that database are processed.
+            filter_db_name: Optional registry database name. ``""`` targets the
+                primary database; any other value targets the matching
+                ``extra`` database and takes precedence over ``filter_db_url``.
+        """
+        if force_fields_nullable is None:
+            selected_fields = set(FORCE_FIELDS_NULLABLE.get())
+        else:
+            selected_fields = set(force_fields_nullable)
+        effective_model_defaults = model_defaults or {}
+        for model_name, defaults in effective_model_defaults.items():
+            for field_name in defaults:
+                selected_fields.add((model_name, field_name))
+
+        for model_name, field_name in tuple(selected_fields):
+            if model_name:
+                continue
+            selected_fields.discard((model_name, field_name))
+            for model_class in self.models.values():
+                if field_name in model_class.fields:
+                    selected_fields.add((model_class.__name__, field_name))
+
+        if not selected_fields:
+            return
+
+        if isinstance(filter_db_name, str):
+            filter_db_url = (
+                str(self.database.url)
+                if filter_db_name == ""
+                else str(self.extra[filter_db_name].url)
+            )
+
+        models_with_fields: dict[str, set[str]] = {}
+        for model_name, field_name in selected_fields:
+            model_class = self.models.get(model_name)
+            if model_class is None:
+                continue
+
+            field = model_class.fields.get(field_name)
+            if field is None:
+                continue
+
+            default_overrides = effective_model_defaults.get(model_name, {})
+            if not field.has_default() and field_name not in default_overrides:
+                continue
+
+            models_with_fields.setdefault(model_name, set()).add(field_name)
+
+        async def backfill_model(
+            model_name: str,
+            field_names: set[str],
+        ) -> None:
+            """Backfill one model's matching rows through normal ORM updates.
+
+            The closure is scheduled by ``run_concurrently`` for each model that
+            has at least one valid forced-nullable field. It keeps row selection
+            narrow by loading primary keys first, then computes default values
+            per object so callable defaults are evaluated for each updated row
+            rather than once for the whole migration.
+
+            Args:
+                model_name: Registered model class name to process.
+                field_names: Field names that were temporarily nullable and
+                    should now receive defaults where the database still stores
+                    ``NULL``.
+            """
+            model_class = self.models[model_name]
+            if filter_db_url and str(model_class.database.url) != filter_db_url:
+                return
+
+            query = model_class.query.filter(**dict.fromkeys(field_names)).only(
+                *model_class.pknames
+            )
+            objects = await query
+            default_overrides = effective_model_defaults.get(model_name, {})
+            for obj in objects:
+                values = {
+                    field_name: (
+                        default_overrides[field_name]
+                        if field_name in default_overrides
+                        else model_class.fields[field_name].get_default_value()
+                    )
+                    for field_name in field_names
+                }
+                await obj.update(**values)
+
+        await run_concurrently(
+            [
+                backfill_model(model_name, field_names)
+                for model_name, field_names in models_with_fields.items()
+            ]
+        )
 
     def _make_metadata(self) -> sqlalchemy.MetaData:
         """Create a fresh SQLAlchemy metadata container for this registry.
