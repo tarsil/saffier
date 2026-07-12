@@ -66,6 +66,26 @@ app = Lilya(
 
 `create_admin_app()` installs Saffier's Lilya registry middleware and Lilya session-context middleware. The parent mount must provide Lilya `SessionMiddleware`; `saffier admin_serve` does this automatically.
 
+## Basic Auth Permissions
+
+`create_admin_app(auth_password=...)` protects the mounted admin with `BasicAuthMiddleware`.
+Applications that build custom Lilya permission stacks can use the same credential behavior through
+`BasicAuthAccess`.
+
+```python
+from saffier.contrib.admin.permissions import BasicAuthAccess
+
+protected_admin = BasicAuthAccess(
+    admin_app,
+    username="admin",
+    password="secret",
+)
+```
+
+`BasicAuthAccess` raises Lilya's `PermissionDenied` with a browser-compatible Basic-auth
+challenge. `BasicAuthMiddleware` emits the challenge response directly from the ASGI middleware
+stack. Both use constant-time credential comparison.
+
 ## Reverse Proxy
 
 Use `AdminConfig.admin_prefix_url` when a proxy exposes the admin at a different public path from the internal ASGI mount.
