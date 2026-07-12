@@ -94,21 +94,28 @@ async def test_run_sync_reentry_restores_asyncio_loop_state():
 
     Python 3.14 requires ``asyncio.timeout()`` to run while
     ``asyncio.current_task()`` is visible. The SQLAlchemy-bound sync bridge
-    temporarily re-enters the running loop for deferred ORM loads, and this
-    regression test proves that the loop is returned to normal before the next
-    regular async callback executes.
+    temporarily re-enters the running loop for deferred ORM loads. Python 3.10
+    does not expose ``asyncio.timeout()``, so the fallback path still proves the
+    loop class is restored after re-entry while newer runtimes also exercise the
+    stricter timeout/current-task invariant.
     """
 
     async def use_timeout() -> str:
-        """Exercise the asyncio timeout path used by asyncpg connections.
+        """Exercise the best timeout primitive available on this Python.
 
-        The coroutine intentionally does no database I/O. It isolates the
-        Python 3.14 event-loop invariant that failed after a permanent nested
-        loop patch had been installed.
+        Python 3.11 and newer use ``asyncio.timeout()``, which is the code path
+        asyncpg reaches on Python 3.14 and the source of the reported failure.
+        Python 3.10 falls back to ``asyncio.wait_for()`` so the same test keeps
+        validating that Saffier removes the temporary nested-loop patch before
+        regular async execution resumes.
         """
 
-        async with asyncio.timeout(1):
-            await asyncio.sleep(0)
+        timeout_context = getattr(asyncio, "timeout", None)
+        if timeout_context is None:
+            await asyncio.wait_for(asyncio.sleep(0), timeout=1)
+        else:
+            async with timeout_context(1):
+                await asyncio.sleep(0)
         return "ready"
 
     loop = asyncio.get_running_loop()
@@ -117,5 +124,4 @@ async def test_run_sync_reentry_restores_asyncio_loop_state():
         assert saffier.run_sync(use_timeout()) == "ready"
 
     assert not hasattr(loop.__class__, "_nest_patched")
-    async with asyncio.timeout(1):
-        await asyncio.sleep(0)
+    assert await use_timeout() == "ready"
