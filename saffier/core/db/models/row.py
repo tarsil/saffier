@@ -5,7 +5,7 @@ from sqlalchemy.engine.result import Row
 
 from saffier.core.db import fields as saffier_fields
 from saffier.core.db.models.base import SaffierBaseModel
-from saffier.core.utils.sync import run_sync
+from saffier.core.utils.sync import force_current_loop_for_sqlalchemy, run_sync
 from saffier.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -616,13 +616,14 @@ class ModelRow(SaffierBaseModel):
                 if isinstance(
                     cls.fields.get(first_part), saffier_fields.ManyToManyField
                 ) or hasattr(model, first_part):
-                    records = run_sync(
-                        cls.__collect_prefetch_records(
-                            model=model,
-                            related_name=related.related_name,
-                            queryset=original_prefetch.queryset,
+                    with force_current_loop_for_sqlalchemy():
+                        records = run_sync(
+                            cls.__collect_prefetch_records(
+                                model=model,
+                                related_name=related.related_name,
+                                queryset=original_prefetch.queryset,
+                            )
                         )
-                    )
                     saffier_setattr(model, related.to_attr, records)
                     continue
 
@@ -650,19 +651,21 @@ class ModelRow(SaffierBaseModel):
                 related.queryset.extra = extra
 
                 # Execute the queryset
-                records = run_sync(cls.__run_query(queryset=related.queryset))
+                with force_current_loop_for_sqlalchemy():
+                    records = run_sync(cls.__run_query(queryset=related.queryset))
                 saffier_setattr(model, related.to_attr, records)
             elif isinstance(
                 cls.fields.get(related.related_name),
                 saffier_fields.ManyToManyField,
             ) or hasattr(model, related.related_name):
-                records = run_sync(
-                    cls.__collect_prefetch_records(
-                        model=model,
-                        related_name=related.related_name,
-                        queryset=related.queryset,
+                with force_current_loop_for_sqlalchemy():
+                    records = run_sync(
+                        cls.__collect_prefetch_records(
+                            model=model,
+                            related_name=related.related_name,
+                            queryset=related.queryset,
+                        )
                     )
-                )
                 saffier_setattr(model, related.to_attr, records)
             else:
                 model_cls = getattr(cls, related.related_name).related_from
@@ -820,7 +823,8 @@ class ModelRow(SaffierBaseModel):
 
         extra = cls._build_related_pk_filter(query, row, parent_cls)
 
-        records = run_sync(cls.__run_query(model_class, extra, queryset))
+        with force_current_loop_for_sqlalchemy():
+            records = run_sync(cls.__run_query(model_class, extra, queryset))
         return records
 
     @classmethod

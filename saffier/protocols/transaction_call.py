@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from databasez.core.transaction import Transaction
+    from saffier.core.connection.database import Transaction
 
 
 class TransactionCallProtocol(Protocol):

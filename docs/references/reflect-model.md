@@ -17,7 +17,7 @@ database rather than generate the table definition from declared fields.
 
 `ReflectModel` is most useful for:
 
-* legacy databases
+* existing production databases
 * reporting or analytics tables maintained elsewhere
 * read-heavy integrations where the table shape is not owned by the Saffier app
 

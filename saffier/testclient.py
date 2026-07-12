@@ -1,16 +1,24 @@
+"""Public test client entry point for Saffier's SQLAlchemy Async runtime.
+
+The concrete implementation lives beside the database runtime so test database
+creation, rollback behavior, and engine lifecycle share one SQLAlchemy-native
+code path. This module keeps the historical import path and environment-default
+configuration used by applications and Saffier's own tests.
+"""
+
 import os
 import typing
 from typing import TYPE_CHECKING, Any
 
-from databasez.testclient import DatabaseTestClient as _DatabaseTestClient
+from saffier.core.connection.database import DatabaseTestClient as _DatabaseTestClient
 
 if TYPE_CHECKING:
     import sqlalchemy
-    from databasez import Database, DatabaseURL
 
-# TODO: move this to the settings
+    from saffier.core.connection.database import Database, DatabaseURL
+
+
 default_test_prefix: str = "test_"
-# for allowing empty
 if "SAFFIER_TESTCLIENT_TEST_PREFIX" in os.environ:
     default_test_prefix = os.environ["SAFFIER_TESTCLIENT_TEST_PREFIX"]
 
@@ -24,9 +32,12 @@ default_drop_database: bool = (
 
 class DatabaseTestClient(_DatabaseTestClient):
     """
-    Adaption of DatabaseTestClient for saffier.
+    Native SQLAlchemy Async test database client for Saffier.
 
-    Note: the default of lazy_setup is True here. This enables the simple Registry syntax.
+    The public test-client entry point enables lazy setup by default so it works
+    cleanly with the simple ``Registry(database=DatabaseTestClient(...))`` test
+    pattern. All database creation and teardown still happens in the base
+    SQLAlchemy-backed implementation.
     """
 
     testclient_default_test_prefix: str = default_test_prefix
@@ -54,7 +65,14 @@ class DatabaseTestClient(_DatabaseTestClient):
         drop_database: bool = default_drop_database,
         test_prefix: str = default_test_prefix,
         **options: Any,
-    ):
+    ) -> None:
+        """Initialize the SQLAlchemy-backed test client with public defaults.
+
+        Environment-driven defaults are resolved at module import time and then
+        passed to the runtime implementation. The wrapper exists to preserve the
+        public ``saffier.testclient.DatabaseTestClient`` API while avoiding a
+        second implementation of test database management.
+        """
         super().__init__(
             url,
             use_existing=use_existing,

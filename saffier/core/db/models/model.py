@@ -19,7 +19,7 @@ from saffier.core.db.models.mixins.generics import DeclarativeMixin
 from saffier.core.db.models.row import ModelRow
 from saffier.core.utils.db import check_db_connection
 from saffier.core.utils.schemas import Schema
-from saffier.core.utils.sync import run_sync
+from saffier.core.utils.sync import force_current_loop_for_sqlalchemy, run_sync
 
 saffier_setattr = object.__setattr__
 
@@ -825,7 +825,8 @@ class Model(ModelRow, DeclarativeMixin, AdminMixin):
                 raise AttributeError(name)
             if name in getattr(self, "__no_load_trigger_attrs__", set()):
                 raise AttributeError(name)
-            run_sync(self.load())
+            with force_current_loop_for_sqlalchemy():
+                run_sync(self.load())
             return self.__dict__[name]
         raise AttributeError(name)
 

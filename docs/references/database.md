@@ -1,10 +1,11 @@
 # `Database`
 
-`Database` is Saffier's database connection wrapper.
+`Database` is Saffier's SQLAlchemy Async database runtime.
 
 Most applications interact with it indirectly through a `Registry`, but the
 class is still important because it defines connection lifecycle, transaction
-management, and the SQLAlchemy async engine used by queries and schema helpers.
+management, and the SQLAlchemy `AsyncEngine`, `AsyncConnection`, and
+`async_sessionmaker` used by queries and schema helpers.
 
 ## Typical usage
 
@@ -17,10 +18,10 @@ models = saffier.Registry(database=database)
 
 ## What to know in practice
 
-* prefer `saffier.Database`, not the `databases` package object
+* use `saffier.Database` for registry ownership and ORM execution
 * registry lifecycle usually controls `connect()` and `disconnect()`
-* synchronous reflection paths use the wrapped sync engine derived from the
-  async engine
+* advanced code can inspect the native SQLAlchemy async engine through
+  `database.engine` after connection
 
 ::: saffier.Database
     options:

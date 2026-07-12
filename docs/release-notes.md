@@ -1,5 +1,28 @@
 # Release Notes
 
+## 2.2.0
+
+Saffier 2.2.0 moves the database runtime fully onto native SQLAlchemy 2.x Async.
+
+The ORM now owns its `AsyncEngine`, `AsyncConnection`, `AsyncSession`, and
+`async_sessionmaker` lifecycle directly. Query execution, transactions, schema
+helpers, database creation and removal, and framework lifespan integration all
+flow through SQLAlchemy's public async APIs.
+
+### Changed
+
+- Replaced the previous database runtime layer with a direct SQLAlchemy 2.x Async implementation.
+- Database URLs now normalize common plain dialects to SQLAlchemy async drivers while preserving the public `DatabaseURL` helper.
+- Transactions now use SQLAlchemy async transaction objects and savepoints directly, including forced rollback scopes.
+- Schema helpers now run through `AsyncConnection.run_sync()` and SQLAlchemy metadata APIs.
+- Documentation now describes Saffier as a first-class SQLAlchemy Async ORM throughout.
+
+### Removed
+
+- Removed the external database runtime dependency from Saffier's runtime requirements.
+- Removed extra database execution indirection from Saffier's runtime path.
+- Removed documentation language that pointed users at the previous database runtime model.
+
 ## 2.1.0
 
 Saffier 2.1.0 expands the ORM into its next layer: engine-pluggable models.
@@ -69,7 +92,7 @@ and... a lot of new features and improvements but also... Faster!
 
 ### Changed
 
-- Add integration with the newly `databasez` 0.8.5+.
+- Updated the database integration used by that release.
 - Internal refactor of the registry.
 
 ### Fixed
@@ -214,7 +237,7 @@ when querying the tenant.
 ### Changed
 
 - `inspectdb` is now handled by an independent isolated called `InspectDB`.
-- Updated internal support for `databasez` 0.7.0 and this fixes the URL parsing errors for complex passwords
+- Updated internal database URL support and fixed URL parsing errors for complex passwords
 caused by the `urlsplit`.
 
 ### Fixed
@@ -403,7 +426,7 @@ PR [#58](https://github.com/tarsil/saffier/pull/58) by [@tarsil](https://github.
 
 ### Changed
 
-- Minor update of the base of databasez package. PR [#56](https://github.com/tarsil/saffier/pull/56) by [@tarsil](https://github.com/tarsil).
+- Minor database integration maintenance update. PR [#56](https://github.com/tarsil/saffier/pull/56) by [@tarsil](https://github.com/tarsil).
 
 ## 0.10.0
 
@@ -497,8 +520,8 @@ to any saffier instance.
 
 ### Changed
 
-- Moved from `databases` to its fork `databasez` and updated internal references.
-- `DatabaseClient` is now being directly used from [Databasez test client](https://databasez.tarsild.io/test-client/).
+- Moved from the original async database package to its then-current fork and updated internal references.
+- `DatabaseClient` was updated to reuse the then-current test database helper.
 
 ### Fixed
 
@@ -541,7 +564,7 @@ to any saffier instance.
     * This brings native generated migrations within Saffier under Alembic's package, allowing
 a seemless integration and cross-compatibility with any framework using Saffier.
 
-- Added new [DatabaseTestClient](./test-client.md) delegating the creating of the `test` database
+- Added new [DatabaseTestClient](./test-client.md) for creating the `test` database
 for each connection string provided.
 
     * No more needed to manually create two separate databases thanks to the client that does the
