@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import unquote
 
 import pytest
-from httpx import ASGITransport, AsyncClient, Response
+from httpx2 import ASGITransport, AsyncClient, Response
 from lilya.apps import Lilya
 from lilya.middleware import DefineMiddleware
 from lilya.middleware.sessions import SessionMiddleware
