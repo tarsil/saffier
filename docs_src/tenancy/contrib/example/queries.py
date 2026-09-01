@@ -1,4 +1,4 @@
-import httpx
+import httpx2 as httpx
 
 # Query the products for the `Saffier` user from the `saffier` schema
 # by passing the tenant and email header.

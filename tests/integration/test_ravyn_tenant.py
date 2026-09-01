@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from ravyn import Gateway, JSONResponse, Ravyn, Request, get
 from ravyn.core.protocols.middleware import MiddlewareProtocol
